@@ -57,6 +57,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: listWaitlist
+      tags: [waitlist]
+      summary: List waitlist signups
+      description: Retrieve all waitlist entries for admin view
+      responses:
+        "200":
+          description: List of waitlist entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitlistList"
 components:
   schemas:
     HealthStatus:
@@ -91,6 +103,38 @@ components:
         - id
         - email
         - message
+    WaitlistEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+          nullable: true
+        userType:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - createdAt
+    WaitlistList:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/WaitlistEntry"
+        total:
+          type: integer
+      required:
+        - entries
+        - total
     ErrorResponse:
       type: object
       properties:

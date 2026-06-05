@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, waitlistTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { JoinWaitlistBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -32,9 +33,27 @@ router.post("/waitlist", async (req, res) => {
       .returning();
 
     req.log.info({ email }, "Waitlist signup");
-    res.status(201).json({ id: entry.id, email: entry.email, message: "You're on the waitlist! We'll be in touch soon." });
+    res.status(201).json({
+      id: entry.id,
+      email: entry.email,
+      message: "You're on the waitlist! We'll be in touch soon.",
+    });
   } catch (err) {
     req.log.error({ err }, "Waitlist insert failed");
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+router.get("/waitlist", async (req, res) => {
+  try {
+    const entries = await db
+      .select()
+      .from(waitlistTable)
+      .orderBy(desc(waitlistTable.createdAt));
+
+    res.json({ entries, total: entries.length });
+  } catch (err) {
+    req.log.error({ err }, "Waitlist fetch failed");
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });

@@ -23,7 +23,8 @@ import type {
   ErrorResponse,
   HealthStatus,
   JoinWaitlistRequest,
-  JoinWaitlistResponse
+  JoinWaitlistResponse,
+  WaitlistList
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -187,4 +188,82 @@ export const useJoinWaitlist = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getJoinWaitlistMutationOptions(options));
     }
+
+export const getListWaitlistUrl = () => {
+
+
+
+
+  return `/api/waitlist`
+}
+
+/**
+ * Retrieve all waitlist entries for admin view
+ * @summary List waitlist signups
+ */
+export const listWaitlist = async ( options?: RequestInit): Promise<WaitlistList> => {
+
+  return customFetch<WaitlistList>(getListWaitlistUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWaitlistQueryKey = () => {
+    return [
+    `/api/waitlist`
+    ] as const;
+    }
+
+
+export const getListWaitlistQueryOptions = <TData = Awaited<ReturnType<typeof listWaitlist>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWaitlist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWaitlistQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWaitlist>>> = ({ signal }) => listWaitlist({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWaitlist>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWaitlistQueryResult = NonNullable<Awaited<ReturnType<typeof listWaitlist>>>
+export type ListWaitlistQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List waitlist signups
+ */
+
+export function useListWaitlist<TData = Awaited<ReturnType<typeof listWaitlist>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWaitlist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWaitlistQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

@@ -10,3 +10,5 @@ export * from './errorResponse';
 export * from './healthStatus';
 export * from './joinWaitlistRequest';
 export * from './joinWaitlistResponse';
+export * from './waitlistEntry';
+export * from './waitlistList';

@@ -28,3 +28,19 @@ export const JoinWaitlistBody = zod.object({
 })
 
 
+/**
+ * Retrieve all waitlist entries for admin view
+ * @summary List waitlist signups
+ */
+export const ListWaitlistResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "name": zod.string().nullish(),
+  "userType": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number()
+})
+
+

@@ -21,6 +21,19 @@ export interface JoinWaitlistResponse {
   message: string;
 }
 
+export interface WaitlistEntry {
+  id: number;
+  email: string;
+  name?: string | null;
+  userType?: string | null;
+  createdAt: string;
+}
+
+export interface WaitlistList {
+  entries: WaitlistEntry[];
+  total: number;
+}
+
 export interface ErrorResponse {
   error: string;
 }
