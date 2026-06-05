@@ -1,0 +1,459 @@
+If you’re using CTO.new to generate and scaffold the platform, you can give it a comprehensive vision prompt. However, I would still recommend instructing it to build the architecture in a way that supports phased releases rather than assuming every feature launches on day one.
+
+⸻
+
+MASTER CTO.NEW PROMPT
+
+PROJECT NAME
+
+DENARIXX AFRICA AI
+
+Tagline
+
+“Africa’s AI Operating System”
+
+Company Vision
+
+Build the largest AI-powered digital ecosystem in Africa, headquartered in Ghana, serving students, professionals, entrepreneurs, freelancers, businesses, investors, farmers, and organizations across the continent.
+
+The platform should be designed as a scalable multi-product ecosystem similar to a combination of:
+
+* LinkedIn
+* Coursera
+* Upwork
+* Fiverr
+* Udemy
+* OpenAI
+
+but built specifically for Africa.
+
+⸻
+
+PLATFORM STRUCTURE
+
+Create a unified platform with one authentication system, one user profile, one payment system, and one AI intelligence layer.
+
+Core platform domains:
+
+1. SkillSwap AI
+2. Jobs AI
+3. Business AI
+4. Marketplace
+5. Farm AI
+6. Health AI
+7. Invest AI
+8. Government AI
+9. Community Network
+10. DENA AI Assistant
+
+⸻
+
+TECHNOLOGY STACK
+
+Frontend:
+
+* Next.js 15
+* React
+* TypeScript
+* Tailwind CSS
+* Framer Motion
+* Zustand
+* React Query
+
+Backend:
+
+* Fastify
+* Node.js
+* TypeScript
+* Prisma ORM
+* PostgreSQL
+
+Infrastructure:
+
+* Docker
+* Kubernetes-ready architecture
+* Cloudflare
+* CDN support
+* Redis caching
+
+Authentication:
+
+* JWT
+* OAuth
+* Google Login
+* Apple Login
+* Microsoft Login
+
+Storage:
+
+* Cloudflare R2
+
+Payments:
+
+* Stripe
+* Paystack
+* Mobile Money
+* Visa
+* Mastercard
+
+AI:
+
+* OpenAI
+* Anthropic
+* Gemini
+* Modular AI provider switching
+
+⸻
+
+GLOBAL DESIGN SYSTEM
+
+Theme:
+
+* Futuristic
+* Premium
+* Enterprise-grade
+* Dark mode default
+
+Colors:
+
+* Primary: #00E5FF
+* Secondary: #7B61FF
+* Accent: #00FF94
+* Background: #0B1020
+* Surface: #111827
+
+Requirements:
+
+* Glassmorphism
+* Smooth animations
+* Responsive
+* Mobile-first
+* Accessibility compliant
+* SEO optimized
+
+⸻
+
+USER TYPES
+
+Student
+
+Learning and career development.
+
+Freelancer
+
+Offering services and finding clients.
+
+Professional
+
+Career growth and networking.
+
+Entrepreneur
+
+Business building and funding.
+
+Investor
+
+Startup discovery and analysis.
+
+Mentor
+
+Teaching and coaching.
+
+Recruiter
+
+Hiring and talent management.
+
+Administrator
+
+Platform operations.
+
+⸻
+
+MODULE 1: SKILLSWAP AI
+
+Features:
+
+* AI mentor
+* Learning roadmaps
+* Skill assessments
+* Mentor marketplace
+* Course marketplace
+* Certifications
+* Learning analytics
+* AI-generated study plans
+* CV builder
+* Cover letter builder
+* Portfolio builder
+* Interview simulator
+* Career guidance
+
+⸻
+
+MODULE 2: JOBS AI
+
+Features:
+
+* Job board
+* AI matching engine
+* Resume ranking
+* Applicant tracking system
+* Recruiter dashboard
+* Interview scheduling
+* Remote jobs
+* Internship portal
+* Freelance opportunities
+
+⸻
+
+MODULE 3: BUSINESS AI
+
+Features:
+
+* Website builder
+* Business plan generator
+* Marketing AI
+* Branding AI
+* Proposal generator
+* Invoice generator
+* Contract templates
+* CRM system
+* Sales pipeline
+
+⸻
+
+MODULE 4: MARKETPLACE
+
+Features:
+
+* Digital products
+* Courses
+* Templates
+* AI agents
+* Services
+* Escrow payments
+* Ratings
+* Reviews
+* Seller dashboards
+* Buyer dashboards
+
+⸻
+
+MODULE 5: FARM AI
+
+Features:
+
+* Crop diagnosis
+* Image-based disease detection
+* Agricultural education
+* Weather intelligence
+* Market price tracking
+* Farm management dashboard
+* Buyer connections
+
+⸻
+
+MODULE 6: HEALTH AI
+
+Features:
+
+* Symptom guidance
+* Medical knowledge assistant
+* Health education
+* Clinic directory
+* Appointment scheduling
+* Wellness recommendations
+
+Include medical disclaimers.
+
+⸻
+
+MODULE 7: INVEST AI
+
+Features:
+
+* Startup profiles
+* Investor profiles
+* AI pitch deck generator
+* Startup analytics
+* Funding marketplace
+* Due diligence tools
+* Founder networking
+
+⸻
+
+MODULE 8: GOVERNMENT AI
+
+Features:
+
+* Business registration guidance
+* Tax guidance
+* Licensing information
+* Public service directory
+* Compliance assistant
+
+Support country-specific expansion.
+
+⸻
+
+MODULE 9: COMMUNITY NETWORK
+
+Features:
+
+* User profiles
+* Activity feeds
+* Posts
+* Comments
+* Messaging
+* Communities
+* Events
+* Groups
+* Networking recommendations
+
+⸻
+
+MODULE 10: DENA AI
+
+Global AI assistant available throughout the platform.
+
+Capabilities:
+
+* Career coaching
+* Learning assistance
+* Business consulting
+* Startup mentoring
+* Research assistance
+* Marketplace support
+* Personalized recommendations
+
+⸻
+
+PROFILE SYSTEM
+
+Each user has:
+
+* Personal profile
+* Skills
+* Achievements
+* Certifications
+* Portfolio
+* Projects
+* Learning history
+* Employment history
+* Marketplace reputation
+* AI-generated growth insights
+
+⸻
+
+GAMIFICATION
+
+Levels:
+
+* Explorer
+* Builder
+* Innovator
+* Visionary
+* Titan
+
+Rewards:
+
+* XP points
+* Achievement badges
+* Reputation system
+* Leaderboards
+
+⸻
+
+ADMIN PLATFORM
+
+Admin modules:
+
+* User management
+* Content moderation
+* Payments
+* Analytics
+* Reports
+* Support tickets
+* Fraud detection
+* AI monitoring
+
+⸻
+
+ANALYTICS
+
+Track:
+
+* User growth
+* Revenue
+* Marketplace activity
+* Learning completion
+* Job placements
+* AI usage
+* Retention metrics
+
+⸻
+
+SECURITY
+
+Implement:
+
+* RBAC permissions
+* Audit logs
+* Encryption
+* Rate limiting
+* 2FA
+* Session management
+* GDPR compliance
+* African regional compliance support
+
+⸻
+
+MONETIZATION
+
+Free Plan:
+
+* Basic platform access
+
+Pro Plan:
+
+* Advanced AI tools
+
+Business Plan:
+
+* Team features
+
+Enterprise Plan:
+
+* Organization features
+
+Revenue Streams:
+
+* Subscriptions
+* Marketplace fees
+* Recruiting fees
+* Premium mentorship
+* AI credits
+* Advertising
+* Enterprise licensing
+
+⸻
+
+LONG-TERM GOAL
+
+Create the most influential AI-powered platform in Africa where people can:
+
+* Learn
+* Work
+* Hire
+* Build businesses
+* Sell products
+* Raise funding
+* Access AI tools
+* Connect with opportunities
+
+through a single ecosystem called:
+
+DENARIXX AFRICA AI
+
+“Africa’s AI Operating System.”
+
+Build the architecture as a multi-tenant, scalable platform capable of supporting millions of users across Africa, with localization, multilingual support, mobile apps, API access, and future expansion into every African country.

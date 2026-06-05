@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "_6bj1PKJbjwI5TTAEuMtA"
+uri = "file://artifacts/denarixx/src/assets/hero-city.png"
+type = "image"
+title = "Futuristic African cityscape"
+
+[[generated]]
+id = "xJI4qiNN4JjbVfAIsJxFt"
+uri = "file://artifacts/denarixx/src/assets/professionals.png"
+type = "image"
+title = "Professionals with holograms"
