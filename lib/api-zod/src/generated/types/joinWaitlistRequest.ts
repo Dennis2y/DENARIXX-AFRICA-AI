@@ -10,4 +10,5 @@ export interface JoinWaitlistRequest {
   email: string;
   name?: string;
   userType?: string;
+  country?: string;
 }

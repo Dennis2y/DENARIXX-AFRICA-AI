@@ -11,5 +11,6 @@ export interface WaitlistEntry {
   email: string;
   name?: string | null;
   userType?: string | null;
+  country?: string | null;
   createdAt: Date;
 }

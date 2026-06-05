@@ -506,10 +506,24 @@ const USER_TYPES = [
   "Other",
 ];
 
+const AFRICAN_COUNTRIES = [
+  "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
+  "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
+  "Congo (DRC)", "Congo (Republic)", "Djibouti", "Egypt", "Equatorial Guinea",
+  "Eritrea", "Eswatini", "Ethiopia", "Gabon", "Gambia", "Ghana", "Guinea",
+  "Guinea-Bissau", "Ivory Coast", "Kenya", "Lesotho", "Liberia", "Libya",
+  "Madagascar", "Malawi", "Mali", "Mauritania", "Mauritius", "Morocco",
+  "Mozambique", "Namibia", "Niger", "Nigeria", "Rwanda", "Sao Tome & Principe",
+  "Senegal", "Seychelles", "Sierra Leone", "Somalia", "South Africa",
+  "South Sudan", "Sudan", "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia",
+  "Zimbabwe", "Other",
+];
+
 const WaitlistCTA = () => {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [userType, setUserType] = useState("");
+  const [country, setCountry] = useState("");
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -529,7 +543,7 @@ const WaitlistCTA = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    mutate({ data: { email, name: name || undefined, userType: userType || undefined } });
+    mutate({ data: { email, name: name || undefined, userType: userType || undefined, country: country || undefined } });
   };
 
   return (
@@ -626,25 +640,51 @@ const WaitlistCTA = () => {
                   </div>
                 </div>
 
-                {/* User type */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground/80" htmlFor="waitlist-usertype">
-                    I am a <span className="text-muted-foreground font-normal">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <select
-                      id="waitlist-usertype"
-                      data-testid="select-waitlist-usertype"
-                      value={userType}
-                      onChange={(e) => setUserType(e.target.value)}
-                      className="w-full appearance-none pl-4 pr-10 py-3 rounded-xl bg-background/60 border border-border text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
-                    >
-                      <option value="">Select your role...</option>
-                      {USER_TYPES.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
+                {/* Two-column row: role + country */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* User type */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground/80" htmlFor="waitlist-usertype">
+                      I am a <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <select
+                        id="waitlist-usertype"
+                        data-testid="select-waitlist-usertype"
+                        value={userType}
+                        onChange={(e) => setUserType(e.target.value)}
+                        className="w-full appearance-none pl-4 pr-10 py-3 rounded-xl bg-background/60 border border-border text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                      >
+                        <option value="">Select role...</option>
+                        {USER_TYPES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Country */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground/80" htmlFor="waitlist-country">
+                      Country <span className="text-muted-foreground font-normal">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <select
+                        id="waitlist-country"
+                        data-testid="select-waitlist-country"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="w-full appearance-none pl-11 pr-10 py-3 rounded-xl bg-background/60 border border-border text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                      >
+                        <option value="">Select country...</option>
+                        {AFRICAN_COUNTRIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 

@@ -24,7 +24,8 @@ export const HealthCheckResponse = zod.object({
 export const JoinWaitlistBody = zod.object({
   "email": zod.string().email(),
   "name": zod.string().optional(),
-  "userType": zod.string().optional()
+  "userType": zod.string().optional(),
+  "country": zod.string().optional()
 })
 
 
@@ -38,6 +39,7 @@ export const ListWaitlistResponse = zod.object({
   "email": zod.string(),
   "name": zod.string().nullish(),
   "userType": zod.string().nullish(),
+  "country": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })),
   "total": zod.number()

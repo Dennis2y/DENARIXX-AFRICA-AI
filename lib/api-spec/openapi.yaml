@@ -88,6 +88,8 @@ components:
           type: string
         userType:
           type: string
+        country:
+          type: string
       required:
         - email
     JoinWaitlistResponse:
@@ -114,6 +116,9 @@ components:
           type: string
           nullable: true
         userType:
+          type: string
+          nullable: true
+        country:
           type: string
           nullable: true
         createdAt:

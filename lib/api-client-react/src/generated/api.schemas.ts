@@ -13,6 +13,7 @@ export interface JoinWaitlistRequest {
   email: string;
   name?: string;
   userType?: string;
+  country?: string;
 }
 
 export interface JoinWaitlistResponse {
@@ -26,6 +27,7 @@ export interface WaitlistEntry {
   email: string;
   name?: string | null;
   userType?: string | null;
+  country?: string | null;
   createdAt: string;
 }
 

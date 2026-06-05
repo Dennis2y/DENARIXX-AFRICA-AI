@@ -13,6 +13,8 @@ import {
   ChevronDown,
   TrendingUp,
   UserCheck,
+  MapPin,
+  Globe,
 } from "lucide-react";
 import { useListWaitlist } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -38,7 +40,7 @@ function formatDate(dateStr: string | Date) {
   });
 }
 
-type SortField = "createdAt" | "email" | "name" | "userType";
+type SortField = "createdAt" | "email" | "name" | "userType" | "country";
 type SortDir = "asc" | "desc";
 
 export default function Admin() {
@@ -55,7 +57,8 @@ export default function Admin() {
       return (
         e.email.toLowerCase().includes(q) ||
         (e.name ?? "").toLowerCase().includes(q) ||
-        (e.userType ?? "").toLowerCase().includes(q)
+        (e.userType ?? "").toLowerCase().includes(q) ||
+        (e.country ?? "").toLowerCase().includes(q)
       );
     })
     .sort((a, b) => {
@@ -71,7 +74,15 @@ export default function Admin() {
     return acc;
   }, {});
 
+  const countryCounts = entries.reduce<Record<string, number>>((acc, e) => {
+    if (e.country) {
+      acc[e.country] = (acc[e.country] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
+
   const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+  const topCountry = Object.entries(countryCounts).sort((a, b) => b[1] - a[1])[0];
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -84,12 +95,13 @@ export default function Admin() {
 
   function downloadCSV() {
     const rows = [
-      ["ID", "Email", "Name", "Role", "Signed Up"],
+      ["ID", "Email", "Name", "Role", "Country", "Signed Up"],
       ...filtered.map((e) => [
         String(e.id),
         e.email,
         e.name ?? "",
         e.userType ?? "",
+        e.country ?? "",
         formatDate(e.createdAt),
       ]),
     ];
@@ -196,17 +208,15 @@ export default function Admin() {
             },
             {
               icon: UserCheck,
-              label: "Named Signups",
-              value: isLoading
-                ? "—"
-                : String(entries.filter((e) => e.name).length),
+              label: "Top Role",
+              value: isLoading ? "—" : (topType ? topType[0] : "—"),
               color: "text-accent",
               bg: "bg-accent/10 border-accent/20",
             },
             {
-              icon: TrendingUp,
-              label: "Top Role",
-              value: isLoading ? "—" : (topType ? topType[0] : "—"),
+              icon: Globe,
+              label: "Top Country",
+              value: isLoading ? "—" : (topCountry ? topCountry[0] : "—"),
               color: "text-amber-400",
               bg: "bg-amber-500/10 border-amber-500/20",
             },
@@ -218,39 +228,94 @@ export default function Admin() {
               <div className={`${color} mb-3`}>
                 <Icon className="w-5 h-5" />
               </div>
-              <p className="text-2xl font-black mb-1">{value}</p>
+              <p className="text-2xl font-black mb-1 truncate" title={value}>{value}</p>
               <p className="text-xs text-muted-foreground">{label}</p>
             </div>
           ))}
         </motion.div>
 
-        {/* Role Breakdown */}
-        {!isLoading && Object.keys(typeCounts).length > 0 && (
+        {/* Breakdown panels: role + country side by side */}
+        {!isLoading && (Object.keys(typeCounts).length > 0 || Object.keys(countryCounts).length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="mb-10 bg-card/60 backdrop-blur border border-border rounded-2xl p-6"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10"
           >
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest mb-5">
-              Signups by Role
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(typeCounts)
-                .sort((a, b) => b[1] - a[1])
-                .map(([type, count]) => (
-                  <div
-                    key={type}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium ${
-                      USER_TYPE_COLORS[type] ?? USER_TYPE_COLORS["Other"]
-                    }`}
-                  >
-                    <Briefcase className="w-3.5 h-3.5" />
-                    {type}
-                    <span className="font-bold">{count}</span>
-                  </div>
-                ))}
-            </div>
+            {/* Role breakdown */}
+            {Object.keys(typeCounts).length > 0 && (
+              <div className="bg-card/60 backdrop-blur border border-border rounded-2xl p-6">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest mb-5 flex items-center gap-2">
+                  <Briefcase className="w-3.5 h-3.5" /> Signups by Role
+                </h2>
+                <div className="space-y-2">
+                  {Object.entries(typeCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([type, count]) => {
+                      const pct = Math.round((count / entries.length) * 100);
+                      return (
+                        <div key={type} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${USER_TYPE_COLORS[type] ?? USER_TYPE_COLORS["Other"]}`}>
+                              {type}
+                            </span>
+                            <span className="font-bold text-foreground">{count} <span className="text-muted-foreground font-normal text-xs">({pct}%)</span></span>
+                          </div>
+                          <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.7, ease: "easeOut" }}
+                              className="h-full bg-primary rounded-full"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Country breakdown */}
+            {Object.keys(countryCounts).length > 0 && (
+              <div className="bg-card/60 backdrop-blur border border-border rounded-2xl p-6">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest mb-5 flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5" /> Signups by Country
+                </h2>
+                <div className="space-y-2">
+                  {Object.entries(countryCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .map(([country, count]) => {
+                      const pct = Math.round((count / entries.length) * 100);
+                      return (
+                        <div key={country} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1.5 text-foreground/80 font-medium">
+                              <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                              {country}
+                            </span>
+                            <span className="font-bold text-foreground">{count} <span className="text-muted-foreground font-normal text-xs">({pct}%)</span></span>
+                          </div>
+                          <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.7, ease: "easeOut" }}
+                              className="h-full bg-accent rounded-full"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {Object.keys(countryCounts).length > 10 && (
+                    <p className="text-xs text-muted-foreground pt-1">
+                      +{Object.keys(countryCounts).length - 10} more countries
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -268,7 +333,7 @@ export default function Admin() {
               <input
                 data-testid="input-search"
                 type="text"
-                placeholder="Search by email, name, or role..."
+                placeholder="Search by email, name, role, or country..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background/60 border border-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
@@ -322,6 +387,12 @@ export default function Admin() {
                     </th>
                     <th
                       className="text-left px-5 py-3 cursor-pointer hover:text-foreground transition select-none hidden lg:table-cell"
+                      onClick={() => toggleSort("country")}
+                    >
+                      Country <SortIcon field="country" />
+                    </th>
+                    <th
+                      className="text-left px-5 py-3 cursor-pointer hover:text-foreground transition select-none hidden xl:table-cell"
                       onClick={() => toggleSort("createdAt")}
                     >
                       Signed Up <SortIcon field="createdAt" />
@@ -348,7 +419,7 @@ export default function Admin() {
                               {entry.email[0].toUpperCase()}
                             </div>
                             <span
-                              className="font-medium truncate max-w-[180px] md:max-w-none"
+                              className="font-medium truncate max-w-[160px] md:max-w-none"
                               data-testid={`text-email-${entry.id}`}
                             >
                               {entry.email}
@@ -356,27 +427,32 @@ export default function Admin() {
                           </div>
                         </td>
                         <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                          {entry.name ?? (
-                            <span className="italic opacity-50">—</span>
-                          )}
+                          {entry.name ?? <span className="italic opacity-40">—</span>}
                         </td>
                         <td className="px-5 py-3.5 hidden sm:table-cell">
                           {entry.userType ? (
                             <span
                               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${
-                                USER_TYPE_COLORS[entry.userType] ??
-                                USER_TYPE_COLORS["Other"]
+                                USER_TYPE_COLORS[entry.userType] ?? USER_TYPE_COLORS["Other"]
                               }`}
                             >
                               {entry.userType}
                             </span>
                           ) : (
-                            <span className="italic text-muted-foreground opacity-50 text-xs">
-                              —
-                            </span>
+                            <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 text-muted-foreground text-xs hidden lg:table-cell">
+                        <td className="px-5 py-3.5 hidden lg:table-cell">
+                          {entry.country ? (
+                            <span className="inline-flex items-center gap-1.5 text-sm text-foreground/80">
+                              <MapPin className="w-3.5 h-3.5 text-accent shrink-0" />
+                              {entry.country}
+                            </span>
+                          ) : (
+                            <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 text-muted-foreground text-xs hidden xl:table-cell">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="w-3.5 h-3.5 shrink-0" />
                             {formatDate(entry.createdAt)}

@@ -7,6 +7,7 @@ export const waitlistTable = pgTable("waitlist", {
   email: text("email").notNull().unique(),
   name: text("name"),
   userType: text("user_type"),
+  country: text("country"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

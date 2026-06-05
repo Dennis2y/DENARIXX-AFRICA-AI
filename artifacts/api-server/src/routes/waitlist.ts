@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, waitlistTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { JoinWaitlistBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -13,7 +12,7 @@ router.post("/waitlist", async (req, res) => {
     return;
   }
 
-  const { email, name, userType } = result.data;
+  const { email, name, userType, country } = result.data;
 
   try {
     const existing = await db
@@ -29,10 +28,10 @@ router.post("/waitlist", async (req, res) => {
 
     const [entry] = await db
       .insert(waitlistTable)
-      .values({ email, name: name ?? null, userType: userType ?? null })
+      .values({ email, name: name ?? null, userType: userType ?? null, country: country ?? null })
       .returning();
 
-    req.log.info({ email }, "Waitlist signup");
+    req.log.info({ email, country }, "Waitlist signup");
     res.status(201).json({
       id: entry.id,
       email: entry.email,
