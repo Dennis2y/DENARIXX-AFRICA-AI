@@ -3,9 +3,11 @@ import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion"
 import { 
   Globe, Cpu, Zap, Shield, Rocket, Target, Users, TrendingUp, 
   MapPin, Heart, ChevronRight, Menu, X, ArrowRight, Play, CheckCircle2,
-  Sparkles, Layers, BookOpen, Briefcase, GraduationCap, Sprout, Building
+  Sparkles, Layers, BookOpen, Briefcase, GraduationCap, Sprout, Building,
+  Mail, User, ChevronDown, PartyPopper, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useJoinWaitlist } from "@workspace/api-client-react";
 
 import heroCity from "@/assets/hero-city.png";
 import professionals from "@/assets/professionals.png";
@@ -493,6 +495,198 @@ const Footer = () => {
   );
 };
 
+const USER_TYPES = [
+  "Student",
+  "Freelancer",
+  "Professional",
+  "Entrepreneur",
+  "Investor",
+  "Farmer",
+  "Recruiter",
+  "Other",
+];
+
+const WaitlistCTA = () => {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [userType, setUserType] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const { mutate, isPending } = useJoinWaitlist({
+    mutation: {
+      onSuccess: () => {
+        setSuccess(true);
+        setErrorMsg("");
+      },
+      onError: (err: unknown) => {
+        const e = err as { response?: { data?: { error?: string } } };
+        setErrorMsg(e?.response?.data?.error ?? "Something went wrong. Please try again.");
+      },
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    mutate({ data: { email, name: name || undefined, userType: userType || undefined } });
+  };
+
+  return (
+    <section id="waitlist" className="py-32 relative overflow-hidden">
+      {/* Background glow orbs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-primary/5 to-background" />
+      </div>
+
+      <div className="container mx-auto px-4 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+          className="max-w-2xl mx-auto text-center"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/30 text-primary text-sm font-semibold mb-8">
+            <Sparkles className="w-4 h-4" />
+            Limited Early Access
+          </div>
+
+          <h2 className="text-4xl md:text-6xl font-black mb-6 leading-tight">
+            The Future is <span className="text-primary">Calling.</span>
+          </h2>
+          <p className="text-lg text-muted-foreground mb-12">
+            Be among the first to experience Africa's AI Operating System. Join thousands already on the waitlist.
+          </p>
+
+          <AnimatePresence mode="wait">
+            {success ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-card/80 backdrop-blur border border-accent/40 rounded-3xl p-10 text-center"
+              >
+                <div className="w-16 h-16 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center mx-auto mb-6">
+                  <PartyPopper className="w-8 h-8 text-accent" />
+                </div>
+                <h3 className="text-2xl font-bold mb-3">You're on the list!</h3>
+                <p className="text-muted-foreground">
+                  We'll reach out when early access opens. Get ready — Africa's AI Operating System is launching soon.
+                </p>
+              </motion.div>
+            ) : (
+              <motion.form
+                key="form"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                onSubmit={handleSubmit}
+                className="bg-card/60 backdrop-blur-xl border border-border rounded-3xl p-8 md:p-10 space-y-5 text-left"
+              >
+                {/* Name */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground/80" htmlFor="waitlist-name">
+                    Your name <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <input
+                      id="waitlist-name"
+                      data-testid="input-waitlist-name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Kofi Mensah"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl bg-background/60 border border-border text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground/80" htmlFor="waitlist-email">
+                    Email address <span className="text-primary">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <input
+                      id="waitlist-email"
+                      data-testid="input-waitlist-email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl bg-background/60 border border-border text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                    />
+                  </div>
+                </div>
+
+                {/* User type */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground/80" htmlFor="waitlist-usertype">
+                    I am a <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <select
+                      id="waitlist-usertype"
+                      data-testid="select-waitlist-usertype"
+                      value={userType}
+                      onChange={(e) => setUserType(e.target.value)}
+                      className="w-full appearance-none pl-4 pr-10 py-3 rounded-xl bg-background/60 border border-border text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+                    >
+                      <option value="">Select your role...</option>
+                      {USER_TYPES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Error */}
+                {errorMsg && (
+                  <p data-testid="text-waitlist-error" className="text-sm text-destructive font-medium">
+                    {errorMsg}
+                  </p>
+                )}
+
+                <Button
+                  type="submit"
+                  data-testid="button-waitlist-submit"
+                  disabled={isPending}
+                  size="lg"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-base font-bold rounded-xl transition-all"
+                >
+                  {isPending ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Joining...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Join the Waitlist
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  )}
+                </Button>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  No spam, ever. Unsubscribe anytime.
+                </p>
+              </motion.form>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+    </section>
+  );
+};
+
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 font-sans">
@@ -504,14 +698,8 @@ export default function Landing() {
       <DenaAI />
       <Pricing />
       <Gamification />
-      <section className="py-32 relative overflow-hidden bg-primary/10">
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-4xl md:text-6xl font-black mb-8">The Future is Calling.</h2>
-          <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 h-16 px-10 text-xl rounded-full">
-            Join the Waitlist Now
-          </Button>
-        </div>
-      </section>
+      <AfricaCoverage />
+      <WaitlistCTA />
       <Footer />
     </div>
   );
