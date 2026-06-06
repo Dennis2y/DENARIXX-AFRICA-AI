@@ -107,6 +107,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WaitlistList"
+  /waitlist/leaderboard:
+    get:
+      operationId: getLeaderboard
+      tags: [waitlist]
+      summary: Public referral leaderboard
+      description: Returns top referrers with anonymized display info
+      responses:
+        "200":
+          description: Leaderboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderboardResponse"
 components:
   schemas:
     HealthStatus:
@@ -206,6 +219,37 @@ components:
       required:
         - code
         - referralCount
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        displayName:
+          type: string
+        maskedEmail:
+          type: string
+        referralCount:
+          type: integer
+        referralCode:
+          type: string
+      required:
+        - rank
+        - displayName
+        - maskedEmail
+        - referralCount
+        - referralCode
+    LeaderboardResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaderboardEntry"
+        total:
+          type: integer
+      required:
+        - entries
+        - total
     ErrorResponse:
       type: object
       properties:

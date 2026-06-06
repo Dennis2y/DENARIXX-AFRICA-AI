@@ -4,7 +4,7 @@ import {
   Globe, Cpu, Zap, Shield, Target, Users, TrendingUp, 
   MapPin, Heart, Menu, X, ArrowRight, Play, CheckCircle2,
   Sparkles, Briefcase, GraduationCap, Sprout, Building,
-  Mail, User, ChevronDown, PartyPopper, Loader2, Share2
+  Mail, User, ChevronDown, PartyPopper, Loader2, Share2, Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useJoinWaitlist, useGetWaitlistCount, useGetWaitlistReferrals } from "@workspace/api-client-react";
@@ -91,9 +91,9 @@ const Hero = () => {
     <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
       {/* Background */}
       <motion.div style={{ y: y1, opacity }} className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-background/80 z-10" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background z-10" />
-        <img src={heroCity} alt="Futuristic African City" className="w-full h-full object-cover opacity-60 mix-blend-luminosity" />
+        <div className="absolute inset-0 bg-background/20 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background z-10" />
+        <img src={heroCity} alt="Futuristic African City" className="w-full h-full object-cover opacity-90" />
       </motion.div>
 
       {/* Glowing Orbs */}
@@ -221,26 +221,251 @@ const Stats = () => {
   );
 };
 
+type ModuleInfo = {
+  icon: React.ReactNode;
+  name: string;
+  desc: string;
+  tagline: string;
+  features: string[];
+  status: "Live" | "Beta" | "Coming Soon";
+  accent: string;
+};
+
+const MODULE_STATUS_STYLE: Record<string, string> = {
+  Live: "bg-accent/15 text-accent border-accent/30",
+  Beta: "bg-primary/15 text-primary border-primary/30",
+  "Coming Soon": "bg-muted text-muted-foreground border-border",
+};
+
 const Modules = () => {
-  const modules = [
-    { icon: <GraduationCap />, name: "SkillSwap AI", desc: "Learn, trade skills, and upskill with AI-guided paths." },
-    { icon: <Briefcase />, name: "Jobs AI", desc: "Smart matching for freelancers and full-time roles." },
-    { icon: <Building />, name: "Business AI", desc: "Automate operations and scale your enterprise." },
-    { icon: <Target />, name: "Marketplace", desc: "Connect buyers and sellers across the continent." },
-    { icon: <Sprout />, name: "Farm AI", desc: "Crop predictions, weather, and yield optimization." },
-    { icon: <Heart />, name: "Health AI", desc: "Accessible diagnostics and telemedicine." },
-    { icon: <TrendingUp />, name: "Invest AI", desc: "Data-driven insights for African markets." },
-    { icon: <Shield />, name: "Government AI", desc: "Streamlined public services and civic tech." },
-    { icon: <Users />, name: "Community Network", desc: "The professional social graph for Africa." },
-    { icon: <Cpu />, name: "DENA AI", desc: "The core intelligence powering it all." },
+  const [selected, setSelected] = useState<ModuleInfo | null>(null);
+
+  const modules: ModuleInfo[] = [
+    {
+      icon: <GraduationCap />,
+      name: "SkillSwap AI",
+      desc: "Learn, trade skills, and upskill with AI-guided paths.",
+      tagline: "Your AI-powered learning & skill trading platform",
+      features: [
+        "Personalized AI learning paths tailored to your goals",
+        "Trade skills peer-to-peer across the continent",
+        "AI mentorship sessions in 50+ African languages",
+        "Industry-recognized digital certifications",
+        "Community-driven study groups and hackathons",
+      ],
+      status: "Beta",
+      accent: "text-blue-400",
+    },
+    {
+      icon: <Briefcase />,
+      name: "Jobs AI",
+      desc: "Smart matching for freelancers and full-time roles.",
+      tagline: "AI-powered talent & job matching for Africa",
+      features: [
+        "Smart AI matching between candidates and employers",
+        "Freelance gig marketplace with escrow payments",
+        "AI resume & portfolio builder",
+        "Salary benchmarks for every African country",
+        "Remote, hybrid, and on-site opportunities",
+      ],
+      status: "Beta",
+      accent: "text-purple-400",
+    },
+    {
+      icon: <Building />,
+      name: "Business AI",
+      desc: "Automate operations and scale your enterprise.",
+      tagline: "Intelligent automation for African enterprises",
+      features: [
+        "End-to-end business operations automation",
+        "AI-driven marketing and customer analytics",
+        "Supplier discovery and procurement tools",
+        "Cash flow forecasting and financial insights",
+        "Multi-currency invoicing across 54 countries",
+      ],
+      status: "Beta",
+      accent: "text-cyan-400",
+    },
+    {
+      icon: <Target />,
+      name: "Marketplace",
+      desc: "Connect buyers and sellers across the continent.",
+      tagline: "Pan-African commerce, powered by AI",
+      features: [
+        "Buy & sell across all 54 African nations",
+        "AI-powered product recommendations",
+        "Secure escrow and dispute resolution",
+        "Logistics integration with local couriers",
+        "Support for 30+ African payment methods",
+      ],
+      status: "Beta",
+      accent: "text-amber-400",
+    },
+    {
+      icon: <Sprout />,
+      name: "Farm AI",
+      desc: "Crop predictions, weather, and yield optimization.",
+      tagline: "Precision agriculture for African farmers",
+      features: [
+        "AI crop yield predictions from satellite data",
+        "Hyperlocal weather and drought alerts",
+        "Soil health monitoring and treatment plans",
+        "Direct-to-market channels for produce",
+        "Micro-financing links for smallholder farmers",
+      ],
+      status: "Coming Soon",
+      accent: "text-lime-400",
+    },
+    {
+      icon: <Heart />,
+      name: "Health AI",
+      desc: "Accessible diagnostics and telemedicine.",
+      tagline: "AI healthcare for every African community",
+      features: [
+        "AI-assisted symptom checker and triage",
+        "Telemedicine with licensed African doctors",
+        "Prescription and pharmacy integration",
+        "Mental health support in local languages",
+        "Community health worker training tools",
+      ],
+      status: "Coming Soon",
+      accent: "text-rose-400",
+    },
+    {
+      icon: <TrendingUp />,
+      name: "Invest AI",
+      desc: "Data-driven insights for African markets.",
+      tagline: "Democratising investment across Africa",
+      features: [
+        "Real-time African stock and forex analytics",
+        "AI portfolio builder for any budget",
+        "Startup deal flow and angel investing",
+        "Risk scoring for African market conditions",
+        "Pension and savings plan automation",
+      ],
+      status: "Coming Soon",
+      accent: "text-green-400",
+    },
+    {
+      icon: <Shield />,
+      name: "Government AI",
+      desc: "Streamlined public services and civic tech.",
+      tagline: "Smart governance tools for African institutions",
+      features: [
+        "Digital identity and e-citizen services",
+        "AI-powered budget transparency dashboards",
+        "Public infrastructure monitoring",
+        "Citizen feedback and petition tools",
+        "Cross-border policy harmonisation support",
+      ],
+      status: "Coming Soon",
+      accent: "text-indigo-400",
+    },
+    {
+      icon: <Users />,
+      name: "Community Network",
+      desc: "The professional social graph for Africa.",
+      tagline: "LinkedIn meets WhatsApp, built for Africa",
+      features: [
+        "Professional profiles and endorsements",
+        "Industry-specific community groups",
+        "AI-matched networking and mentorship",
+        "Events, conferences, and meetups hub",
+        "Pan-African alumni and diaspora networks",
+      ],
+      status: "Beta",
+      accent: "text-orange-400",
+    },
+    {
+      icon: <Cpu />,
+      name: "DENA AI",
+      desc: "The core intelligence powering it all.",
+      tagline: "Africa's first context-aware AI assistant",
+      features: [
+        "Understands 50+ African languages and dialects",
+        "Context-aware across all 10 platform modules",
+        "Trained on African legal, cultural, and market data",
+        "Voice-first interface for low-literacy users",
+        "On-device processing for low-bandwidth areas",
+      ],
+      status: "Live",
+      accent: "text-primary",
+    },
   ];
 
   return (
     <section id="modules" className="py-32 relative">
+      {/* Module detail modal */}
+      <AnimatePresence>
+        {selected && (
+          <motion.div
+            key="module-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            onClick={() => setSelected(null)}
+          >
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
+            <motion.div
+              key="module-modal-card"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 20, stiffness: 260 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-card border border-border rounded-3xl p-8 max-w-lg w-full shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
+            >
+              <button
+                onClick={() => setSelected(null)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className={`w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center mb-5 ${selected.accent}`}>
+                {selected.icon}
+              </div>
+
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <h3 className="text-2xl font-black">{selected.name}</h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${MODULE_STATUS_STYLE[selected.status]}`}>
+                  {selected.status}
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-muted-foreground mb-1">{selected.tagline}</p>
+              <p className="text-sm text-muted-foreground mb-6">{selected.desc}</p>
+
+              <div className="space-y-2.5 mb-8">
+                {selected.features.map((f, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-start gap-2.5 text-sm"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                    <span className="text-foreground/80">{f}</span>
+                  </motion.div>
+                ))}
+              </div>
+
+              <Button
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => { setSelected(null); scrollTo("waitlist"); }}
+              >
+                Join Waitlist for Early Access <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="container mx-auto px-4 relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-20">
           <h2 className="text-3xl md:text-5xl font-bold mb-6">One Platform. <br/><span className="text-primary">Infinite Possibilities.</span></h2>
-          <p className="text-muted-foreground text-lg">10 integrated modules designed to solve real challenges and accelerate growth across every sector in Africa.</p>
+          <p className="text-muted-foreground text-lg">10 integrated AI modules designed to solve real challenges and accelerate growth across every sector in Africa. Click any module to learn more.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
@@ -251,15 +476,24 @@ const Modules = () => {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.05 }}
-              whileHover={{ y: -5 }}
-              className="p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/50 transition-colors group cursor-default relative overflow-hidden"
+              whileHover={{ y: -6, scale: 1.02 }}
+              onClick={() => setSelected(mod)}
+              className="p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/50 transition-all group cursor-pointer relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
+              <div className={`w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${mod.accent}`}>
                 {mod.icon}
               </div>
-              <h3 className="text-lg font-bold mb-2 text-foreground">{mod.name}</h3>
-              <p className="text-sm text-muted-foreground">{mod.desc}</p>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-base font-bold text-foreground leading-tight">{mod.name}</h3>
+                <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold border ${MODULE_STATUS_STYLE[mod.status]}`}>
+                  {mod.status}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{mod.desc}</p>
+              <p className={`text-xs font-semibold mt-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${mod.accent}`}>
+                Learn more <ArrowRight className="w-3 h-3" />
+              </p>
             </motion.div>
           ))}
         </div>
@@ -521,10 +755,18 @@ const Footer = () => {
             </ul>
           </div>
         </div>
-        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-border/50 text-sm text-muted-foreground">
+        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-border/50 text-sm text-muted-foreground gap-4">
           <p>© {new Date().getFullYear()} DENARIXX AFRICA AI. All rights reserved.</p>
-          <div className="flex items-center gap-2 mt-4 md:mt-0">
-            <Globe className="w-4 h-4" /> Built in Africa
+          <div className="flex items-center gap-6 flex-wrap justify-center">
+            <a href="/leaderboard" className="hover:text-primary transition-colors flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5" /> Leaderboard
+            </a>
+            <a href="/admin" className="hover:text-primary transition-colors flex items-center gap-1.5 opacity-40 hover:opacity-100">
+              <Shield className="w-3.5 h-3.5" /> Admin
+            </a>
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4" /> Built in Africa
+            </div>
           </div>
         </div>
       </div>

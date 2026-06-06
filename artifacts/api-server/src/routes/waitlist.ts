@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, waitlistTable } from "@workspace/db";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import { JoinWaitlistBody } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
 
@@ -102,6 +102,53 @@ router.post("/waitlist", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Waitlist insert failed");
     res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "***";
+  return `${local[0]}***@${domain}`;
+}
+
+function formatDisplayName(name: string | null, email: string): string {
+  if (name && name.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length > 1) return `${parts[0]} ${parts[1][0]}.`;
+    return parts[0];
+  }
+  const localPart = email.split("@")[0];
+  return localPart.length > 6 ? localPart.slice(0, 6) + "…" : localPart;
+}
+
+router.get("/waitlist/leaderboard", async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        w.name,
+        w.email,
+        w.referral_code,
+        COUNT(r.id)::int AS referral_count
+      FROM waitlist w
+      INNER JOIN waitlist r ON r.referred_by = w.referral_code
+      GROUP BY w.id, w.name, w.email, w.referral_code
+      ORDER BY referral_count DESC
+      LIMIT 20
+    `);
+
+    const rows = result.rows as Array<Record<string, unknown>>;
+    const entries = rows.map((row, i) => ({
+      rank: i + 1,
+      displayName: formatDisplayName(row.name as string | null, row.email as string),
+      maskedEmail: maskEmail(row.email as string),
+      referralCount: Number(row.referral_count),
+      referralCode: row.referral_code as string,
+    }));
+
+    res.json({ entries, total: entries.length });
+  } catch (err) {
+    req.log.error({ err }, "Leaderboard fetch failed");
+    res.status(500).json({ error: "Something went wrong." });
   }
 });
 

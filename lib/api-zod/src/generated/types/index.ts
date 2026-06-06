@@ -10,6 +10,8 @@ export * from './errorResponse';
 export * from './healthStatus';
 export * from './joinWaitlistRequest';
 export * from './joinWaitlistResponse';
+export * from './leaderboardEntry';
+export * from './leaderboardResponse';
 export * from './waitlistCount';
 export * from './waitlistEntry';
 export * from './waitlistList';

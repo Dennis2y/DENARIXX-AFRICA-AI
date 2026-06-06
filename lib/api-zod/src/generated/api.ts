@@ -72,3 +72,19 @@ export const ListWaitlistResponse = zod.object({
 })
 
 
+/**
+ * Returns top referrers with anonymized display info
+ * @summary Public referral leaderboard
+ */
+export const GetLeaderboardResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "rank": zod.number(),
+  "displayName": zod.string(),
+  "maskedEmail": zod.string(),
+  "referralCount": zod.number(),
+  "referralCode": zod.string()
+})),
+  "total": zod.number()
+})
+
+

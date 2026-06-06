@@ -49,6 +49,19 @@ export interface WaitlistReferralStats {
   referralCount: number;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  displayName: string;
+  maskedEmail: string;
+  referralCount: number;
+  referralCode: string;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  total: number;
+}
+
 export interface ErrorResponse {
   error: string;
 }
