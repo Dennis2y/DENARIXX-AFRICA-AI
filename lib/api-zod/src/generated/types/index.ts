@@ -13,3 +13,4 @@ export * from './joinWaitlistResponse';
 export * from './waitlistCount';
 export * from './waitlistEntry';
 export * from './waitlistList';
+export * from './waitlistReferralStats';

@@ -12,5 +12,7 @@ export interface WaitlistEntry {
   name?: string | null;
   userType?: string | null;
   country?: string | null;
+  referralCode?: string | null;
+  referredBy?: string | null;
   createdAt: Date;
 }

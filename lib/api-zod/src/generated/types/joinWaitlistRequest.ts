@@ -11,4 +11,5 @@ export interface JoinWaitlistRequest {
   name?: string;
   userType?: string;
   country?: string;
+  referredBy?: string;
 }

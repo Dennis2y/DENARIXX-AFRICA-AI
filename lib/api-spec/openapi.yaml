@@ -39,6 +39,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WaitlistCount"
+  /waitlist/referrals/{code}:
+    get:
+      operationId: getWaitlistReferrals
+      tags: [waitlist]
+      summary: Get referral stats for a code
+      description: Returns how many people signed up using a referral code
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Referral stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitlistReferralStats"
+        "404":
+          description: Code not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /waitlist:
     post:
       operationId: joinWaitlist
@@ -103,6 +128,8 @@ components:
           type: string
         country:
           type: string
+        referredBy:
+          type: string
       required:
         - email
     JoinWaitlistResponse:
@@ -114,10 +141,13 @@ components:
           type: string
         message:
           type: string
+        referralCode:
+          type: string
       required:
         - id
         - email
         - message
+        - referralCode
     WaitlistEntry:
       type: object
       properties:
@@ -132,6 +162,12 @@ components:
           type: string
           nullable: true
         country:
+          type: string
+          nullable: true
+        referralCode:
+          type: string
+          nullable: true
+        referredBy:
           type: string
           nullable: true
         createdAt:
@@ -160,6 +196,16 @@ components:
           type: integer
       required:
         - count
+    WaitlistReferralStats:
+      type: object
+      properties:
+        code:
+          type: string
+        referralCount:
+          type: integer
+      required:
+        - code
+        - referralCount
     ErrorResponse:
       type: object
       properties:

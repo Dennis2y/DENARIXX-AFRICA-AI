@@ -15,6 +15,8 @@ import {
   UserCheck,
   MapPin,
   Globe,
+  Link2,
+  Trophy,
 } from "lucide-react";
 import { useListWaitlist } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +42,7 @@ function formatDate(dateStr: string | Date) {
   });
 }
 
-type SortField = "createdAt" | "email" | "name" | "userType" | "country";
+type SortField = "createdAt" | "email" | "name" | "userType" | "country" | "referrals";
 type SortDir = "asc" | "desc";
 
 export default function Admin() {
@@ -51,6 +53,21 @@ export default function Admin() {
 
   const entries = data?.entries ?? [];
 
+  // Build referral count map: referralCode → count of people who used it
+  const referralCountMap = entries.reduce<Record<string, number>>((acc, e) => {
+    if (e.referredBy) {
+      acc[e.referredBy] = (acc[e.referredBy] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
+
+  // Top referrers: entries with a referralCode that was used by others
+  const topReferrers = entries
+    .filter((e) => e.referralCode && referralCountMap[e.referralCode] > 0)
+    .map((e) => ({ ...e, referralCount: referralCountMap[e.referralCode!] }))
+    .sort((a, b) => b.referralCount - a.referralCount)
+    .slice(0, 5);
+
   const filtered = entries
     .filter((e) => {
       const q = search.toLowerCase();
@@ -58,13 +75,19 @@ export default function Admin() {
         e.email.toLowerCase().includes(q) ||
         (e.name ?? "").toLowerCase().includes(q) ||
         (e.userType ?? "").toLowerCase().includes(q) ||
-        (e.country ?? "").toLowerCase().includes(q)
+        (e.country ?? "").toLowerCase().includes(q) ||
+        (e.referralCode ?? "").toLowerCase().includes(q)
       );
     })
     .sort((a, b) => {
       const mul = sortDir === "asc" ? 1 : -1;
-      const va = String(a[sortField] ?? "");
-      const vb = String(b[sortField] ?? "");
+      if (sortField === "referrals") {
+        const ra = referralCountMap[a.referralCode ?? ""] ?? 0;
+        const rb = referralCountMap[b.referralCode ?? ""] ?? 0;
+        return (ra - rb) * mul;
+      }
+      const va = String(a[sortField as keyof typeof a] ?? "");
+      const vb = String(b[sortField as keyof typeof b] ?? "");
       return va.localeCompare(vb) * mul;
     });
 
@@ -81,6 +104,8 @@ export default function Admin() {
     return acc;
   }, {});
 
+  const totalReferrals = Object.values(referralCountMap).reduce((s, n) => s + n, 0);
+
   const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
   const topCountry = Object.entries(countryCounts).sort((a, b) => b[1] - a[1])[0];
 
@@ -89,19 +114,22 @@ export default function Admin() {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortField(field);
-      setSortDir("asc");
+      setSortDir("desc");
     }
   }
 
   function downloadCSV() {
     const rows = [
-      ["ID", "Email", "Name", "Role", "Country", "Signed Up"],
+      ["ID", "Email", "Name", "Role", "Country", "Referral Code", "Referred By", "Referrals Sent", "Signed Up"],
       ...filtered.map((e) => [
         String(e.id),
         e.email,
         e.name ?? "",
         e.userType ?? "",
         e.country ?? "",
+        e.referralCode ?? "",
+        e.referredBy ?? "",
+        String(referralCountMap[e.referralCode ?? ""] ?? 0),
         formatDate(e.createdAt),
       ]),
     ];
@@ -180,7 +208,7 @@ export default function Admin() {
             Waitlist <span className="text-primary">Dashboard</span>
           </h1>
           <p className="text-muted-foreground">
-            Track early access signups for DENARIXX AFRICA AI.
+            Track early access signups and referrals for DENARIXX AFRICA AI.
           </p>
         </motion.div>
 
@@ -200,9 +228,9 @@ export default function Admin() {
               bg: "bg-primary/10 border-primary/20",
             },
             {
-              icon: Mail,
-              label: "Filtered Results",
-              value: isLoading ? "—" : String(filtered.length),
+              icon: TrendingUp,
+              label: "Via Referral",
+              value: isLoading ? "—" : String(totalReferrals),
               color: "text-secondary",
               bg: "bg-secondary/10 border-secondary/20",
             },
@@ -234,13 +262,13 @@ export default function Admin() {
           ))}
         </motion.div>
 
-        {/* Breakdown panels: role + country side by side */}
+        {/* Breakdown panels: role + country */}
         {!isLoading && (Object.keys(typeCounts).length > 0 || Object.keys(countryCounts).length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"
           >
             {/* Role breakdown */}
             {Object.keys(typeCounts).length > 0 && (
@@ -319,11 +347,65 @@ export default function Admin() {
           </motion.div>
         )}
 
+        {/* Top Referrers */}
+        {!isLoading && topReferrers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="bg-card/60 backdrop-blur border border-border rounded-2xl p-6 mb-6"
+          >
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest mb-5 flex items-center gap-2">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" /> Top Referrers
+            </h2>
+            <div className="space-y-3">
+              {topReferrers.map((entry, i) => {
+                const max = topReferrers[0].referralCount;
+                const pct = Math.round((entry.referralCount / max) * 100);
+                const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
+                return (
+                  <div key={entry.id} className="flex items-center gap-4">
+                    <span className="text-lg w-6 text-center shrink-0">{medals[i]}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                            {entry.email[0].toUpperCase()}
+                          </div>
+                          <span className="text-sm font-medium truncate">{entry.name ?? entry.email}</span>
+                          {entry.name && (
+                            <span className="text-xs text-muted-foreground truncate hidden sm:inline">{entry.email}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-2">
+                          <span className="text-xs font-mono text-muted-foreground hidden md:inline flex items-center gap-1">
+                            <Link2 className="w-3 h-3 inline mr-0.5" />{entry.referralCode}
+                          </span>
+                          <span className="font-black text-primary tabular-nums">{entry.referralCount}</span>
+                          <span className="text-xs text-muted-foreground">invited</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.7, ease: "easeOut", delay: i * 0.05 }}
+                          className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
         {/* Search + Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
           className="bg-card/60 backdrop-blur border border-border rounded-2xl overflow-hidden"
         >
           {/* Search bar */}
@@ -333,7 +415,7 @@ export default function Admin() {
               <input
                 data-testid="input-search"
                 type="text"
-                placeholder="Search by email, name, role, or country..."
+                placeholder="Search by email, name, role, country, or code..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background/60 border border-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
@@ -393,6 +475,12 @@ export default function Admin() {
                     </th>
                     <th
                       className="text-left px-5 py-3 cursor-pointer hover:text-foreground transition select-none hidden xl:table-cell"
+                      onClick={() => toggleSort("referrals")}
+                    >
+                      Referrals <SortIcon field="referrals" />
+                    </th>
+                    <th
+                      className="text-left px-5 py-3 cursor-pointer hover:text-foreground transition select-none hidden xl:table-cell"
                       onClick={() => toggleSort("createdAt")}
                     >
                       Signed Up <SortIcon field="createdAt" />
@@ -401,65 +489,84 @@ export default function Admin() {
                 </thead>
                 <AnimatePresence>
                   <tbody>
-                    {filtered.map((entry, i) => (
-                      <motion.tr
-                        key={entry.id}
-                        data-testid={`row-waitlist-${entry.id}`}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: Math.min(i * 0.02, 0.3) }}
-                        className="border-b border-border/50 last:border-0 hover:bg-primary/5 transition-colors"
-                      >
-                        <td className="px-5 py-3.5 text-muted-foreground font-mono text-xs">
-                          {entry.id}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                              {entry.email[0].toUpperCase()}
+                    {filtered.map((entry, i) => {
+                      const refCount = referralCountMap[entry.referralCode ?? ""] ?? 0;
+                      return (
+                        <motion.tr
+                          key={entry.id}
+                          data-testid={`row-waitlist-${entry.id}`}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: Math.min(i * 0.02, 0.3) }}
+                          className="border-b border-border/50 last:border-0 hover:bg-primary/5 transition-colors"
+                        >
+                          <td className="px-5 py-3.5 text-muted-foreground font-mono text-xs">
+                            {entry.id}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                                {entry.email[0].toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <span
+                                  className="font-medium truncate max-w-[160px] md:max-w-none block"
+                                  data-testid={`text-email-${entry.id}`}
+                                >
+                                  {entry.email}
+                                </span>
+                                {entry.referredBy && (
+                                  <span className="text-xs text-secondary flex items-center gap-1 mt-0.5">
+                                    <Link2 className="w-2.5 h-2.5" /> via {entry.referredBy}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span
-                              className="font-medium truncate max-w-[160px] md:max-w-none"
-                              data-testid={`text-email-${entry.id}`}
-                            >
-                              {entry.email}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                          {entry.name ?? <span className="italic opacity-40">—</span>}
-                        </td>
-                        <td className="px-5 py-3.5 hidden sm:table-cell">
-                          {entry.userType ? (
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${
-                                USER_TYPE_COLORS[entry.userType] ?? USER_TYPE_COLORS["Other"]
-                              }`}
-                            >
-                              {entry.userType}
-                            </span>
-                          ) : (
-                            <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 hidden lg:table-cell">
-                          {entry.country ? (
-                            <span className="inline-flex items-center gap-1.5 text-sm text-foreground/80">
-                              <MapPin className="w-3.5 h-3.5 text-accent shrink-0" />
-                              {entry.country}
-                            </span>
-                          ) : (
-                            <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 text-muted-foreground text-xs hidden xl:table-cell">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 shrink-0" />
-                            {formatDate(entry.createdAt)}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
+                          </td>
+                          <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
+                            {entry.name ?? <span className="italic opacity-40">—</span>}
+                          </td>
+                          <td className="px-5 py-3.5 hidden sm:table-cell">
+                            {entry.userType ? (
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${
+                                  USER_TYPE_COLORS[entry.userType] ?? USER_TYPE_COLORS["Other"]
+                                }`}
+                              >
+                                {entry.userType}
+                              </span>
+                            ) : (
+                              <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 hidden lg:table-cell">
+                            {entry.country ? (
+                              <span className="inline-flex items-center gap-1.5 text-sm text-foreground/80">
+                                <MapPin className="w-3.5 h-3.5 text-accent shrink-0" />
+                                {entry.country}
+                              </span>
+                            ) : (
+                              <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 hidden xl:table-cell">
+                            {refCount > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold">
+                                {refCount} invited
+                              </span>
+                            ) : (
+                              <span className="italic text-muted-foreground opacity-40 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 text-muted-foreground text-xs hidden xl:table-cell">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 shrink-0" />
+                              {formatDate(entry.createdAt)}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
                   </tbody>
                 </AnimatePresence>
               </table>
@@ -468,9 +575,11 @@ export default function Admin() {
 
           {/* Footer count */}
           {!isLoading && !isError && filtered.length > 0 && (
-            <div className="px-5 py-3 border-t border-border/50 text-xs text-muted-foreground">
-              Showing {filtered.length} of {data?.total ?? 0} signup
-              {(data?.total ?? 0) !== 1 ? "s" : ""}
+            <div className="px-5 py-3 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between">
+              <span>Showing {filtered.length} of {data?.total ?? 0} signup{(data?.total ?? 0) !== 1 ? "s" : ""}</span>
+              {totalReferrals > 0 && (
+                <span className="text-secondary font-medium">{totalReferrals} joined via referral</span>
+              )}
             </div>
           )}
         </motion.div>

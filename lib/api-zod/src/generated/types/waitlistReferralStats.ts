@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface JoinWaitlistResponse {
-  id: number;
-  email: string;
-  message: string;
-  referralCode: string;
+export interface WaitlistReferralStats {
+  code: string;
+  referralCount: number;
 }

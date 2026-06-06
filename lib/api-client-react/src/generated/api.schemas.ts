@@ -14,12 +14,14 @@ export interface JoinWaitlistRequest {
   name?: string;
   userType?: string;
   country?: string;
+  referredBy?: string;
 }
 
 export interface JoinWaitlistResponse {
   id: number;
   email: string;
   message: string;
+  referralCode: string;
 }
 
 export interface WaitlistEntry {
@@ -28,6 +30,8 @@ export interface WaitlistEntry {
   name?: string | null;
   userType?: string | null;
   country?: string | null;
+  referralCode?: string | null;
+  referredBy?: string | null;
   createdAt: string;
 }
 
@@ -38,6 +42,11 @@ export interface WaitlistList {
 
 export interface WaitlistCount {
   count: number;
+}
+
+export interface WaitlistReferralStats {
+  code: string;
+  referralCount: number;
 }
 
 export interface ErrorResponse {

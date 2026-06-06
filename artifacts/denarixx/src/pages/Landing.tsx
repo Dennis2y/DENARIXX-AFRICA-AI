@@ -7,7 +7,7 @@ import {
   Mail, User, ChevronDown, PartyPopper, Loader2, Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useJoinWaitlist, useGetWaitlistCount } from "@workspace/api-client-react";
+import { useJoinWaitlist, useGetWaitlistCount, useGetWaitlistReferrals } from "@workspace/api-client-react";
 
 import heroCity from "@/assets/hero-city.png";
 import professionals from "@/assets/professionals.png";
@@ -556,19 +556,109 @@ const AFRICAN_COUNTRIES = [
   "Zimbabwe", "Other",
 ];
 
+const ReferralSuccessScreen = ({ myCode }: { myCode: string }) => {
+  const [copied, setCopied] = useState(false);
+  const { data: refData } = useGetWaitlistReferrals(myCode);
+  const referralCount = refData?.referralCount ?? 0;
+  const referralUrl = `${window.location.origin}${window.location.pathname}?ref=${myCode}`;
+  const tweetText = `I just joined the DENARIXX AFRICA AI waitlist! 🚀 Africa's AI Operating System is coming — built for the continent, by the continent. Join me 👇`;
+
+  return (
+    <motion.div
+      key="success"
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="bg-card/80 backdrop-blur border border-accent/40 rounded-3xl p-10 text-center"
+    >
+      <div className="w-16 h-16 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center mx-auto mb-6">
+        <PartyPopper className="w-8 h-8 text-accent" />
+      </div>
+      <h3 className="text-2xl font-bold mb-2">You're on the list! 🎉</h3>
+      <p className="text-muted-foreground mb-8">
+        We'll reach out when early access opens. Meanwhile, invite friends to move up the queue.
+      </p>
+
+      {/* Referral Stats */}
+      <div className="mb-8 p-5 rounded-2xl bg-primary/5 border border-primary/20">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Your Referral Progress</p>
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <motion.span
+            key={referralCount}
+            initial={{ scale: 1.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-4xl font-black text-primary tabular-nums"
+          >
+            {referralCount}
+          </motion.span>
+          <span className="text-muted-foreground text-sm text-left leading-tight">
+            {referralCount === 1 ? "person" : "people"}<br/>invited so far
+          </span>
+        </div>
+        <div className="flex items-center gap-2 bg-background/60 border border-border rounded-xl px-4 py-3">
+          <span className="text-xs text-muted-foreground font-mono flex-1 truncate text-left">{referralUrl}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(referralUrl).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
+            }}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+          >
+            {copied ? <><CheckCircle2 className="w-3.5 h-3.5" /> Copied!</> : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Share Buttons */}
+      <div className="border-t border-border/40 pt-6">
+        <p className="text-xs font-semibold text-foreground/60 uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
+          <Share2 className="w-3.5 h-3.5" /> Share Your Link
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <a
+            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(referralUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1DA1F2]/10 border border-[#1DA1F2]/30 text-[#1DA1F2] font-semibold text-sm hover:bg-[#1DA1F2]/20 transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+            Share on X
+          </a>
+          <a
+            href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#0077B5]/10 border border-[#0077B5]/30 text-[#0077B5] font-semibold text-sm hover:bg-[#0077B5]/20 transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            </svg>
+            Share on LinkedIn
+          </a>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const WaitlistCTA = () => {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [userType, setUserType] = useState("");
   const [country, setCountry] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [copied, setCopied] = useState(false);
+
+  const referredBy = new URLSearchParams(window.location.search).get("ref") ?? undefined;
 
   const { mutate, isPending } = useJoinWaitlist({
     mutation: {
-      onSuccess: () => {
-        setSuccess(true);
+      onSuccess: (data) => {
+        setMyReferralCode(data.referralCode);
         setErrorMsg("");
       },
       onError: (err: unknown) => {
@@ -581,7 +671,7 @@ const WaitlistCTA = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    mutate({ data: { email, name: name || undefined, userType: userType || undefined, country: country || undefined } });
+    mutate({ data: { email, name: name || undefined, userType: userType || undefined, country: country || undefined, referredBy } });
   };
 
   return (
@@ -614,75 +704,8 @@ const WaitlistCTA = () => {
           </p>
 
           <AnimatePresence mode="wait">
-            {success ? (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-card/80 backdrop-blur border border-accent/40 rounded-3xl p-10 text-center"
-              >
-                <div className="w-16 h-16 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center mx-auto mb-6">
-                  <PartyPopper className="w-8 h-8 text-accent" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3">You're on the list! 🎉</h3>
-                <p className="text-muted-foreground mb-8">
-                  We'll reach out when early access opens. Get ready — Africa's AI Operating System is launching soon.
-                </p>
-
-                <div className="border-t border-border/40 pt-8">
-                  <p className="text-sm font-semibold text-foreground/70 uppercase tracking-widest mb-5 flex items-center justify-center gap-2">
-                    <Share2 className="w-4 h-4" /> Spread the Word
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <a
-                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("I just joined the DENARIXX AFRICA AI waitlist! 🚀 Africa's AI Operating System is coming — built for the continent, by the continent. Join me 👇")}&url=${encodeURIComponent("https://denarixx.ai")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#1DA1F2]/10 border border-[#1DA1F2]/30 text-[#1DA1F2] font-semibold text-sm hover:bg-[#1DA1F2]/20 transition-colors"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                      </svg>
-                      Share on X (Twitter)
-                    </a>
-                    <a
-                      href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://denarixx.ai")}&summary=${encodeURIComponent("I just joined the DENARIXX AFRICA AI waitlist! Africa's AI Operating System is coming. Join the movement.")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#0077B5]/10 border border-[#0077B5]/30 text-[#0077B5] font-semibold text-sm hover:bg-[#0077B5]/20 transition-colors"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                      </svg>
-                      Share on LinkedIn
-                    </a>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText("https://denarixx.ai").then(() => {
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        });
-                      }}
-                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors"
-                    >
-                      {copied ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" /> Copied!
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                          </svg>
-                          Copy Link
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
+            {myReferralCode ? (
+              <ReferralSuccessScreen myCode={myReferralCode} />
             ) : (
               <motion.form
                 key="form"

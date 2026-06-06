@@ -27,6 +27,20 @@ export const GetWaitlistCountResponse = zod.object({
 
 
 /**
+ * Returns how many people signed up using a referral code
+ * @summary Get referral stats for a code
+ */
+export const GetWaitlistReferralsParams = zod.object({
+  "code": zod.coerce.string()
+})
+
+export const GetWaitlistReferralsResponse = zod.object({
+  "code": zod.string(),
+  "referralCount": zod.number()
+})
+
+
+/**
  * Register email for early access
  * @summary Join the waitlist
  */
@@ -34,7 +48,8 @@ export const JoinWaitlistBody = zod.object({
   "email": zod.string().email(),
   "name": zod.string().optional(),
   "userType": zod.string().optional(),
-  "country": zod.string().optional()
+  "country": zod.string().optional(),
+  "referredBy": zod.string().optional()
 })
 
 
@@ -49,6 +64,8 @@ export const ListWaitlistResponse = zod.object({
   "name": zod.string().nullish(),
   "userType": zod.string().nullish(),
   "country": zod.string().nullish(),
+  "referralCode": zod.string().nullish(),
+  "referredBy": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })),
   "total": zod.number()

@@ -25,7 +25,8 @@ import type {
   JoinWaitlistRequest,
   JoinWaitlistResponse,
   WaitlistCount,
-  WaitlistList
+  WaitlistList,
+  WaitlistReferralStats
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -184,6 +185,84 @@ export function useGetWaitlistCount<TData = Awaited<ReturnType<typeof getWaitlis
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetWaitlistCountQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetWaitlistReferralsUrl = (code: string,) => {
+
+
+
+
+  return `/api/waitlist/referrals/${code}`
+}
+
+/**
+ * Returns how many people signed up using a referral code
+ * @summary Get referral stats for a code
+ */
+export const getWaitlistReferrals = async (code: string, options?: RequestInit): Promise<WaitlistReferralStats> => {
+
+  return customFetch<WaitlistReferralStats>(getGetWaitlistReferralsUrl(code),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWaitlistReferralsQueryKey = (code: string,) => {
+    return [
+    `/api/waitlist/referrals/${code}`
+    ] as const;
+    }
+
+
+export const getGetWaitlistReferralsQueryOptions = <TData = Awaited<ReturnType<typeof getWaitlistReferrals>>, TError = ErrorType<ErrorResponse>>(code: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWaitlistReferrals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWaitlistReferralsQueryKey(code);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWaitlistReferrals>>> = ({ signal }) => getWaitlistReferrals(code, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(code), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWaitlistReferrals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWaitlistReferralsQueryResult = NonNullable<Awaited<ReturnType<typeof getWaitlistReferrals>>>
+export type GetWaitlistReferralsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get referral stats for a code
+ */
+
+export function useGetWaitlistReferrals<TData = Awaited<ReturnType<typeof getWaitlistReferrals>>, TError = ErrorType<ErrorResponse>>(
+ code: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWaitlistReferrals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWaitlistReferralsQueryOptions(code,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

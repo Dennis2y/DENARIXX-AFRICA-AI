@@ -8,6 +8,8 @@ export const waitlistTable = pgTable("waitlist", {
   name: text("name"),
   userType: text("user_type"),
   country: text("country"),
+  referralCode: text("referral_code").unique(),
+  referredBy: text("referred_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
