@@ -26,6 +26,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /waitlist/count:
+    get:
+      operationId: getWaitlistCount
+      tags: [waitlist]
+      summary: Get waitlist count
+      description: Returns the total number of people on the waitlist (public)
+      responses:
+        "200":
+          description: Waitlist count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitlistCount"
   /waitlist:
     post:
       operationId: joinWaitlist
@@ -140,6 +153,13 @@ components:
       required:
         - entries
         - total
+    WaitlistCount:
+      type: object
+      properties:
+        count:
+          type: integer
+      required:
+        - count
     ErrorResponse:
       type: object
       properties:

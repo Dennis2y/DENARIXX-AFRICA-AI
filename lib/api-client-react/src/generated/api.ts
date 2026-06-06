@@ -24,6 +24,7 @@ import type {
   HealthStatus,
   JoinWaitlistRequest,
   JoinWaitlistResponse,
+  WaitlistCount,
   WaitlistList
 } from './api.schemas';
 
@@ -105,6 +106,84 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetWaitlistCountUrl = () => {
+
+
+
+
+  return `/api/waitlist/count`
+}
+
+/**
+ * Returns the total number of people on the waitlist (public)
+ * @summary Get waitlist count
+ */
+export const getWaitlistCount = async ( options?: RequestInit): Promise<WaitlistCount> => {
+
+  return customFetch<WaitlistCount>(getGetWaitlistCountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWaitlistCountQueryKey = () => {
+    return [
+    `/api/waitlist/count`
+    ] as const;
+    }
+
+
+export const getGetWaitlistCountQueryOptions = <TData = Awaited<ReturnType<typeof getWaitlistCount>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWaitlistCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWaitlistCountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWaitlistCount>>> = ({ signal }) => getWaitlistCount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWaitlistCount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWaitlistCountQueryResult = NonNullable<Awaited<ReturnType<typeof getWaitlistCount>>>
+export type GetWaitlistCountQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get waitlist count
+ */
+
+export function useGetWaitlistCount<TData = Awaited<ReturnType<typeof getWaitlistCount>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWaitlistCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWaitlistCountQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -7,7 +7,7 @@ import {
   Mail, User, ChevronDown, PartyPopper, Loader2, Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useJoinWaitlist } from "@workspace/api-client-react";
+import { useJoinWaitlist, useGetWaitlistCount } from "@workspace/api-client-react";
 
 import heroCity from "@/assets/hero-city.png";
 import professionals from "@/assets/professionals.png";
@@ -82,6 +82,8 @@ const Hero = () => {
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 1000], [0, 200]);
   const opacity = useTransform(scrollY, [0, 500], [1, 0]);
+  const { data: countData } = useGetWaitlistCount();
+  const waitlistCount = countData?.count ?? null;
 
   const title = "Africa's AI Operating System".split(" ");
 
@@ -103,11 +105,42 @@ const Hero = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-6"
         >
           <Sparkles className="w-4 h-4" />
           <span>The Future is Here. Version 1.0 Live.</span>
         </motion.div>
+
+        {waitlistCount !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex items-center justify-center mb-8"
+          >
+            <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-card/70 backdrop-blur border border-border/60 shadow-lg">
+              <div className="flex -space-x-2">
+                {["bg-primary", "bg-secondary", "bg-accent"].map((color, i) => (
+                  <div key={i} className={`w-7 h-7 rounded-full ${color}/80 border-2 border-background flex items-center justify-center`}>
+                    <Users className="w-3 h-3 text-background" />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                <motion.span
+                  key={waitlistCount}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-primary font-black tabular-nums"
+                >
+                  {waitlistCount.toLocaleString()}
+                </motion.span>
+                <span className="text-muted-foreground font-medium">people already on the waitlist</span>
+              </div>
+              <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            </div>
+          </motion.div>
+        )}
 
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-6 max-w-5xl leading-tight">
           {title.map((word, i) => (

@@ -18,6 +18,15 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Returns the total number of people on the waitlist (public)
+ * @summary Get waitlist count
+ */
+export const GetWaitlistCountResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
  * Register email for early access
  * @summary Join the waitlist
  */

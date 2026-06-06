@@ -36,6 +36,10 @@ export interface WaitlistList {
   total: number;
 }
 
+export interface WaitlistCount {
+  count: number;
+}
+
 export interface ErrorResponse {
   error: string;
 }
