@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { 
-  Globe, Cpu, Zap, Shield, Rocket, Target, Users, TrendingUp, 
-  MapPin, Heart, ChevronRight, Menu, X, ArrowRight, Play, CheckCircle2,
-  Sparkles, Layers, BookOpen, Briefcase, GraduationCap, Sprout, Building,
-  Mail, User, ChevronDown, PartyPopper, Loader2
+  Globe, Cpu, Zap, Shield, Target, Users, TrendingUp, 
+  MapPin, Heart, Menu, X, ArrowRight, Play, CheckCircle2,
+  Sparkles, Briefcase, GraduationCap, Sprout, Building,
+  Mail, User, ChevronDown, PartyPopper, Loader2, Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useJoinWaitlist } from "@workspace/api-client-react";
 
 import heroCity from "@/assets/hero-city.png";
 import professionals from "@/assets/professionals.png";
+
+const scrollTo = (id: string) => {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+};
 
 // --- Components ---
 
@@ -42,8 +46,8 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-4">
-          <Button variant="ghost" className="text-foreground">Log In</Button>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90">Get Early Access</Button>
+          <Button variant="ghost" className="text-foreground" onClick={() => scrollTo("waitlist")}>Log In</Button>
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => scrollTo("waitlist")}>Get Early Access</Button>
         </div>
 
         <button className="md:hidden text-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -65,8 +69,8 @@ const Navbar = () => {
             <a href="#dena" className="p-2 text-foreground font-medium" onClick={() => setMobileMenuOpen(false)}>DENA AI</a>
             <a href="#pricing" className="p-2 text-foreground font-medium" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
             <div className="h-px w-full bg-border my-2" />
-            <Button variant="outline" className="w-full">Log In</Button>
-            <Button className="w-full bg-primary text-primary-foreground">Get Early Access</Button>
+            <Button variant="outline" className="w-full" onClick={() => { scrollTo("waitlist"); setMobileMenuOpen(false); }}>Log In</Button>
+            <Button className="w-full bg-primary text-primary-foreground" onClick={() => { scrollTo("waitlist"); setMobileMenuOpen(false); }}>Get Early Access</Button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -135,14 +139,14 @@ const Hero = () => {
           transition={{ duration: 0.5, delay: 0.8 }}
           className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center"
         >
-          <Button size="lg" className="h-14 px-8 text-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full sm:w-auto group relative overflow-hidden">
+          <Button size="lg" onClick={() => scrollTo("waitlist")} className="h-14 px-8 text-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full sm:w-auto group relative overflow-hidden">
             <span className="relative z-10 flex items-center gap-2">
               Join the Waitlist <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
           </Button>
-          <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full w-full sm:w-auto bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
-            <Play className="w-5 h-5 mr-2" /> Watch Demo
+          <Button size="lg" variant="outline" onClick={() => scrollTo("modules")} className="h-14 px-8 text-lg rounded-full w-full sm:w-auto bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
+            <Play className="w-5 h-5 mr-2" /> Explore Platform
           </Button>
         </motion.div>
       </div>
@@ -299,7 +303,7 @@ const DenaAI = () => {
           <p className="text-xl md:text-2xl text-muted-foreground mb-12">
             The beating heart of the ecosystem. A context-aware, hyper-intelligent assistant that understands African languages, markets, and nuances.
           </p>
-          <Button size="lg" className="bg-primary text-primary-foreground rounded-full px-8">Interact with DENA</Button>
+          <Button size="lg" onClick={() => scrollTo("waitlist")} className="bg-primary text-primary-foreground rounded-full px-8">Get Early Access</Button>
         </motion.div>
       </div>
     </section>
@@ -368,7 +372,7 @@ const Pricing = () => {
                 ))}
               </ul>
 
-              <Button className={`w-full ${plan.popular ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+              <Button onClick={() => scrollTo("waitlist")} className={`w-full ${plan.popular ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
                 {plan.cta}
               </Button>
             </motion.div>
@@ -468,19 +472,19 @@ const Footer = () => {
           <div>
             <h4 className="font-bold mb-4">Platform</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-primary">Modules</a></li>
-              <li><a href="#" className="hover:text-primary">DENA AI</a></li>
-              <li><a href="#" className="hover:text-primary">Pricing</a></li>
-              <li><a href="#" className="hover:text-primary">Waitlist</a></li>
+              <li><button onClick={() => scrollTo("modules")} className="hover:text-primary transition-colors">Modules</button></li>
+              <li><button onClick={() => scrollTo("dena")} className="hover:text-primary transition-colors">DENA AI</button></li>
+              <li><button onClick={() => scrollTo("pricing")} className="hover:text-primary transition-colors">Pricing</button></li>
+              <li><button onClick={() => scrollTo("waitlist")} className="hover:text-primary transition-colors">Waitlist</button></li>
             </ul>
           </div>
           <div>
             <h4 className="font-bold mb-4">Company</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-primary">About</a></li>
-              <li><a href="#" className="hover:text-primary">Careers</a></li>
-              <li><a href="#" className="hover:text-primary">Privacy</a></li>
-              <li><a href="#" className="hover:text-primary">Terms</a></li>
+              <li><button onClick={() => scrollTo("users")} className="hover:text-primary transition-colors">About</button></li>
+              <li><button onClick={() => scrollTo("waitlist")} className="hover:text-primary transition-colors">Careers</button></li>
+              <li><button onClick={() => scrollTo("waitlist")} className="hover:text-primary transition-colors">Privacy</button></li>
+              <li><button onClick={() => scrollTo("waitlist")} className="hover:text-primary transition-colors">Terms</button></li>
             </ul>
           </div>
         </div>
@@ -526,6 +530,7 @@ const WaitlistCTA = () => {
   const [country, setCountry] = useState("");
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const { mutate, isPending } = useJoinWaitlist({
     mutation: {
@@ -587,10 +592,63 @@ const WaitlistCTA = () => {
                 <div className="w-16 h-16 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center mx-auto mb-6">
                   <PartyPopper className="w-8 h-8 text-accent" />
                 </div>
-                <h3 className="text-2xl font-bold mb-3">You're on the list!</h3>
-                <p className="text-muted-foreground">
+                <h3 className="text-2xl font-bold mb-3">You're on the list! 🎉</h3>
+                <p className="text-muted-foreground mb-8">
                   We'll reach out when early access opens. Get ready — Africa's AI Operating System is launching soon.
                 </p>
+
+                <div className="border-t border-border/40 pt-8">
+                  <p className="text-sm font-semibold text-foreground/70 uppercase tracking-widest mb-5 flex items-center justify-center gap-2">
+                    <Share2 className="w-4 h-4" /> Spread the Word
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <a
+                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("I just joined the DENARIXX AFRICA AI waitlist! 🚀 Africa's AI Operating System is coming — built for the continent, by the continent. Join me 👇")}&url=${encodeURIComponent("https://denarixx.ai")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#1DA1F2]/10 border border-[#1DA1F2]/30 text-[#1DA1F2] font-semibold text-sm hover:bg-[#1DA1F2]/20 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      Share on X (Twitter)
+                    </a>
+                    <a
+                      href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://denarixx.ai")}&summary=${encodeURIComponent("I just joined the DENARIXX AFRICA AI waitlist! Africa's AI Operating System is coming. Join the movement.")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#0077B5]/10 border border-[#0077B5]/30 text-[#0077B5] font-semibold text-sm hover:bg-[#0077B5]/20 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                      </svg>
+                      Share on LinkedIn
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText("https://denarixx.ai").then(() => {
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        });
+                      }}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors"
+                    >
+                      {copied ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                          Copy Link
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             ) : (
               <motion.form
