@@ -21,6 +21,12 @@ import Jobs from "@/pages/Jobs";
 import InterviewCoach from "@/pages/InterviewCoach";
 import Community from "@/pages/Community";
 import Messages from "@/pages/Messages";
+import BusinessAI from "@/pages/BusinessAI";
+import Marketplace from "@/pages/Marketplace";
+import FarmAI from "@/pages/FarmAI";
+import HealthAI from "@/pages/HealthAI";
+import InvestAI from "@/pages/InvestAI";
+import GovAI from "@/pages/GovAI";
 import DenaChat from "@/components/DenaChat";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -155,6 +161,12 @@ function Router() {
       <Route path="/interview-coach" component={InterviewCoach} />
       <Route path="/community" component={Community} />
       <Route path="/messages" component={Messages} />
+      <Route path="/business-ai" component={BusinessAI} />
+      <Route path="/marketplace" component={Marketplace} />
+      <Route path="/farm-ai" component={FarmAI} />
+      <Route path="/health-ai" component={HealthAI} />
+      <Route path="/invest-ai" component={InvestAI} />
+      <Route path="/gov-ai" component={GovAI} />
       <Route path="/admin" component={Admin} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route component={NotFound} />

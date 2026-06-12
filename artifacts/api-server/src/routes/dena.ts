@@ -43,9 +43,10 @@ function buildSystemPrompt(userContext?: { name?: string | null; role?: string |
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
-  const { message, conversationId } = req.body as {
+  const { message, conversationId, moduleContext } = req.body as {
     message: string;
     conversationId?: number;
+    moduleContext?: string;
   };
 
   if (!message || typeof message !== "string") {
@@ -101,7 +102,10 @@ router.post("/chat", async (req, res) => {
   }
 
   const openai = getOpenAI();
-  const systemPrompt = buildSystemPrompt(userContext);
+  let systemPrompt = buildSystemPrompt(userContext);
+  if (moduleContext) {
+    systemPrompt += `\n\n--- Module Context ---\n${moduleContext}\nFocus your responses on this domain. Be specific, practical, and Africa-aware.`;
+  }
 
   try {
     const stream = await openai.chat.completions.create({

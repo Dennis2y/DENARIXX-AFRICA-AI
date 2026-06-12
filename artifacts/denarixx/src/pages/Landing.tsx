@@ -265,6 +265,7 @@ type ModuleInfo = {
   features: string[];
   status: "Live" | "Beta" | "Coming Soon";
   accent: string;
+  href: string;
 };
 
 const MODULE_STATUS_STYLE: Record<string, string> = {
@@ -291,6 +292,7 @@ const Modules = () => {
       ],
       status: "Beta",
       accent: "text-blue-400",
+      href: "/skillswap",
     },
     {
       icon: <Briefcase />,
@@ -306,6 +308,7 @@ const Modules = () => {
       ],
       status: "Beta",
       accent: "text-purple-400",
+      href: "/jobs",
     },
     {
       icon: <Building />,
@@ -321,6 +324,7 @@ const Modules = () => {
       ],
       status: "Beta",
       accent: "text-cyan-400",
+      href: "/business-ai",
     },
     {
       icon: <Target />,
@@ -336,6 +340,7 @@ const Modules = () => {
       ],
       status: "Beta",
       accent: "text-amber-400",
+      href: "/marketplace",
     },
     {
       icon: <Sprout />,
@@ -349,8 +354,9 @@ const Modules = () => {
         "Direct-to-market channels for produce",
         "Micro-financing links for smallholder farmers",
       ],
-      status: "Coming Soon",
+      status: "Beta",
       accent: "text-lime-400",
+      href: "/farm-ai",
     },
     {
       icon: <Heart />,
@@ -364,8 +370,9 @@ const Modules = () => {
         "Mental health support in local languages",
         "Community health worker training tools",
       ],
-      status: "Coming Soon",
+      status: "Beta",
       accent: "text-rose-400",
+      href: "/health-ai",
     },
     {
       icon: <TrendingUp />,
@@ -379,8 +386,9 @@ const Modules = () => {
         "Risk scoring for African market conditions",
         "Pension and savings plan automation",
       ],
-      status: "Coming Soon",
+      status: "Beta",
       accent: "text-green-400",
+      href: "/invest-ai",
     },
     {
       icon: <Shield />,
@@ -394,8 +402,9 @@ const Modules = () => {
         "Citizen feedback and petition tools",
         "Cross-border policy harmonisation support",
       ],
-      status: "Coming Soon",
+      status: "Beta",
       accent: "text-indigo-400",
+      href: "/gov-ai",
     },
     {
       icon: <Users />,
@@ -411,6 +420,7 @@ const Modules = () => {
       ],
       status: "Beta",
       accent: "text-orange-400",
+      href: "/community",
     },
     {
       icon: <Cpu />,
@@ -426,6 +436,7 @@ const Modules = () => {
       ],
       status: "Live",
       accent: "text-primary",
+      href: "/dena",
     },
   ];
 
@@ -487,12 +498,17 @@ const Modules = () => {
                 ))}
               </div>
 
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => { setSelected(null); scrollTo("waitlist"); }}
+              <a
+                href={`${basePath}/sign-up`}
+                className="block w-full"
               >
-                Join Waitlist for Early Access <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+                <Button
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={() => setSelected(null)}
+                >
+                  Launch {selected.name} <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </a>
             </motion.div>
           </motion.div>
         )}
