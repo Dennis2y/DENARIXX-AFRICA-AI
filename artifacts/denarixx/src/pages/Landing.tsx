@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useJoinWaitlist, useGetWaitlistCount, useGetWaitlistReferrals } from "@workspace/api-client-react";
+import { useUser, Show } from "@clerk/react";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 import heroCity from "@/assets/hero-city.png";
 import professionals from "@/assets/professionals.png";
@@ -46,8 +49,17 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-4">
-          <Button variant="ghost" className="text-foreground" onClick={() => scrollTo("waitlist")}>Log In</Button>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => scrollTo("waitlist")}>Get Early Access</Button>
+          <Show when="signed-out">
+            <a href={`${basePath}/sign-in`}>
+              <Button variant="ghost" className="text-foreground">Log In</Button>
+            </a>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => scrollTo("waitlist")}>Get Early Access</Button>
+          </Show>
+          <Show when="signed-in">
+            <a href={`${basePath}/dashboard`}>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">Go to Dashboard</Button>
+            </a>
+          </Show>
         </div>
 
         <button className="md:hidden text-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -69,8 +81,17 @@ const Navbar = () => {
             <a href="#dena" className="p-2 text-foreground font-medium" onClick={() => setMobileMenuOpen(false)}>DENA AI</a>
             <a href="#pricing" className="p-2 text-foreground font-medium" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
             <div className="h-px w-full bg-border my-2" />
-            <Button variant="outline" className="w-full" onClick={() => { scrollTo("waitlist"); setMobileMenuOpen(false); }}>Log In</Button>
-            <Button className="w-full bg-primary text-primary-foreground" onClick={() => { scrollTo("waitlist"); setMobileMenuOpen(false); }}>Get Early Access</Button>
+            <Show when="signed-out">
+              <a href={`${basePath}/sign-in`} className="w-full">
+                <Button variant="outline" className="w-full" onClick={() => setMobileMenuOpen(false)}>Log In</Button>
+              </a>
+              <Button className="w-full bg-primary text-primary-foreground" onClick={() => { scrollTo("waitlist"); setMobileMenuOpen(false); }}>Get Early Access</Button>
+            </Show>
+            <Show when="signed-in">
+              <a href={`${basePath}/dashboard`} className="w-full">
+                <Button className="w-full bg-primary text-primary-foreground" onClick={() => setMobileMenuOpen(false)}>Dashboard</Button>
+              </a>
+            </Show>
           </motion.div>
         )}
       </AnimatePresence>

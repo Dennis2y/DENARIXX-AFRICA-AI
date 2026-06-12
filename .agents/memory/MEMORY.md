@@ -1,0 +1,3 @@
+- [Clerk + Tailwind v4 setup](clerk-tailwind-v4.md) — layer declaration, optimize:false, clerk/themes v1 for react v6 compat
+- [OpenAI direct key](openai-direct-key.md) — uses OPENAI_API_KEY directly (not Replit proxy); client in lib/integrations-openai-ai-server/src/client.ts
+- [DB schema exports](db-schema-exports.md) — all tables must be exported from lib/db/src/schema/index.ts for push to create them
