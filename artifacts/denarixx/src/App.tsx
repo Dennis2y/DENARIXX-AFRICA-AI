@@ -3,6 +3,7 @@ import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wo
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
+// @ts-expect-error — @clerk/themes@1.x ships shadcn but its d.ts omits it
 import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,8 @@ import Leaderboard from "@/pages/Leaderboard";
 import Dashboard from "@/pages/Dashboard";
 import Profile from "@/pages/Profile";
 import SkillSwap from "@/pages/SkillSwap";
+import DenaPage from "@/pages/Dena";
+import CvBuilder from "@/pages/CvBuilder";
 import DenaChat from "@/components/DenaChat";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -141,6 +144,8 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/skillswap" component={SkillSwap} />
+      <Route path="/dena" component={DenaPage} />
+      <Route path="/cv-builder" component={CvBuilder} />
       <Route path="/admin" component={Admin} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route component={NotFound} />

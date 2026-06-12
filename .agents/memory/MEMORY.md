@@ -2,3 +2,5 @@
 - [OpenAI direct key](openai-direct-key.md) — uses OPENAI_API_KEY directly (not Replit proxy); client in lib/integrations-openai-ai-server/src/client.ts
 - [DB schema exports](db-schema-exports.md) — all tables must be exported from lib/db/src/schema/index.ts for push to create them
 - [API server OpenAI import](api-server-openai.md) — never import openai at top-level in api-server routes; use dynamic require("@workspace/integrations-openai-ai-server") inside handler; Orval inline request body schemas cause TS2308 name collision — always use named $ref instead.
+- [Clerk themes shadcn type](clerk-themes-shadcn.md) — @clerk/themes@1.x ships shadcn at runtime but d.ts omits it; suppress with @ts-expect-error on the import line
+- [DENA conversation persistence](dena-persistence.md) — conversations table needed clerkUserId column (added via push); POST /chat saves user+assistant messages to DB after streaming; X-Conversation-Id response header carries the resolved conversationId

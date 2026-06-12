@@ -14,6 +14,12 @@ tags:
     description: Waitlist operations
   - name: skillswap
     description: SkillSwap AI — peer-to-peer skill exchange
+  - name: dena
+    description: DENA AI — conversational assistant
+  - name: users
+    description: User profile management
+  - name: cvbuilder
+    description: AI CV & cover letter generator
 paths:
   /healthz:
     get:
@@ -290,6 +296,166 @@ paths:
                 $ref: "#/components/schemas/SkillConnectionResult"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /dena/chat:
+    post:
+      operationId: denaChatStream
+      tags: [dena]
+      summary: Stream a DENA AI response
+      description: Sends a message and streams the reply via SSE. Persists conversation when authenticated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DenaChatRequest"
+      responses:
+        "200":
+          description: SSE stream of content chunks
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /dena/conversations:
+    get:
+      operationId: getDenaConversations
+      tags: [dena]
+      summary: List user's saved conversations
+      responses:
+        "200":
+          description: Conversations list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DenaConversationsResponse"
+  /dena/conversations/{id}/messages:
+    get:
+      operationId: getDenaConversationMessages
+      tags: [dena]
+      summary: Load all messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Message history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DenaMessagesResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /dena/conversations/{id}:
+    delete:
+      operationId: deleteDenaConversation
+      tags: [dena]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /users/me:
+    get:
+      operationId: getMyProfile
+      tags: [users]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile with skills
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateMyProfile
+      tags: [users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+  /users/me/skills:
+    put:
+      operationId: updateMySkills
+      tags: [users]
+      summary: Replace user skill list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSkillsRequest"
+      responses:
+        "200":
+          description: Updated skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserSkill"
+  /cv-builder/generate:
+    post:
+      operationId: generateCv
+      tags: [cvbuilder]
+      summary: Generate AI resume and cover letter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CvGenerateRequest"
+      responses:
+        "200":
+          description: Generated resume and cover letter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CvGenerateResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: AI unavailable
           content:
             application/json:
               schema:
@@ -632,3 +798,226 @@ components:
           enum: [accepted, declined]
       required:
         - status
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+    DenaChatRequest:
+      type: object
+      properties:
+        message:
+          type: string
+        conversationId:
+          type: integer
+      required:
+        - message
+    DenaConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkUserId
+        - title
+        - createdAt
+        - updatedAt
+    DenaConversationsResponse:
+      type: object
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DenaConversation"
+      required:
+        - conversations
+    DenaMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+    DenaMessagesResponse:
+      type: object
+      properties:
+        conversationId:
+          type: integer
+        title:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DenaMessage"
+      required:
+        - conversationId
+        - title
+        - messages
+    UserSkill:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        skill:
+          type: string
+        level:
+          type: string
+      required:
+        - id
+        - userId
+        - skill
+        - level
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        role:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        twitterHandle:
+          type: string
+          nullable: true
+        linkedinUrl:
+          type: string
+          nullable: true
+        githubHandle:
+          type: string
+          nullable: true
+        reputationScore:
+          type: integer
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSkill"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkUserId
+        - email
+        - reputationScore
+        - skills
+        - createdAt
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        bio:
+          type: string
+        role:
+          type: string
+        location:
+          type: string
+        country:
+          type: string
+        website:
+          type: string
+        twitterHandle:
+          type: string
+        linkedinUrl:
+          type: string
+        githubHandle:
+          type: string
+    UpdateSkillsRequest:
+      type: object
+      properties:
+        skills:
+          type: array
+          items:
+            type: object
+            properties:
+              skill:
+                type: string
+              level:
+                type: string
+            required:
+              - skill
+      required:
+        - skills
+    CvGenerateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        targetRole:
+          type: string
+        currentRole:
+          type: string
+        experience:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        education:
+          type: string
+        achievements:
+          type: string
+        tone:
+          type: string
+          enum: [professional, creative, executive]
+      required:
+        - name
+        - targetRole
+        - experience
+    CvGenerateResponse:
+      type: object
+      properties:
+        resume:
+          type: string
+        coverLetter:
+          type: string
+      required:
+        - resume
+        - coverLetter

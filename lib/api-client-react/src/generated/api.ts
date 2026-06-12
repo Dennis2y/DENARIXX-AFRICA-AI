@@ -22,7 +22,12 @@ import type {
 import type {
   CreateSkillConnectionRequest,
   CreateSkillListingRequest,
+  CvGenerateRequest,
+  CvGenerateResponse,
   DeleteSkillListing200,
+  DenaChatRequest,
+  DenaConversationsResponse,
+  DenaMessagesResponse,
   ErrorResponse,
   GetSkillListingsParams,
   HealthStatus,
@@ -35,7 +40,12 @@ import type {
   SkillListingResult,
   SkillListingsResponse,
   SkillMatchesResponse,
+  SuccessResponse,
   UpdateConnectionStatusRequest,
+  UpdateProfileRequest,
+  UpdateSkillsRequest,
+  UserProfile,
+  UserSkill,
   WaitlistCount,
   WaitlistList,
   WaitlistReferralStats
@@ -1117,5 +1127,591 @@ export const useUpdateSkillConnection = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateSkillConnectionMutationOptions(options));
+    }
+
+export const getDenaChatStreamUrl = () => {
+
+
+
+
+  return `/api/dena/chat`
+}
+
+/**
+ * Sends a message and streams the reply via SSE. Persists conversation when authenticated.
+ * @summary Stream a DENA AI response
+ */
+export const denaChatStream = async (denaChatRequest: DenaChatRequest, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDenaChatStreamUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      denaChatRequest,)
+  }
+);}
+
+
+
+
+export const getDenaChatStreamMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof denaChatStream>>, TError,{data: BodyType<DenaChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof denaChatStream>>, TError,{data: BodyType<DenaChatRequest>}, TContext> => {
+
+const mutationKey = ['denaChatStream'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof denaChatStream>>, {data: BodyType<DenaChatRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  denaChatStream(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DenaChatStreamMutationResult = NonNullable<Awaited<ReturnType<typeof denaChatStream>>>
+    export type DenaChatStreamMutationBody = BodyType<DenaChatRequest>
+    export type DenaChatStreamMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Stream a DENA AI response
+ */
+export const useDenaChatStream = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof denaChatStream>>, TError,{data: BodyType<DenaChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof denaChatStream>>,
+        TError,
+        {data: BodyType<DenaChatRequest>},
+        TContext
+      > => {
+      return useMutation(getDenaChatStreamMutationOptions(options));
+    }
+
+export const getGetDenaConversationsUrl = () => {
+
+
+
+
+  return `/api/dena/conversations`
+}
+
+/**
+ * @summary List user's saved conversations
+ */
+export const getDenaConversations = async ( options?: RequestInit): Promise<DenaConversationsResponse> => {
+
+  return customFetch<DenaConversationsResponse>(getGetDenaConversationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDenaConversationsQueryKey = () => {
+    return [
+    `/api/dena/conversations`
+    ] as const;
+    }
+
+
+export const getGetDenaConversationsQueryOptions = <TData = Awaited<ReturnType<typeof getDenaConversations>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDenaConversations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDenaConversationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDenaConversations>>> = ({ signal }) => getDenaConversations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDenaConversations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDenaConversationsQueryResult = NonNullable<Awaited<ReturnType<typeof getDenaConversations>>>
+export type GetDenaConversationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List user's saved conversations
+ */
+
+export function useGetDenaConversations<TData = Awaited<ReturnType<typeof getDenaConversations>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDenaConversations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDenaConversationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDenaConversationMessagesUrl = (id: number,) => {
+
+
+
+
+  return `/api/dena/conversations/${id}/messages`
+}
+
+/**
+ * @summary Load all messages in a conversation
+ */
+export const getDenaConversationMessages = async (id: number, options?: RequestInit): Promise<DenaMessagesResponse> => {
+
+  return customFetch<DenaMessagesResponse>(getGetDenaConversationMessagesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDenaConversationMessagesQueryKey = (id: number,) => {
+    return [
+    `/api/dena/conversations/${id}/messages`
+    ] as const;
+    }
+
+
+export const getGetDenaConversationMessagesQueryOptions = <TData = Awaited<ReturnType<typeof getDenaConversationMessages>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDenaConversationMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDenaConversationMessagesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDenaConversationMessages>>> = ({ signal }) => getDenaConversationMessages(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDenaConversationMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDenaConversationMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof getDenaConversationMessages>>>
+export type GetDenaConversationMessagesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Load all messages in a conversation
+ */
+
+export function useGetDenaConversationMessages<TData = Awaited<ReturnType<typeof getDenaConversationMessages>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDenaConversationMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDenaConversationMessagesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeleteDenaConversationUrl = (id: number,) => {
+
+
+
+
+  return `/api/dena/conversations/${id}`
+}
+
+/**
+ * @summary Delete a conversation
+ */
+export const deleteDenaConversation = async (id: number, options?: RequestInit): Promise<SuccessResponse> => {
+
+  return customFetch<SuccessResponse>(getDeleteDenaConversationUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDenaConversationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDenaConversation>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDenaConversation>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteDenaConversation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDenaConversation>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDenaConversation(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDenaConversationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDenaConversation>>>
+
+    export type DeleteDenaConversationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a conversation
+ */
+export const useDeleteDenaConversation = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDenaConversation>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDenaConversation>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDenaConversationMutationOptions(options));
+    }
+
+export const getGetMyProfileUrl = () => {
+
+
+
+
+  return `/api/users/me`
+}
+
+/**
+ * @summary Get current user profile
+ */
+export const getMyProfile = async ( options?: RequestInit): Promise<UserProfile> => {
+
+  return customFetch<UserProfile>(getGetMyProfileUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyProfileQueryKey = () => {
+    return [
+    `/api/users/me`
+    ] as const;
+    }
+
+
+export const getGetMyProfileQueryOptions = <TData = Awaited<ReturnType<typeof getMyProfile>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyProfileQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyProfile>>> = ({ signal }) => getMyProfile({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getMyProfile>>>
+export type GetMyProfileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get current user profile
+ */
+
+export function useGetMyProfile<TData = Awaited<ReturnType<typeof getMyProfile>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyProfileQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateMyProfileUrl = () => {
+
+
+
+
+  return `/api/users/me`
+}
+
+/**
+ * @summary Update current user profile
+ */
+export const updateMyProfile = async (updateProfileRequest: UpdateProfileRequest, options?: RequestInit): Promise<UserProfile> => {
+
+  return customFetch<UserProfile>(getUpdateMyProfileUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateProfileRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateMyProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyProfile>>, TError,{data: BodyType<UpdateProfileRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMyProfile>>, TError,{data: BodyType<UpdateProfileRequest>}, TContext> => {
+
+const mutationKey = ['updateMyProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMyProfile>>, {data: BodyType<UpdateProfileRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateMyProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMyProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateMyProfile>>>
+    export type UpdateMyProfileMutationBody = BodyType<UpdateProfileRequest>
+    export type UpdateMyProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update current user profile
+ */
+export const useUpdateMyProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyProfile>>, TError,{data: BodyType<UpdateProfileRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMyProfile>>,
+        TError,
+        {data: BodyType<UpdateProfileRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateMyProfileMutationOptions(options));
+    }
+
+export const getUpdateMySkillsUrl = () => {
+
+
+
+
+  return `/api/users/me/skills`
+}
+
+/**
+ * @summary Replace user skill list
+ */
+export const updateMySkills = async (updateSkillsRequest: UpdateSkillsRequest, options?: RequestInit): Promise<UserSkill[]> => {
+
+  return customFetch<UserSkill[]>(getUpdateMySkillsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateSkillsRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateMySkillsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMySkills>>, TError,{data: BodyType<UpdateSkillsRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMySkills>>, TError,{data: BodyType<UpdateSkillsRequest>}, TContext> => {
+
+const mutationKey = ['updateMySkills'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMySkills>>, {data: BodyType<UpdateSkillsRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateMySkills(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMySkillsMutationResult = NonNullable<Awaited<ReturnType<typeof updateMySkills>>>
+    export type UpdateMySkillsMutationBody = BodyType<UpdateSkillsRequest>
+    export type UpdateMySkillsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Replace user skill list
+ */
+export const useUpdateMySkills = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMySkills>>, TError,{data: BodyType<UpdateSkillsRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMySkills>>,
+        TError,
+        {data: BodyType<UpdateSkillsRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateMySkillsMutationOptions(options));
+    }
+
+export const getGenerateCvUrl = () => {
+
+
+
+
+  return `/api/cv-builder/generate`
+}
+
+/**
+ * @summary Generate AI resume and cover letter
+ */
+export const generateCv = async (cvGenerateRequest: CvGenerateRequest, options?: RequestInit): Promise<CvGenerateResponse> => {
+
+  return customFetch<CvGenerateResponse>(getGenerateCvUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      cvGenerateRequest,)
+  }
+);}
+
+
+
+
+export const getGenerateCvMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCv>>, TError,{data: BodyType<CvGenerateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateCv>>, TError,{data: BodyType<CvGenerateRequest>}, TContext> => {
+
+const mutationKey = ['generateCv'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateCv>>, {data: BodyType<CvGenerateRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateCv(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateCvMutationResult = NonNullable<Awaited<ReturnType<typeof generateCv>>>
+    export type GenerateCvMutationBody = BodyType<CvGenerateRequest>
+    export type GenerateCvMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Generate AI resume and cover letter
+ */
+export const useGenerateCv = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateCv>>, TError,{data: BodyType<CvGenerateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateCv>>,
+        TError,
+        {data: BodyType<CvGenerateRequest>},
+        TContext
+      > => {
+      return useMutation(getGenerateCvMutationOptions(options));
     }
 

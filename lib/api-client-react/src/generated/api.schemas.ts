@@ -191,6 +191,120 @@ export interface UpdateConnectionStatusRequest {
   status: UpdateConnectionStatusRequestStatus;
 }
 
+export interface SuccessResponse {
+  success: boolean;
+}
+
+export interface DenaChatRequest {
+  message: string;
+  conversationId?: number;
+}
+
+export interface DenaConversation {
+  id: number;
+  clerkUserId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DenaConversationsResponse {
+  conversations: DenaConversation[];
+}
+
+export type DenaMessageRole = typeof DenaMessageRole[keyof typeof DenaMessageRole];
+
+
+export const DenaMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export interface DenaMessage {
+  id: number;
+  conversationId: number;
+  role: DenaMessageRole;
+  content: string;
+  createdAt: string;
+}
+
+export interface DenaMessagesResponse {
+  conversationId: number;
+  title: string;
+  messages: DenaMessage[];
+}
+
+export interface UserSkill {
+  id: number;
+  userId: number;
+  skill: string;
+  level: string;
+}
+
+export interface UserProfile {
+  id: number;
+  clerkUserId: string;
+  email: string;
+  name?: string | null;
+  bio?: string | null;
+  role?: string | null;
+  location?: string | null;
+  country?: string | null;
+  website?: string | null;
+  twitterHandle?: string | null;
+  linkedinUrl?: string | null;
+  githubHandle?: string | null;
+  reputationScore: number;
+  skills: UserSkill[];
+  createdAt: string;
+}
+
+export interface UpdateProfileRequest {
+  name?: string;
+  bio?: string;
+  role?: string;
+  location?: string;
+  country?: string;
+  website?: string;
+  twitterHandle?: string;
+  linkedinUrl?: string;
+  githubHandle?: string;
+}
+
+export type UpdateSkillsRequestSkillsItem = {
+  skill: string;
+  level?: string;
+};
+
+export interface UpdateSkillsRequest {
+  skills: UpdateSkillsRequestSkillsItem[];
+}
+
+export type CvGenerateRequestTone = typeof CvGenerateRequestTone[keyof typeof CvGenerateRequestTone];
+
+
+export const CvGenerateRequestTone = {
+  professional: 'professional',
+  creative: 'creative',
+  executive: 'executive',
+} as const;
+
+export interface CvGenerateRequest {
+  name: string;
+  targetRole: string;
+  currentRole?: string;
+  experience: string;
+  skills?: string[];
+  education?: string;
+  achievements?: string;
+  tone?: CvGenerateRequestTone;
+}
+
+export interface CvGenerateResponse {
+  resume: string;
+  coverLetter: string;
+}
+
 export type GetSkillListingsParams = {
 type?: GetSkillListingsType;
 category?: string;

@@ -239,3 +239,164 @@ export const UpdateSkillConnectionResponse = zod.object({
 })
 
 
+/**
+ * Sends a message and streams the reply via SSE. Persists conversation when authenticated.
+ * @summary Stream a DENA AI response
+ */
+export const DenaChatStreamBody = zod.object({
+  "message": zod.string(),
+  "conversationId": zod.number().optional()
+})
+
+
+/**
+ * @summary List user's saved conversations
+ */
+export const GetDenaConversationsResponse = zod.object({
+  "conversations": zod.array(zod.object({
+  "id": zod.number(),
+  "clerkUserId": zod.string(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Load all messages in a conversation
+ */
+export const GetDenaConversationMessagesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetDenaConversationMessagesResponse = zod.object({
+  "conversationId": zod.number(),
+  "title": zod.string(),
+  "messages": zod.array(zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number(),
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Delete a conversation
+ */
+export const DeleteDenaConversationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteDenaConversationResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get current user profile
+ */
+export const GetMyProfileResponse = zod.object({
+  "id": zod.number(),
+  "clerkUserId": zod.string(),
+  "email": zod.string(),
+  "name": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "role": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "website": zod.string().nullish(),
+  "twitterHandle": zod.string().nullish(),
+  "linkedinUrl": zod.string().nullish(),
+  "githubHandle": zod.string().nullish(),
+  "reputationScore": zod.number(),
+  "skills": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "skill": zod.string(),
+  "level": zod.string()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update current user profile
+ */
+export const UpdateMyProfileBody = zod.object({
+  "name": zod.string().optional(),
+  "bio": zod.string().optional(),
+  "role": zod.string().optional(),
+  "location": zod.string().optional(),
+  "country": zod.string().optional(),
+  "website": zod.string().optional(),
+  "twitterHandle": zod.string().optional(),
+  "linkedinUrl": zod.string().optional(),
+  "githubHandle": zod.string().optional()
+})
+
+export const UpdateMyProfileResponse = zod.object({
+  "id": zod.number(),
+  "clerkUserId": zod.string(),
+  "email": zod.string(),
+  "name": zod.string().nullish(),
+  "bio": zod.string().nullish(),
+  "role": zod.string().nullish(),
+  "location": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "website": zod.string().nullish(),
+  "twitterHandle": zod.string().nullish(),
+  "linkedinUrl": zod.string().nullish(),
+  "githubHandle": zod.string().nullish(),
+  "reputationScore": zod.number(),
+  "skills": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "skill": zod.string(),
+  "level": zod.string()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Replace user skill list
+ */
+export const UpdateMySkillsBody = zod.object({
+  "skills": zod.array(zod.object({
+  "skill": zod.string(),
+  "level": zod.string().optional()
+}))
+})
+
+export const UpdateMySkillsResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "skill": zod.string(),
+  "level": zod.string()
+})
+export const UpdateMySkillsResponse = zod.array(UpdateMySkillsResponseItem)
+
+
+/**
+ * @summary Generate AI resume and cover letter
+ */
+export const GenerateCvBody = zod.object({
+  "name": zod.string(),
+  "targetRole": zod.string(),
+  "currentRole": zod.string().optional(),
+  "experience": zod.string(),
+  "skills": zod.array(zod.string()).optional(),
+  "education": zod.string().optional(),
+  "achievements": zod.string().optional(),
+  "tone": zod.enum(['professional', 'creative', 'executive']).optional()
+})
+
+export const GenerateCvResponse = zod.object({
+  "resume": zod.string(),
+  "coverLetter": zod.string()
+})
+
+

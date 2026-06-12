@@ -87,7 +87,7 @@ function ListingCard({
     userLocation?: string | null;
     userRole?: string | null;
   };
-  onConnect?: (listing: typeof listing) => void;
+  onConnect?: (listing: { id: number; userId: number; skillName: string; category: string; listingType: string; description?: string | null; level: string; availability?: string | null; userName?: string | null; userAvatar?: string | null; userLocation?: string | null; userRole?: string | null }) => void;
   isConnecting?: boolean;
   showConnect?: boolean;
 }) {
