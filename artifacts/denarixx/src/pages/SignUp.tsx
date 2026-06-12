@@ -9,6 +9,7 @@ export default function SignUpPage() {
         routing="path"
         path={`${basePath}/sign-up`}
         signInUrl={`${basePath}/sign-in`}
+        forceRedirectUrl={`${basePath}/profile`}
       />
     </div>
   );

@@ -97,7 +97,9 @@ function ProfileContent() {
         body: JSON.stringify({ skills }),
       });
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      setTimeout(() => {
+        window.location.href = `${basePath}/dashboard`;
+      }, 1200);
     } catch {
       // silent
     } finally {
