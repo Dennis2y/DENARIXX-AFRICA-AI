@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
   Zap, User, BookOpen, FileText, Briefcase, Users, BarChart3,
-  LogOut, Settings, Trophy, ChevronRight, Sparkles, Lock, Mic
+  LogOut, Trophy, ChevronRight, Sparkles, Lock, Mic, MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,6 +27,7 @@ const modules: Module[] = [
   { icon: Mic, label: "Interview Coach", desc: "Practice with AI feedback", color: "text-primary", bg: "bg-primary/10 border-primary/20", href: `${basePath}/interview-coach`, live: true },
   { icon: Briefcase, label: "Jobs AI", desc: "Matched jobs for your profile", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20", href: `${basePath}/jobs`, live: true },
   { icon: Users, label: "Community", desc: "Connect with African talent", color: "text-pink-400", bg: "bg-pink-400/10 border-pink-400/20", href: `${basePath}/community`, live: true },
+  { icon: MessageCircle, label: "Messages", desc: "Chat with your connections", color: "text-teal-400", bg: "bg-teal-400/10 border-teal-400/20", href: `${basePath}/messages`, live: true },
   { icon: Trophy, label: "Leaderboard", desc: "Your referral rank", color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20", href: `${basePath}/leaderboard`, live: true },
 ];
 

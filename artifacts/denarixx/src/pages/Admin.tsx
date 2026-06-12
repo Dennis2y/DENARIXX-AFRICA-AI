@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Show, useUser } from "@clerk/react";
+import { Redirect } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -45,7 +47,7 @@ function formatDate(dateStr: string | Date) {
 type SortField = "createdAt" | "email" | "name" | "userType" | "country" | "referrals";
 type SortDir = "asc" | "desc";
 
-export default function Admin() {
+function AdminContent() {
   const { data, isLoading, isError, refetch, isFetching } = useListWaitlist();
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("createdAt");
@@ -585,5 +587,18 @@ export default function Admin() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function Admin() {
+  return (
+    <>
+      <Show when="signed-in">
+        <AdminContent />
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/sign-in" />
+      </Show>
+    </>
   );
 }

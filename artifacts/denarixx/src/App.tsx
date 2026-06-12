@@ -20,6 +20,7 @@ import CvBuilder from "@/pages/CvBuilder";
 import Jobs from "@/pages/Jobs";
 import InterviewCoach from "@/pages/InterviewCoach";
 import Community from "@/pages/Community";
+import Messages from "@/pages/Messages";
 import DenaChat from "@/components/DenaChat";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -152,6 +153,7 @@ function Router() {
       <Route path="/jobs" component={Jobs} />
       <Route path="/interview-coach" component={InterviewCoach} />
       <Route path="/community" component={Community} />
+      <Route path="/messages" component={Messages} />
       <Route path="/admin" component={Admin} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route component={NotFound} />

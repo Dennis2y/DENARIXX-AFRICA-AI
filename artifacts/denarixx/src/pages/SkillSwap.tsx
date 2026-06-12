@@ -5,7 +5,7 @@ import { Redirect, useLocation } from "wouter";
 import {
   BookOpen, Sparkles, Users, Zap, ArrowLeft, Plus, Trash2, Send,
   CheckCircle2, XCircle, Clock, Search, Filter, RefreshCw, ChevronRight,
-  MapPin, Star, User
+  MapPin, Star, User, MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,8 +16,9 @@ import {
   useGetSkillMatches,
   useGetSkillConnections,
   useCreateSkillConnection,
+  useUpdateSkillConnection,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -499,9 +500,21 @@ function MatchesTab() {
 }
 
 function ConnectionsTab() {
-  const { user } = useUser();
-  const { data, isLoading } = useGetSkillConnections();
+  const [, setLocation] = useLocation();
+  const { data: profileData } = useQuery({
+    queryKey: ["my-profile-ss"],
+    queryFn: async () => {
+      const r = await fetch(`${basePath}/api/users/me`, { credentials: "include" });
+      if (!r.ok) return null;
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+  const { mutateAsync: acceptConn } = useUpdateSkillConnection();
+  const { data, isLoading, refetch } = useGetSkillConnections();
+  const qc = useQueryClient();
   const connections = data?.connections ?? [];
+  const myDbId: number | undefined = profileData?.id;
 
   const statusIcon: Record<string, React.ReactNode> = {
     pending: <Clock className="w-4 h-4 text-yellow-400" />,
@@ -512,6 +525,16 @@ function ConnectionsTab() {
     pending: "Pending",
     accepted: "Connected",
     declined: "Declined",
+  };
+
+  const handleAccept = async (id: number, status: "accepted" | "declined") => {
+    try {
+      await acceptConn({ id, data: { status } });
+      qc.invalidateQueries({ queryKey: ["/api/skillswap/connections"] });
+      refetch();
+    } catch {
+      // ignore
+    }
   };
 
   if (isLoading) return (
@@ -530,32 +553,70 @@ function ConnectionsTab() {
 
   return (
     <div className="space-y-3">
-      {connections.map(c => (
-        <motion.div
-          key={c.id}
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4"
-        >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              {statusIcon[c.status]}
-              <span className="text-sm font-semibold">{statusLabel[c.status] ?? c.status}</span>
+      {connections.map(c => {
+        const isIncoming = myDbId !== undefined && c.targetId === myDbId;
+        const partnerId = myDbId !== undefined
+          ? (c.requesterId === myDbId ? c.targetId : c.requesterId)
+          : undefined;
+
+        return (
+          <motion.div
+            key={c.id}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                {statusIcon[c.status]}
+                <span className="text-sm font-semibold">{statusLabel[c.status] ?? c.status}</span>
+                <span className="text-xs text-muted-foreground">
+                  {isIncoming ? "← Received" : "→ Sent"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {c.message ?? "Skill swap request"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {new Date(c.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {c.message ?? "Skill swap request"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {new Date(c.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-            </p>
-          </div>
-          <div className="text-xs text-muted-foreground text-right flex-shrink-0">
-            <div className="font-medium">
-              {/* Show whether this is sent or received relative to current user */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {c.status === "pending" && isIncoming && (
+                <>
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30"
+                    variant="ghost"
+                    onClick={() => handleAccept(c.id, "accepted")}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs text-muted-foreground"
+                    onClick={() => handleAccept(c.id, "declined")}
+                  >
+                    Decline
+                  </Button>
+                </>
+              )}
+              {c.status === "accepted" && partnerId !== undefined && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5 border-teal-500/30 text-teal-400 hover:bg-teal-500/10"
+                  onClick={() => setLocation(`/messages?partner=${partnerId}`)}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Message
+                </Button>
+              )}
             </div>
-          </div>
-        </motion.div>
-      ))}
+          </motion.div>
+        );
+      })}
     </div>
   );
 }

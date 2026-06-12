@@ -105,7 +105,7 @@ router.post("/chat", async (req, res) => {
 
   try {
     const stream = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1-mini",
       stream: true,
       messages: [
         { role: "system", content: systemPrompt },

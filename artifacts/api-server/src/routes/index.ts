@@ -8,6 +8,7 @@ import cvBuilderRouter from "./cvbuilder";
 import jobsRouter from "./jobs";
 import interviewCoachRouter from "./interviewCoach";
 import communityRouter from "./community";
+import messagesRouter from "./messages";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use("/cv-builder", cvBuilderRouter);
 router.use("/jobs", jobsRouter);
 router.use("/interview-coach", interviewCoachRouter);
 router.use("/community", communityRouter);
+router.use("/messages", messagesRouter);
 
 export default router;
