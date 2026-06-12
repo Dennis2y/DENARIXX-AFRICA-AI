@@ -107,17 +107,20 @@
   }
 }
 
-/* Ken Burns — continuous zoom + pan, GPU-accelerated */
-@keyframes kenburns {
-  0%   { transform: scale(1.0) translate(0px, 0px); }
-  25%  { transform: scale(1.12) translate(-20px, -10px); }
-  50%  { transform: scale(1.22) translate(0px, -20px); }
-  75%  { transform: scale(1.12) translate(20px, -10px); }
-  100% { transform: scale(1.0) translate(0px, 0px); }
+/* City pan — slow cinematic sweep, GPU compositor only, mobile-safe */
+@keyframes citypan {
+  /* Start: camera is positioned at top-left of the city */
+  0%   { transform: scale(1.28) translate(-9%, -5%); }
+  /* Pan right and slightly down — revealing the right side skyline */
+  50%  { transform: scale(1.28) translate(9%, 3%); }
+  /* Return to start */
+  100% { transform: scale(1.28) translate(-9%, -5%); }
 }
 
 .hero-kenburns {
-  animation: kenburns 24s ease-in-out infinite;
+  animation: citypan 32s linear infinite;
   will-change: transform;
   transform-origin: center center;
+  /* Static colour grade — never animate filter, it forces rasterisation */
+  filter: brightness(0.88) saturate(1.25);
 }

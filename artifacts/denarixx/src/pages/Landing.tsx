@@ -121,7 +121,6 @@ const Hero = () => {
           src={heroCity}
           alt="Futuristic African City"
           className="hero-kenburns w-full h-full object-cover"
-          style={{ filter: "brightness(0.88) saturate(1.25)" }}
         />
       </motion.div>
 
