@@ -10,6 +10,21 @@ function getOpenAI() {
   return openai;
 }
 
+type OpenAIClient = ReturnType<typeof getOpenAI>;
+
+function getOpenAISafe(res: { status: (c: number) => { json: (b: unknown) => void } }): OpenAIClient | null {
+  if (!process.env.OPENAI_API_KEY) {
+    res.status(503).json({ error: "AI service is not configured. Please add your OPENAI_API_KEY in environment settings." });
+    return null;
+  }
+  try {
+    return getOpenAI();
+  } catch {
+    res.status(503).json({ error: "AI service failed to initialize. Please verify your OPENAI_API_KEY is valid." });
+    return null;
+  }
+}
+
 // POST /api/cv-builder/generate
 router.post("/generate", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
@@ -88,7 +103,9 @@ ${education ? `Education: ${education}` : ""}
 ${achievements ? `Achievements: ${achievements}` : ""}
 Tone: ${tone}`;
 
-  const openai = getOpenAI();
+  const openai = getOpenAISafe(res);
+  if (!openai) return;
+
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -101,9 +118,10 @@ Tone: ${tone}`;
     const resume = splitIdx > -1 ? raw.slice(0, splitIdx).trim() : raw.trim();
     const coverLetter = splitIdx > -1 ? raw.slice(splitIdx + "---COVER LETTER---".length).trim() : "";
     res.json({ resume, coverLetter });
-  } catch (err) {
+  } catch (err: any) {
     req.log.error({ err }, "CV generation failed");
-    res.status(500).json({ error: "AI is temporarily unavailable. Please try again." });
+    const msg = err?.status === 401 ? "Invalid OpenAI API key." : err?.status === 429 ? "OpenAI rate limit reached. Please wait and try again." : "AI is temporarily unavailable. Please try again.";
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -116,7 +134,8 @@ router.post("/assist", requireAuth, async (req, res) => {
 
   if (!action) { res.status(400).json({ error: "action is required" }); return; }
 
-  const openai = getOpenAI();
+  const openai = getOpenAISafe(res);
+  if (!openai) return;
 
   const prompts: Record<string, { system: string; user: string }> = {
     experienceSummary: {
@@ -165,9 +184,10 @@ router.post("/assist", requireAuth, async (req, res) => {
     } else {
       res.json({ result });
     }
-  } catch (err) {
+  } catch (err: any) {
     req.log.error({ err }, "CV assist failed");
-    res.status(500).json({ error: "AI assist is temporarily unavailable." });
+    const msg = err?.status === 401 ? "Invalid OpenAI API key." : err?.status === 429 ? "Rate limit reached. Please try again shortly." : "AI assist is temporarily unavailable.";
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -182,7 +202,8 @@ router.post("/tailor", requireAuth, async (req, res) => {
     return;
   }
 
-  const openai = getOpenAI();
+  const openai = getOpenAISafe(res);
+  if (!openai) return;
 
   const systemPrompt = `You are an expert ATS and recruitment consultant. Analyze this CV against the job description.
 
@@ -213,9 +234,10 @@ Return ONLY a valid JSON object (no markdown, no code blocks):
       if (match) res.json(JSON.parse(match[0]));
       else res.status(500).json({ error: "Failed to parse ATS analysis. Please try again." });
     }
-  } catch (err) {
+  } catch (err: any) {
     req.log.error({ err }, "CV tailor failed");
-    res.status(500).json({ error: "AI is temporarily unavailable." });
+    const msg = err?.status === 401 ? "Invalid OpenAI API key." : err?.status === 429 ? "Rate limit reached. Please try again shortly." : "AI analysis is temporarily unavailable.";
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -228,7 +250,8 @@ router.post("/parse", requireAuth, async (req, res) => {
     return;
   }
 
-  const openai = getOpenAI();
+  const openai = getOpenAISafe(res);
+  if (!openai) return;
 
   const systemPrompt = `You are an expert CV parser. Extract structured information from the provided CV text.
 
@@ -264,9 +287,10 @@ Return ONLY a valid JSON object (no markdown, no code blocks):
       if (match) res.json(JSON.parse(match[0]));
       else res.status(500).json({ error: "Failed to parse CV. Please try again." });
     }
-  } catch (err) {
+  } catch (err: any) {
     req.log.error({ err }, "CV parse failed");
-    res.status(500).json({ error: "AI is temporarily unavailable." });
+    const msg = err?.status === 401 ? "Invalid OpenAI API key." : err?.status === 429 ? "Rate limit reached. Please try again shortly." : "CV parsing is temporarily unavailable.";
+    res.status(500).json({ error: msg });
   }
 });
 

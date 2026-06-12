@@ -289,6 +289,7 @@ function CvBuilderContent() {
   const [assistLoading, setAssistLoading] = useState<AssistKey | null>(null);
   const [copied, setCopied] = useState<"resume" | "cover" | null>(null);
   const [activeTab, setActiveTab] = useState<"resume" | "cover">("resume");
+  const [editedCoverLetter, setEditedCoverLetter] = useState("");
 
   const [form, setForm] = useState<FormData>({
     name: user?.fullName ?? "",
@@ -309,7 +310,7 @@ function CvBuilderContent() {
           ...prev,
           name: prev.name || data.name || user?.fullName || "",
           email: prev.email || user?.primaryEmailAddress?.emailAddress || "",
-          location: prev.location || data.location || "",
+          location: prev.location || data.location || data.country || "",
           linkedin: prev.linkedin || data.linkedinUrl || "",
           currentRole: prev.currentRole || data.role || "",
           summary: prev.summary || data.bio || "",
@@ -443,6 +444,7 @@ function CvBuilderContent() {
       if (!res.ok) throw new Error((await res.json()).error ?? "Generation failed");
       const data: GenerateResult = await res.json();
       setResult(data);
+      setEditedCoverLetter(data.coverLetter);
       setStep("preview");
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
@@ -458,19 +460,28 @@ function CvBuilderContent() {
   }, [result, selectedTemplate, form.name, form.targetRole]);
 
   const downloadPDF = () => {
-    const content = activeTab === "resume" ? result?.resume : result?.coverLetter;
+    const content = activeTab === "resume" ? result?.resume : editedCoverLetter;
     if (!content) return;
     const t = TEMPLATES.find(x => x.id === selectedTemplate) ?? TEMPLATES[0];
     const html = buildPrintHTML(content, form.name, form.targetRole, t);
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 300);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) {
+      toast({ title: "Popup blocked", description: "Please allow popups for this site and try again.", variant: "destructive" });
+      URL.revokeObjectURL(url);
+      return;
+    }
+    win.onload = () => {
+      setTimeout(() => {
+        win.print();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      }, 300);
+    };
   };
 
   const copyText = async (which: "resume" | "cover") => {
-    const text = which === "resume" ? result?.resume : result?.coverLetter;
+    const text = which === "resume" ? result?.resume : editedCoverLetter;
     if (!text) return;
     await navigator.clipboard.writeText(text);
     setCopied(which);
@@ -546,27 +557,27 @@ function CvBuilderContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Full Name *</label>
-                    <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="Amara Nwosu" className={inputCls} />
+                    <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="Your full name" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Email</label>
-                    <input value={form.email} onChange={e => setField("email", e.target.value)} placeholder="amara@email.com" className={inputCls} />
+                    <input value={form.email} onChange={e => setField("email", e.target.value)} placeholder="your@email.com" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Phone</label>
-                    <input value={form.phone} onChange={e => setField("phone", e.target.value)} placeholder="+234 801 234 5678" className={inputCls} />
+                    <input value={form.phone} onChange={e => setField("phone", e.target.value)} placeholder="+1 555 000 0000" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Location</label>
-                    <input value={form.location} onChange={e => setField("location", e.target.value)} placeholder="Lagos, Nigeria" className={inputCls} />
+                    <input value={form.location} onChange={e => setField("location", e.target.value)} placeholder="City, Country" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5">LinkedIn URL</label>
-                    <input value={form.linkedin} onChange={e => setField("linkedin", e.target.value)} placeholder="linkedin.com/in/yourname" className={inputCls} />
+                    <input value={form.linkedin} onChange={e => setField("linkedin", e.target.value)} placeholder="linkedin.com/in/yourprofile" className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Current Role</label>
-                    <input value={form.currentRole} onChange={e => setField("currentRole", e.target.value)} placeholder="Software Engineer at Andela" className={inputCls} />
+                    <input value={form.currentRole} onChange={e => setField("currentRole", e.target.value)} placeholder="e.g. Software Engineer at Company" className={inputCls} />
                   </div>
                 </div>
               </div>
@@ -580,11 +591,11 @@ function CvBuilderContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Target Role *</label>
-                    <input value={form.targetRole} onChange={e => setField("targetRole", e.target.value)} placeholder="Senior Software Engineer" className={inputCls} />
+                    <input value={form.targetRole} onChange={e => setField("targetRole", e.target.value)} placeholder="e.g. Product Manager, Senior Engineer..." className={inputCls} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Target Company <span className="text-muted-foreground font-normal">(for cover letter)</span></label>
-                    <input value={form.targetCompany} onChange={e => setField("targetCompany", e.target.value)} placeholder="Google, Flutterwave..." className={inputCls} />
+                    <input value={form.targetCompany} onChange={e => setField("targetCompany", e.target.value)} placeholder="Company you're applying to (for cover letter)" className={inputCls} />
                   </div>
                 </div>
                 <div className="mt-4">
@@ -633,7 +644,7 @@ function CvBuilderContent() {
                 <textarea
                   value={form.experience}
                   onChange={e => setField("experience", e.target.value)}
-                  placeholder={"Senior Engineer at Flutterwave (2021–Present)\n- Led team of 8, reduced latency by 40%\n- Architected platform processing $2M/day\n\nDeveloper at Andela (2019–2021)\n- Built APIs for 500k+ users..."}
+                  placeholder={"Senior Engineer at Company A (2022–Present)\n- Led a team of 6, reduced load time by 40%\n- Architected a platform serving 200k+ users\n\nDeveloper at Company B (2019–2022)\n- Built REST APIs consumed by 100k+ users\n- Reduced infrastructure costs by 30%"}
                   rows={7}
                   className={textareaCls}
                 />
@@ -649,7 +660,7 @@ function CvBuilderContent() {
                   <textarea
                     value={form.education}
                     onChange={e => setField("education", e.target.value)}
-                    placeholder={"BSc Computer Science\nUniversity of Lagos (2019)\nFirst Class Honours\n\nAWS Solutions Architect (2022)"}
+                    placeholder={"BSc Computer Science\nUniversity Name (2019)\nFirst Class Honours\n\nAWS Solutions Architect Certification (2022)"}
                     rows={5}
                     className={textareaCls}
                   />
@@ -666,7 +677,7 @@ function CvBuilderContent() {
                   <textarea
                     value={form.achievements}
                     onChange={e => setField("achievements", e.target.value)}
-                    placeholder={"- Speaker at AfricaTech Summit 2023\n- Built product used by 200k users\n- 1,400+ GitHub stars"}
+                    placeholder={"- Speaker at industry conference\n- Built product used by 100k+ users\n- Top performer award 2023"}
                     rows={5}
                     className={textareaCls}
                   />
@@ -834,18 +845,30 @@ function CvBuilderContent() {
 
               {/* Two-column: content + iframe preview */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Content */}
+                {/* Content — editable for cover letter */}
                 <div>
                   <div className="h-1.5 w-full rounded-t-lg" style={{ backgroundColor: TEMPLATES.find(t => t.id === selectedTemplate)?.accent }} />
-                  <div className="bg-white border border-border rounded-b-2xl p-6 leading-relaxed max-h-[600px] overflow-y-auto">
-                    <div
-                      className="prose prose-sm max-w-none"
-                      style={{ color: "#1e293b" }}
-                      dangerouslySetInnerHTML={{
-                        __html: renderMarkdown(activeTab === "resume" ? result.resume : result.coverLetter),
-                      }}
-                    />
-                  </div>
+                  {activeTab === "resume" ? (
+                    <div className="bg-white border border-border rounded-b-2xl p-6 leading-relaxed max-h-[600px] overflow-y-auto">
+                      <div
+                        className="prose prose-sm max-w-none"
+                        style={{ color: "#1e293b" }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(result.resume) }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <textarea
+                        value={editedCoverLetter}
+                        onChange={e => setEditedCoverLetter(e.target.value)}
+                        className="w-full bg-white border border-border rounded-b-2xl p-6 text-sm text-gray-800 leading-relaxed resize-none outline-none focus:border-primary/40 transition-colors"
+                        style={{ minHeight: 600, fontFamily: "Georgia, serif" }}
+                      />
+                      <div className="absolute top-3 right-3 text-[10px] text-gray-400 bg-white/80 px-1.5 py-0.5 rounded">
+                        editable
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Live iframe preview */}
@@ -855,9 +878,9 @@ function CvBuilderContent() {
                   </div>
                   <div className="rounded-2xl border border-border overflow-hidden" style={{ height: 600 }}>
                     <iframe
-                      key={`${selectedTemplate}-${activeTab}`}
+                      key={`${selectedTemplate}-${activeTab}-${editedCoverLetter.length}`}
                       title="CV Preview"
-                      srcDoc={activeTab === "resume" ? previewHtml : buildPrintHTML(result.coverLetter, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0])}
+                      srcDoc={activeTab === "resume" ? previewHtml : buildPrintHTML(editedCoverLetter, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0])}
                       className="w-full h-full border-0 bg-white"
                       sandbox="allow-same-origin"
                     />
@@ -866,7 +889,7 @@ function CvBuilderContent() {
               </div>
 
               <p className="text-center text-xs text-muted-foreground mt-4">
-                Download opens the print dialog → choose <strong>Save as PDF</strong> in your browser
+                Download opens the print dialog → choose <strong>Save as PDF</strong> in your browser's print dialog
               </p>
 
               <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between gap-4 flex-wrap">
