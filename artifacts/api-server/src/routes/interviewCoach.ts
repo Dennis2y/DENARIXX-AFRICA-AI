@@ -12,7 +12,7 @@ Always be encouraging but never vague. Score answers 1–10.`;
 async function callOpenAI(messages: { role: string; content: string }[]): Promise<string> {
   const { openai } = require("@workspace/integrations-openai-ai-server");
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
     messages,
     max_tokens: 800,
   });
