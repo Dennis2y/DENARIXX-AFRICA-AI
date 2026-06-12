@@ -20,11 +20,22 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CreateSkillConnectionRequest,
+  CreateSkillListingRequest,
+  DeleteSkillListing200,
   ErrorResponse,
+  GetSkillListingsParams,
   HealthStatus,
   JoinWaitlistRequest,
   JoinWaitlistResponse,
   LeaderboardResponse,
+  MySkillListingsResponse,
+  SkillConnectionResult,
+  SkillConnectionsResponse,
+  SkillListingResult,
+  SkillListingsResponse,
+  SkillMatchesResponse,
+  UpdateConnectionStatusRequest,
   WaitlistCount,
   WaitlistList,
   WaitlistReferralStats
@@ -503,4 +514,608 @@ export function useGetLeaderboard<TData = Awaited<ReturnType<typeof getLeaderboa
 
 
 
+
+export const getGetSkillListingsUrl = (params?: GetSkillListingsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/skillswap/listings?${stringifiedParams}` : `/api/skillswap/listings`
+}
+
+/**
+ * Returns all active skill listings (public)
+ * @summary Browse skill listings
+ */
+export const getSkillListings = async (params?: GetSkillListingsParams, options?: RequestInit): Promise<SkillListingsResponse> => {
+
+  return customFetch<SkillListingsResponse>(getGetSkillListingsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSkillListingsQueryKey = (params?: GetSkillListingsParams,) => {
+    return [
+    `/api/skillswap/listings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSkillListingsQueryOptions = <TData = Awaited<ReturnType<typeof getSkillListings>>, TError = ErrorType<unknown>>(params?: GetSkillListingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSkillListings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSkillListingsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSkillListings>>> = ({ signal }) => getSkillListings(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSkillListings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSkillListingsQueryResult = NonNullable<Awaited<ReturnType<typeof getSkillListings>>>
+export type GetSkillListingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Browse skill listings
+ */
+
+export function useGetSkillListings<TData = Awaited<ReturnType<typeof getSkillListings>>, TError = ErrorType<unknown>>(
+ params?: GetSkillListingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSkillListings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSkillListingsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSkillListingUrl = () => {
+
+
+
+
+  return `/api/skillswap/listings`
+}
+
+/**
+ * Post a skill you are offering or seeking
+ * @summary Create a skill listing
+ */
+export const createSkillListing = async (createSkillListingRequest: CreateSkillListingRequest, options?: RequestInit): Promise<SkillListingResult> => {
+
+  return customFetch<SkillListingResult>(getCreateSkillListingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createSkillListingRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSkillListingMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSkillListing>>, TError,{data: BodyType<CreateSkillListingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSkillListing>>, TError,{data: BodyType<CreateSkillListingRequest>}, TContext> => {
+
+const mutationKey = ['createSkillListing'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSkillListing>>, {data: BodyType<CreateSkillListingRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSkillListing(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSkillListingMutationResult = NonNullable<Awaited<ReturnType<typeof createSkillListing>>>
+    export type CreateSkillListingMutationBody = BodyType<CreateSkillListingRequest>
+    export type CreateSkillListingMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create a skill listing
+ */
+export const useCreateSkillListing = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSkillListing>>, TError,{data: BodyType<CreateSkillListingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSkillListing>>,
+        TError,
+        {data: BodyType<CreateSkillListingRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateSkillListingMutationOptions(options));
+    }
+
+export const getGetMySkillListingsUrl = () => {
+
+
+
+
+  return `/api/skillswap/my-listings`
+}
+
+/**
+ * Returns the authenticated user's own listings
+ * @summary My skill listings
+ */
+export const getMySkillListings = async ( options?: RequestInit): Promise<MySkillListingsResponse> => {
+
+  return customFetch<MySkillListingsResponse>(getGetMySkillListingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMySkillListingsQueryKey = () => {
+    return [
+    `/api/skillswap/my-listings`
+    ] as const;
+    }
+
+
+export const getGetMySkillListingsQueryOptions = <TData = Awaited<ReturnType<typeof getMySkillListings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMySkillListings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMySkillListingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMySkillListings>>> = ({ signal }) => getMySkillListings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMySkillListings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMySkillListingsQueryResult = NonNullable<Awaited<ReturnType<typeof getMySkillListings>>>
+export type GetMySkillListingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary My skill listings
+ */
+
+export function useGetMySkillListings<TData = Awaited<ReturnType<typeof getMySkillListings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMySkillListings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMySkillListingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeleteSkillListingUrl = (id: number,) => {
+
+
+
+
+  return `/api/skillswap/listings/${id}`
+}
+
+/**
+ * @summary Delete a skill listing
+ */
+export const deleteSkillListing = async (id: number, options?: RequestInit): Promise<DeleteSkillListing200> => {
+
+  return customFetch<DeleteSkillListing200>(getDeleteSkillListingUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSkillListingMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSkillListing>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSkillListing>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSkillListing'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSkillListing>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSkillListing(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSkillListingMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSkillListing>>>
+
+    export type DeleteSkillListingMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a skill listing
+ */
+export const useDeleteSkillListing = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSkillListing>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSkillListing>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSkillListingMutationOptions(options));
+    }
+
+export const getGetSkillMatchesUrl = () => {
+
+
+
+
+  return `/api/skillswap/matches`
+}
+
+/**
+ * Returns skill listings most relevant to the authenticated user, ranked by AI
+ * @summary AI-powered match suggestions
+ */
+export const getSkillMatches = async ( options?: RequestInit): Promise<SkillMatchesResponse> => {
+
+  return customFetch<SkillMatchesResponse>(getGetSkillMatchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSkillMatchesQueryKey = () => {
+    return [
+    `/api/skillswap/matches`
+    ] as const;
+    }
+
+
+export const getGetSkillMatchesQueryOptions = <TData = Awaited<ReturnType<typeof getSkillMatches>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSkillMatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSkillMatchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSkillMatches>>> = ({ signal }) => getSkillMatches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSkillMatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSkillMatchesQueryResult = NonNullable<Awaited<ReturnType<typeof getSkillMatches>>>
+export type GetSkillMatchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary AI-powered match suggestions
+ */
+
+export function useGetSkillMatches<TData = Awaited<ReturnType<typeof getSkillMatches>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSkillMatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSkillMatchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSkillConnectionsUrl = () => {
+
+
+
+
+  return `/api/skillswap/connections`
+}
+
+/**
+ * Returns all connection requests sent or received by the authenticated user
+ * @summary My connections
+ */
+export const getSkillConnections = async ( options?: RequestInit): Promise<SkillConnectionsResponse> => {
+
+  return customFetch<SkillConnectionsResponse>(getGetSkillConnectionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSkillConnectionsQueryKey = () => {
+    return [
+    `/api/skillswap/connections`
+    ] as const;
+    }
+
+
+export const getGetSkillConnectionsQueryOptions = <TData = Awaited<ReturnType<typeof getSkillConnections>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSkillConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSkillConnectionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSkillConnections>>> = ({ signal }) => getSkillConnections({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSkillConnections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSkillConnectionsQueryResult = NonNullable<Awaited<ReturnType<typeof getSkillConnections>>>
+export type GetSkillConnectionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary My connections
+ */
+
+export function useGetSkillConnections<TData = Awaited<ReturnType<typeof getSkillConnections>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSkillConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSkillConnectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSkillConnectionUrl = () => {
+
+
+
+
+  return `/api/skillswap/connections`
+}
+
+/**
+ * @summary Send a connection request
+ */
+export const createSkillConnection = async (createSkillConnectionRequest: CreateSkillConnectionRequest, options?: RequestInit): Promise<SkillConnectionResult> => {
+
+  return customFetch<SkillConnectionResult>(getCreateSkillConnectionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createSkillConnectionRequest,)
+  }
+);}
+
+
+
+
+export const getCreateSkillConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSkillConnection>>, TError,{data: BodyType<CreateSkillConnectionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSkillConnection>>, TError,{data: BodyType<CreateSkillConnectionRequest>}, TContext> => {
+
+const mutationKey = ['createSkillConnection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSkillConnection>>, {data: BodyType<CreateSkillConnectionRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSkillConnection(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSkillConnectionMutationResult = NonNullable<Awaited<ReturnType<typeof createSkillConnection>>>
+    export type CreateSkillConnectionMutationBody = BodyType<CreateSkillConnectionRequest>
+    export type CreateSkillConnectionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Send a connection request
+ */
+export const useCreateSkillConnection = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSkillConnection>>, TError,{data: BodyType<CreateSkillConnectionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSkillConnection>>,
+        TError,
+        {data: BodyType<CreateSkillConnectionRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateSkillConnectionMutationOptions(options));
+    }
+
+export const getUpdateSkillConnectionUrl = (id: number,) => {
+
+
+
+
+  return `/api/skillswap/connections/${id}`
+}
+
+/**
+ * @summary Accept or decline a connection request
+ */
+export const updateSkillConnection = async (id: number,
+    updateConnectionStatusRequest: UpdateConnectionStatusRequest, options?: RequestInit): Promise<SkillConnectionResult> => {
+
+  return customFetch<SkillConnectionResult>(getUpdateSkillConnectionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateConnectionStatusRequest,)
+  }
+);}
+
+
+
+
+export const getUpdateSkillConnectionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSkillConnection>>, TError,{id: number;data: BodyType<UpdateConnectionStatusRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSkillConnection>>, TError,{id: number;data: BodyType<UpdateConnectionStatusRequest>}, TContext> => {
+
+const mutationKey = ['updateSkillConnection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSkillConnection>>, {id: number;data: BodyType<UpdateConnectionStatusRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSkillConnection(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSkillConnectionMutationResult = NonNullable<Awaited<ReturnType<typeof updateSkillConnection>>>
+    export type UpdateSkillConnectionMutationBody = BodyType<UpdateConnectionStatusRequest>
+    export type UpdateSkillConnectionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Accept or decline a connection request
+ */
+export const useUpdateSkillConnection = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSkillConnection>>, TError,{id: number;data: BodyType<UpdateConnectionStatusRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSkillConnection>>,
+        TError,
+        {id: number;data: BodyType<UpdateConnectionStatusRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateSkillConnectionMutationOptions(options));
+    }
 

@@ -13,6 +13,7 @@ import Admin from "@/pages/Admin";
 import Leaderboard from "@/pages/Leaderboard";
 import Dashboard from "@/pages/Dashboard";
 import Profile from "@/pages/Profile";
+import SkillSwap from "@/pages/SkillSwap";
 import DenaChat from "@/components/DenaChat";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -139,6 +140,7 @@ function Router() {
       <Route path="/sign-up/*?" component={SignUpPage} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
+      <Route path="/skillswap" component={SkillSwap} />
       <Route path="/admin" component={Admin} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route component={NotFound} />

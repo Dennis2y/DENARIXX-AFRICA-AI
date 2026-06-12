@@ -6,12 +6,32 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './createSkillConnectionRequest';
+export * from './createSkillListingRequest';
+export * from './createSkillListingRequestListingType';
+export * from './deleteSkillListing200';
 export * from './errorResponse';
+export * from './getSkillListingsParams';
+export * from './getSkillListingsType';
 export * from './healthStatus';
 export * from './joinWaitlistRequest';
 export * from './joinWaitlistResponse';
 export * from './leaderboardEntry';
 export * from './leaderboardResponse';
+export * from './mySkillListing';
+export * from './mySkillListingListingType';
+export * from './mySkillListingsResponse';
+export * from './skillConnection';
+export * from './skillConnectionResult';
+export * from './skillConnectionsResponse';
+export * from './skillConnectionStatus';
+export * from './skillListing';
+export * from './skillListingListingType';
+export * from './skillListingResult';
+export * from './skillListingsResponse';
+export * from './skillMatchesResponse';
+export * from './updateConnectionStatusRequest';
+export * from './updateConnectionStatusRequestStatus';
 export * from './waitlistCount';
 export * from './waitlistEntry';
 export * from './waitlistList';

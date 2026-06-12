@@ -3,3 +3,5 @@ export * from "./users";
 export * from "./userSkills";
 export * from "./conversations";
 export * from "./messages";
+export * from "./skillListings";
+export * from "./skillConnections";

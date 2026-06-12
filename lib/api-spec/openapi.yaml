@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: waitlist
     description: Waitlist operations
+  - name: skillswap
+    description: SkillSwap AI — peer-to-peer skill exchange
 paths:
   /healthz:
     get:
@@ -120,6 +122,178 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeaderboardResponse"
+  /skillswap/listings:
+    get:
+      operationId: getSkillListings
+      tags: [skillswap]
+      summary: Browse skill listings
+      description: Returns all active skill listings (public)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [offering, seeking]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of skill listings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillListingsResponse"
+    post:
+      operationId: createSkillListing
+      tags: [skillswap]
+      summary: Create a skill listing
+      description: Post a skill you are offering or seeking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSkillListingRequest"
+      responses:
+        "201":
+          description: Listing created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillListingResult"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /skillswap/my-listings:
+    get:
+      operationId: getMySkillListings
+      tags: [skillswap]
+      summary: My skill listings
+      description: Returns the authenticated user's own listings
+      responses:
+        "200":
+          description: My listings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MySkillListingsResponse"
+  /skillswap/listings/{id}:
+    delete:
+      operationId: deleteSkillListing
+      tags: [skillswap]
+      summary: Delete a skill listing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required:
+                  - success
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /skillswap/matches:
+    get:
+      operationId: getSkillMatches
+      tags: [skillswap]
+      summary: AI-powered match suggestions
+      description: Returns skill listings most relevant to the authenticated user, ranked by AI
+      responses:
+        "200":
+          description: AI match results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillMatchesResponse"
+  /skillswap/connections:
+    get:
+      operationId: getSkillConnections
+      tags: [skillswap]
+      summary: My connections
+      description: Returns all connection requests sent or received by the authenticated user
+      responses:
+        "200":
+          description: Connections list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillConnectionsResponse"
+    post:
+      operationId: createSkillConnection
+      tags: [skillswap]
+      summary: Send a connection request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSkillConnectionRequest"
+      responses:
+        "201":
+          description: Connection request sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillConnectionResult"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /skillswap/connections/{id}:
+    patch:
+      operationId: updateSkillConnection
+      tags: [skillswap]
+      summary: Accept or decline a connection request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConnectionStatusRequest"
+      responses:
+        "200":
+          description: Connection updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillConnectionResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -257,3 +431,204 @@ components:
           type: string
       required:
         - error
+    SkillListing:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        skillName:
+          type: string
+        category:
+          type: string
+        listingType:
+          type: string
+          enum: [offering, seeking]
+        description:
+          type: string
+          nullable: true
+        level:
+          type: string
+        availability:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        userName:
+          type: string
+          nullable: true
+        userAvatar:
+          type: string
+          nullable: true
+        userLocation:
+          type: string
+          nullable: true
+        userRole:
+          type: string
+          nullable: true
+      required:
+        - id
+        - userId
+        - skillName
+        - category
+        - listingType
+        - level
+        - createdAt
+    SkillListingsResponse:
+      type: object
+      properties:
+        listings:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillListing"
+        total:
+          type: integer
+      required:
+        - listings
+        - total
+    MySkillListing:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        skillName:
+          type: string
+        category:
+          type: string
+        listingType:
+          type: string
+          enum: [offering, seeking]
+        description:
+          type: string
+          nullable: true
+        level:
+          type: string
+        availability:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - skillName
+        - category
+        - listingType
+        - level
+        - isActive
+        - createdAt
+    MySkillListingsResponse:
+      type: object
+      properties:
+        listings:
+          type: array
+          items:
+            $ref: "#/components/schemas/MySkillListing"
+      required:
+        - listings
+    CreateSkillListingRequest:
+      type: object
+      properties:
+        skillName:
+          type: string
+        category:
+          type: string
+        listingType:
+          type: string
+          enum: [offering, seeking]
+        description:
+          type: string
+        level:
+          type: string
+        availability:
+          type: string
+      required:
+        - skillName
+        - listingType
+    SkillListingResult:
+      type: object
+      properties:
+        listing:
+          $ref: "#/components/schemas/MySkillListing"
+      required:
+        - listing
+    SkillMatchesResponse:
+      type: object
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillListing"
+        reason:
+          type: string
+      required:
+        - matches
+    SkillConnection:
+      type: object
+      properties:
+        id:
+          type: integer
+        requesterId:
+          type: integer
+        targetId:
+          type: integer
+        listingId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [pending, accepted, declined]
+        message:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - requesterId
+        - targetId
+        - status
+        - createdAt
+    SkillConnectionsResponse:
+      type: object
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkillConnection"
+      required:
+        - connections
+    CreateSkillConnectionRequest:
+      type: object
+      properties:
+        targetUserId:
+          type: integer
+        listingId:
+          type: integer
+        message:
+          type: string
+      required:
+        - targetUserId
+    SkillConnectionResult:
+      type: object
+      properties:
+        connection:
+          $ref: "#/components/schemas/SkillConnection"
+      required:
+        - connection
+    UpdateConnectionStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted, declined]
+      required:
+        - status

@@ -66,3 +66,146 @@ export interface ErrorResponse {
   error: string;
 }
 
+export type SkillListingListingType = typeof SkillListingListingType[keyof typeof SkillListingListingType];
+
+
+export const SkillListingListingType = {
+  offering: 'offering',
+  seeking: 'seeking',
+} as const;
+
+export interface SkillListing {
+  id: number;
+  userId: number;
+  skillName: string;
+  category: string;
+  listingType: SkillListingListingType;
+  description?: string | null;
+  level: string;
+  availability?: string | null;
+  createdAt: string;
+  userName?: string | null;
+  userAvatar?: string | null;
+  userLocation?: string | null;
+  userRole?: string | null;
+}
+
+export interface SkillListingsResponse {
+  listings: SkillListing[];
+  total: number;
+}
+
+export type MySkillListingListingType = typeof MySkillListingListingType[keyof typeof MySkillListingListingType];
+
+
+export const MySkillListingListingType = {
+  offering: 'offering',
+  seeking: 'seeking',
+} as const;
+
+export interface MySkillListing {
+  id: number;
+  userId: number;
+  skillName: string;
+  category: string;
+  listingType: MySkillListingListingType;
+  description?: string | null;
+  level: string;
+  availability?: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface MySkillListingsResponse {
+  listings: MySkillListing[];
+}
+
+export type CreateSkillListingRequestListingType = typeof CreateSkillListingRequestListingType[keyof typeof CreateSkillListingRequestListingType];
+
+
+export const CreateSkillListingRequestListingType = {
+  offering: 'offering',
+  seeking: 'seeking',
+} as const;
+
+export interface CreateSkillListingRequest {
+  skillName: string;
+  category?: string;
+  listingType: CreateSkillListingRequestListingType;
+  description?: string;
+  level?: string;
+  availability?: string;
+}
+
+export interface SkillListingResult {
+  listing: MySkillListing;
+}
+
+export interface SkillMatchesResponse {
+  matches: SkillListing[];
+  reason?: string;
+}
+
+export type SkillConnectionStatus = typeof SkillConnectionStatus[keyof typeof SkillConnectionStatus];
+
+
+export const SkillConnectionStatus = {
+  pending: 'pending',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface SkillConnection {
+  id: number;
+  requesterId: number;
+  targetId: number;
+  listingId?: number | null;
+  status: SkillConnectionStatus;
+  message?: string | null;
+  createdAt: string;
+}
+
+export interface SkillConnectionsResponse {
+  connections: SkillConnection[];
+}
+
+export interface CreateSkillConnectionRequest {
+  targetUserId: number;
+  listingId?: number;
+  message?: string;
+}
+
+export interface SkillConnectionResult {
+  connection: SkillConnection;
+}
+
+export type UpdateConnectionStatusRequestStatus = typeof UpdateConnectionStatusRequestStatus[keyof typeof UpdateConnectionStatusRequestStatus];
+
+
+export const UpdateConnectionStatusRequestStatus = {
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface UpdateConnectionStatusRequest {
+  status: UpdateConnectionStatusRequestStatus;
+}
+
+export type GetSkillListingsParams = {
+type?: GetSkillListingsType;
+category?: string;
+q?: string;
+};
+
+export type GetSkillListingsType = typeof GetSkillListingsType[keyof typeof GetSkillListingsType];
+
+
+export const GetSkillListingsType = {
+  offering: 'offering',
+  seeking: 'seeking',
+} as const;
+
+export type DeleteSkillListing200 = {
+  success: boolean;
+};
+

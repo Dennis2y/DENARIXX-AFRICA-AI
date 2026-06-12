@@ -11,7 +11,7 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const modules = [
   { icon: Sparkles, label: "DENA AI", desc: "Your personal AI assistant", color: "text-cyan-400", bg: "bg-cyan-400/10 border-cyan-400/20", href: "#dena" },
-  { icon: BookOpen, label: "SkillSwap AI", desc: "Learn & grow your skills", color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20", href: "#skillswap" },
+  { icon: BookOpen, label: "SkillSwap AI", desc: "Learn & grow your skills", color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20", href: `${basePath}/skillswap` },
   { icon: FileText, label: "CV Builder", desc: "AI-powered resume builder", color: "text-green-400", bg: "bg-green-400/10 border-green-400/20", href: "#cv" },
   { icon: Briefcase, label: "Jobs AI", desc: "Matched jobs for your profile", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20", href: "#jobs" },
   { icon: Users, label: "Community", desc: "Connect with professionals", color: "text-pink-400", bg: "bg-pink-400/10 border-pink-400/20", href: "#community" },

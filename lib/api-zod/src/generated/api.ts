@@ -88,3 +88,154 @@ export const GetLeaderboardResponse = zod.object({
 })
 
 
+/**
+ * Returns all active skill listings (public)
+ * @summary Browse skill listings
+ */
+export const GetSkillListingsQueryParams = zod.object({
+  "type": zod.enum(['offering', 'seeking']).optional(),
+  "category": zod.coerce.string().optional(),
+  "q": zod.coerce.string().optional()
+})
+
+export const GetSkillListingsResponse = zod.object({
+  "listings": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "skillName": zod.string(),
+  "category": zod.string(),
+  "listingType": zod.enum(['offering', 'seeking']),
+  "description": zod.string().nullish(),
+  "level": zod.string(),
+  "availability": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "userName": zod.string().nullish(),
+  "userAvatar": zod.string().nullish(),
+  "userLocation": zod.string().nullish(),
+  "userRole": zod.string().nullish()
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * Post a skill you are offering or seeking
+ * @summary Create a skill listing
+ */
+export const CreateSkillListingBody = zod.object({
+  "skillName": zod.string(),
+  "category": zod.string().optional(),
+  "listingType": zod.enum(['offering', 'seeking']),
+  "description": zod.string().optional(),
+  "level": zod.string().optional(),
+  "availability": zod.string().optional()
+})
+
+
+/**
+ * Returns the authenticated user's own listings
+ * @summary My skill listings
+ */
+export const GetMySkillListingsResponse = zod.object({
+  "listings": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "skillName": zod.string(),
+  "category": zod.string(),
+  "listingType": zod.enum(['offering', 'seeking']),
+  "description": zod.string().nullish(),
+  "level": zod.string(),
+  "availability": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Delete a skill listing
+ */
+export const DeleteSkillListingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteSkillListingResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * Returns skill listings most relevant to the authenticated user, ranked by AI
+ * @summary AI-powered match suggestions
+ */
+export const GetSkillMatchesResponse = zod.object({
+  "matches": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "skillName": zod.string(),
+  "category": zod.string(),
+  "listingType": zod.enum(['offering', 'seeking']),
+  "description": zod.string().nullish(),
+  "level": zod.string(),
+  "availability": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "userName": zod.string().nullish(),
+  "userAvatar": zod.string().nullish(),
+  "userLocation": zod.string().nullish(),
+  "userRole": zod.string().nullish()
+})),
+  "reason": zod.string().optional()
+})
+
+
+/**
+ * Returns all connection requests sent or received by the authenticated user
+ * @summary My connections
+ */
+export const GetSkillConnectionsResponse = zod.object({
+  "connections": zod.array(zod.object({
+  "id": zod.number(),
+  "requesterId": zod.number(),
+  "targetId": zod.number(),
+  "listingId": zod.number().nullish(),
+  "status": zod.enum(['pending', 'accepted', 'declined']),
+  "message": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Send a connection request
+ */
+export const CreateSkillConnectionBody = zod.object({
+  "targetUserId": zod.number(),
+  "listingId": zod.number().optional(),
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Accept or decline a connection request
+ */
+export const UpdateSkillConnectionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSkillConnectionBody = zod.object({
+  "status": zod.enum(['accepted', 'declined'])
+})
+
+export const UpdateSkillConnectionResponse = zod.object({
+  "connection": zod.object({
+  "id": zod.number(),
+  "requesterId": zod.number(),
+  "targetId": zod.number(),
+  "listingId": zod.number().nullish(),
+  "status": zod.enum(['pending', 'accepted', 'declined']),
+  "message": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+})
+
+
