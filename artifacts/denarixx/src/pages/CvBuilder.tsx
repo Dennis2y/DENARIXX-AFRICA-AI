@@ -4,7 +4,7 @@ import { useUser, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Camera,
-  FileText, Sparkles, Download, Copy, Check, ChevronLeft,
+  FileText, Sparkles, Download, Copy, Check, ChevronLeft, ChevronRight,
   Loader2, Plus, X, Wand2, Layout, Eye, Upload, Target,
   ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
   TrendingUp, User, Briefcase, GraduationCap, Trophy, Zap,
@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-type Step = "build" | "preview";
 type TemplateId = "sidebar-dark" | "sidebar-teal" | "modern" | "photo-right" | "classic" | "compact" | "minimal" | "two-column";
 type LayoutType = "single" | "sidebar" | "two-col-body";
 type Tone = "professional" | "creative" | "executive";
@@ -742,19 +741,89 @@ function AtsPanel({ ats, onApplySummary }: { ats: AtsResult; onApplySummary: (s:
   );
 }
 
+function cleanText(s: string): string {
+  if (!s) return "";
+  return s
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD\uFFFE\uFFFF]/g, "")
+    .replace(/^[·•▪◆▶►→]\s*/gm, "- ")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function cleanSkills(skills: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of skills) {
+    for (const part of raw.split(/[,;|\/]/)) {
+      const s = part.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, "");
+      const key = s.toLowerCase();
+      if (s.length > 1 && s.length < 60 && !seen.has(key)) {
+        seen.add(key);
+        result.push(s);
+      }
+    }
+  }
+  return result;
+}
+
+function prioritizeExperience(experience: string): string {
+  if (!experience) return "";
+  const techRx = /\b(AI|ML|software|engineer|developer|data scientist|backend|frontend|full.?stack|python|javascript|typescript|machine learning|NLP|API|cloud|aws|azure|docker|kubernetes|react|node|django|flask|java|golang|rust|computer|tech|IT|information technology)\b/i;
+  const logisticsRx = /\b(warehouse|logistics|driver|delivery|forklift|picker|packer|stocker|stock|shipping|transport|freight|postal|courier|operative|production line|assembly|factory|manufacturing)\b/i;
+  const entries = experience.split(/\n\n+/).filter(e => e.trim());
+  const tech = entries.filter(e => techRx.test(e) && !logisticsRx.test(e));
+  const logistics = entries.filter(e => logisticsRx.test(e));
+  const other = entries.filter(e => !techRx.test(e) && !logisticsRx.test(e));
+  return [...tech, ...other, ...logistics].join("\n\n");
+}
+
+function buildRawPreviewHTML(form: CvFormData, template: Template): string {
+  const sections = [
+    form.summary    ? `## Summary\n${form.summary}` : "",
+    form.experience ? `## Experience\n${form.experience}` : "",
+    form.education  ? `## Education\n${form.education}` : "",
+    form.achievements ? `## Achievements\n${form.achievements}` : "",
+  ].filter(Boolean).join("\n\n");
+  return buildPrintHTML(
+    sections,
+    form.name || "Your Name",
+    form.targetRole || form.currentRole || "Your Target Role",
+    template,
+    form.photo || undefined,
+    { email: form.email, phone: form.phone, location: form.location, linkedin: form.linkedin, skills: form.skills }
+  );
+}
+
+interface ImportedCV {
+  name: string; email: string; phone: string; location: string; linkedin: string;
+  currentRole: string; targetRole: string; summary: string; experience: string;
+  education: string; achievements: string; skills: string[]; photo?: string;
+  _diagnostics?: { fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string };
+}
+
+const WIZARD_STEPS = [
+  { id: 1, label: "Personal Info" },
+  { id: 2, label: "Target Job" },
+  { id: 3, label: "Experience" },
+  { id: 4, label: "Skills & Education" },
+  { id: 5, label: "AI Review" },
+  { id: 6, label: "Preview" },
+] as const;
+
 function CvBuilderContent() {
   const { user } = useUser();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<Step>("build");
+  const [wizardStep, setWizardStep] = useState(1);
+  const [importedData, setImportedData] = useState<ImportedCV | null>(null);
+  const [showImportReview, setShowImportReview] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("sidebar-dark");
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [atsResult, setAtsResult] = useState<AtsResult | null>(null);
   const [jobDescription, setJobDescription] = useState("");
-  const [showUpload, setShowUpload] = useState(false);
-  const [showJobTarget, setShowJobTarget] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [tailorLoading, setTailorLoading] = useState(false);
   const [parseLoading, setParseLoading] = useState(false);
@@ -762,11 +831,8 @@ function CvBuilderContent() {
   const [copied, setCopied] = useState<"resume" | "cover" | null>(null);
   const [activeTab, setActiveTab] = useState<"resume" | "cover">("resume");
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
-  const [parsedSuccess, setParsedSuccess] = useState(false);
-  const [parseDiagnostics, setParseDiagnostics] = useState<{
-    fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string;
-  } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ ach: false, jd: false, exp: true });
 
   const [form, setForm] = useState<CvFormData>({
     name: user?.fullName ?? "",
@@ -845,8 +911,6 @@ function CvBuilderContent() {
       return;
     }
     setParseLoading(true);
-    setParsedSuccess(false);
-    setParseDiagnostics(null);
     try {
       const arrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -869,28 +933,25 @@ function CvBuilderContent() {
         throw new Error(`Server error (${res.status}). Please try again.`);
       }
       const data = await res.json();
-      if (data._diagnostics) setParseDiagnostics(data._diagnostics);
-      setForm(prev => ({
-        ...prev,
-        name: data.name || prev.name,
-        email: data.email || prev.email,
-        phone: data.phone || prev.phone,
-        location: data.location || prev.location,
-        linkedin: data.linkedin || prev.linkedin,
-        currentRole: data.currentRole || prev.currentRole,
-        targetRole: data.targetRole || prev.targetRole,
-        summary: data.summary || prev.summary,
-        experience: data.experience || prev.experience,
-        education: data.education || prev.education,
-        achievements: data.achievements || prev.achievements,
-        skills: data.skills?.length > 0 ? [...new Set([...prev.skills, ...data.skills])] : prev.skills,
-        photo: data.photo || prev.photo,
-      }));
-      setParsedSuccess(true);
-      setShowUpload(false);
-      const ocrNote = data._diagnostics?.ocrUsed ? " (OCR)" : "";
-      const photoNote = data.photo ? " · Photo extracted ✓" : "";
-      toast({ title: "CV imported! ✨", description: `All fields populated${ocrNote}${photoNote}. Review and generate.` });
+      const cleaned: ImportedCV = {
+        name: (data.name || "").trim(),
+        email: (data.email || "").trim(),
+        phone: (data.phone || "").trim(),
+        location: (data.location || "").trim(),
+        linkedin: (data.linkedin || "").trim(),
+        currentRole: (data.currentRole || "").trim(),
+        targetRole: (data.targetRole || "").trim(),
+        summary: cleanText(data.summary || ""),
+        experience: prioritizeExperience(cleanText(data.experience || "")),
+        education: cleanText(data.education || ""),
+        achievements: cleanText(data.achievements || ""),
+        skills: cleanSkills(data.skills || []),
+        photo: data.photo,
+        _diagnostics: data._diagnostics,
+      };
+      setImportedData(cleaned);
+      setShowImportReview(true);
+      toast({ title: "CV extracted!", description: "Review the imported data below — then apply to your CV." });
     } catch (err: any) {
       toast({ title: "Import failed", description: err.message ?? "Check file format and try again.", variant: "destructive" });
     } finally {
@@ -898,6 +959,32 @@ function CvBuilderContent() {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  const applyImportedData = () => {
+    if (!importedData) return;
+    setForm(prev => ({
+      ...prev,
+      name: importedData.name || prev.name,
+      email: importedData.email || prev.email,
+      phone: importedData.phone || prev.phone,
+      location: importedData.location || prev.location,
+      linkedin: importedData.linkedin || prev.linkedin,
+      currentRole: importedData.currentRole || prev.currentRole,
+      targetRole: importedData.targetRole || prev.targetRole,
+      summary: importedData.summary || prev.summary,
+      experience: importedData.experience || prev.experience,
+      education: importedData.education || prev.education,
+      achievements: importedData.achievements || prev.achievements,
+      skills: importedData.skills.length > 0 ? [...new Set([...prev.skills, ...importedData.skills])] : prev.skills,
+      photo: importedData.photo || prev.photo,
+    }));
+    setShowImportReview(false);
+    setImportedData(null);
+    toast({ title: "CV imported! ✨", description: "Data applied. Review each step and generate your CV." });
+  };
+
+  const toggleSection = (key: string) =>
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -976,7 +1063,7 @@ function CvBuilderContent() {
       const data: GenerateResult = await res.json();
       setResult(data);
       setEditedCoverLetter(data.coverLetter);
-      setStep("preview");
+      setWizardStep(6);
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
@@ -985,12 +1072,14 @@ function CvBuilderContent() {
   };
 
   const previewHtml = useMemo(() => {
-    if (!result) return "";
     const t = TEMPLATES.find(x => x.id === selectedTemplate) ?? TEMPLATES[0];
-    return buildPrintHTML(result.resume, form.name, form.targetRole, t, form.photo || undefined, {
-      email: form.email, phone: form.phone, location: form.location, linkedin: form.linkedin, skills: form.skills,
-    });
-  }, [result, selectedTemplate, form.name, form.targetRole, form.photo, form.email, form.phone, form.location, form.linkedin, form.skills]);
+    if (result) {
+      return buildPrintHTML(result.resume, form.name, form.targetRole, t, form.photo || undefined, {
+        email: form.email, phone: form.phone, location: form.location, linkedin: form.linkedin, skills: form.skills,
+      });
+    }
+    return buildRawPreviewHTML(form, t);
+  }, [result, selectedTemplate, form]);
 
   const downloadPDF = () => {
     const content = activeTab === "resume" ? result?.resume : editedCoverLetter;
@@ -1052,442 +1141,541 @@ function CvBuilderContent() {
             <FileText className="w-4 h-4 text-green-400" />
             <span className="font-semibold text-sm">AI CV Builder</span>
           </div>
-          {step === "preview" && (
+          {wizardStep < 6 && (
             <>
               <span className="text-border">|</span>
-              <div className="flex gap-1 text-xs">
-                <button onClick={() => setStep("build")} className="px-2 py-1 rounded-md text-muted-foreground hover:text-foreground transition-colors">
-                  ← Edit
-                </button>
-                <span className="text-border self-center">/</span>
-                <span className="px-2 py-1 rounded-md text-primary font-semibold">Preview</span>
-              </div>
+              <span className="text-xs text-muted-foreground">Step {wizardStep} of 5</span>
+            </>
+          )}
+          {wizardStep === 6 && (
+            <>
+              <span className="text-border">|</span>
+              <button onClick={() => setWizardStep(5)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">← Edit</button>
             </>
           )}
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 py-8 max-w-5xl">
+      {/* Progress bar */}
+      {wizardStep < 6 && (
+        <div className="border-b border-border bg-card/50">
+          <div className="container mx-auto px-4 py-2">
+            <div className="flex items-center gap-0.5 overflow-x-auto">
+              {WIZARD_STEPS.slice(0, 5).map((s, i) => (
+                <span key={s.id} className="flex items-center">
+                  <button
+                    onClick={() => setWizardStep(s.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                      wizardStep === s.id ? "bg-primary text-primary-foreground"
+                      : wizardStep > s.id ? "text-green-400 hover:bg-muted/50"
+                      : "text-muted-foreground hover:bg-muted/30"
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0 ${
+                      wizardStep > s.id ? "bg-green-400 text-black"
+                      : wizardStep === s.id ? "bg-white text-black"
+                      : "bg-muted text-muted-foreground"
+                    }`}>
+                      {wizardStep > s.id ? "✓" : s.id}
+                    </span>
+                    {s.label}
+                  </button>
+                  {i < 4 && <ChevronRight className="w-3 h-3 text-border flex-shrink-0 mx-0.5" />}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Review Overlay */}
+      <AnimatePresence>
+        {showImportReview && importedData && (
+          <motion.div
+            key="import-review"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto"
+          >
+            <div className="min-h-full flex items-start justify-center p-4 pt-10 pb-20">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                className="w-full max-w-3xl bg-background border border-border rounded-2xl overflow-hidden shadow-2xl"
+              >
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-green-400/5">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                    <div>
+                      <h2 className="font-bold text-base">CV Extracted — Review Before Applying</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        AI cleaned and structured your data. Confirm to apply to your form.
+                        {importedData._diagnostics && ` · ${importedData._diagnostics.textExtracted?.toLocaleString()} chars read`}
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowImportReview(false)} className="text-muted-foreground hover:text-foreground p-1">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <User className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Personal Info</span>
+                      </div>
+                      {importedData.photo && (
+                        <div className="mb-3">
+                          <img src={importedData.photo} alt="Profile" className="w-14 h-14 rounded-full object-cover border-2 border-border" />
+                          <p className="text-[10px] text-green-400 mt-1">Photo extracted ✓</p>
+                        </div>
+                      )}
+                      <div className="space-y-1.5 text-sm">
+                        {importedData.name && <div><span className="text-muted-foreground text-xs">Name: </span>{importedData.name}</div>}
+                        {importedData.email && <div><span className="text-muted-foreground text-xs">Email: </span>{importedData.email}</div>}
+                        {importedData.phone && <div><span className="text-muted-foreground text-xs">Phone: </span>{importedData.phone}</div>}
+                        {importedData.location && <div><span className="text-muted-foreground text-xs">Location: </span>{importedData.location}</div>}
+                        {importedData.currentRole && <div><span className="text-muted-foreground text-xs">Role: </span>{importedData.currentRole}</div>}
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Zap className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Skills ({importedData.skills.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto">
+                        {importedData.skills.length > 0
+                          ? importedData.skills.map(s => (
+                              <span key={s} className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5">{s}</span>
+                            ))
+                          : <span className="text-xs text-muted-foreground">No skills extracted</span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  {importedData.summary && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Summary</span>
+                      </div>
+                      <p className="text-sm leading-relaxed">{importedData.summary}</p>
+                    </div>
+                  )}
+
+                  {importedData.experience && (
+                    <div className="bg-card border border-border rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => toggleSection("rev-exp")}
+                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="w-4 h-4 text-primary" />
+                          <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Work Experience</span>
+                          {!expandedSections["rev-exp"] && <span className="text-[10px] text-primary">Click to expand</span>}
+                        </div>
+                        {expandedSections["rev-exp"] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                      {expandedSections["rev-exp"]
+                        ? <div className="px-4 pb-4 border-t border-border"><pre className="text-sm whitespace-pre-wrap leading-relaxed mt-3 font-sans">{importedData.experience}</pre></div>
+                        : <div className="px-4 pb-3"><p className="text-xs text-muted-foreground line-clamp-2">{importedData.experience.split("\n")[0]}</p></div>
+                      }
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {importedData.education && (
+                      <div className="bg-card border border-border rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <GraduationCap className="w-4 h-4 text-primary" />
+                          <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Education</span>
+                        </div>
+                        <p className="text-sm whitespace-pre-line leading-relaxed">{importedData.education}</p>
+                      </div>
+                    )}
+                    {importedData.achievements && (
+                      <div className="bg-card border border-border rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Trophy className="w-4 h-4 text-primary" />
+                          <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Achievements</span>
+                        </div>
+                        <p className="text-sm whitespace-pre-line leading-relaxed line-clamp-5">{importedData.achievements}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-border bg-card/50">
+                  <button
+                    onClick={() => { setShowImportReview(false); setImportedData(null); }}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Discard
+                  </button>
+                  <Button onClick={applyImportedData} className="bg-green-500 hover:bg-green-600 text-white gap-2 rounded-xl px-6">
+                    <CheckCircle2 className="w-4 h-4" />Apply to my CV
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="container mx-auto px-4 py-6 max-w-7xl">
         <AnimatePresence mode="wait">
 
-          {/* ─── STEP 1: BUILD ─── */}
-          {step === "build" && (
-            <motion.div key="build" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-6">
+          {/* Steps 1–5: two-column wizard */}
+          {wizardStep < 6 && (
+            <motion.div key={`step-${wizardStep}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}>
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
 
-              {/* Header */}
-              <div className="text-center">
-                <div className="inline-flex items-center gap-2 bg-green-400/10 border border-green-400/20 rounded-full px-4 py-1.5 text-sm text-green-400 mb-3">
-                  <Wand2 className="w-4 h-4" />AI-Powered Resume Builder
-                </div>
-                <h1 className="text-3xl font-bold mb-2">Build Your Professional CV</h1>
-                <p className="text-muted-foreground">Your profile is pre-filled. Add experience, then generate with AI.</p>
-              </div>
+                {/* ── Left: step form ── */}
+                <div className="space-y-5 min-w-0">
 
-              {/* Section: Personal Info */}
-              <div className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <User className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Personal Information</h2>
-                </div>
-
-                {/* Photo picker */}
-                <div className="flex items-center gap-4 mb-5">
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handlePhotoUpload}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => photoInputRef.current?.click()}
-                    className="relative w-20 h-20 rounded-full border-2 border-dashed border-border hover:border-primary/60 overflow-hidden bg-muted/30 flex items-center justify-center shrink-0 group transition-all"
-                  >
-                    {form.photo ? (
-                      <img src={form.photo} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <Camera className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera className="w-5 h-5 text-white" />
+                  {/* ── Step 1: Personal Info ── */}
+                  {wizardStep === 1 && (<>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"><User className="w-4 h-4 text-primary" /></div>
+                      <div>
+                        <h2 className="font-bold text-lg">Personal Information</h2>
+                        <p className="text-xs text-muted-foreground">Your contact details appear on every template</p>
+                      </div>
                     </div>
-                  </button>
-                  <div>
-                    <p className="text-sm font-medium">Profile Photo</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG or WebP · appears on your CV</p>
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => photoInputRef.current?.click()}
-                        className="text-xs text-primary hover:text-primary/80 transition-colors border border-primary/20 bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-lg"
-                      >
-                        {form.photo ? "Change photo" : "Upload photo"}
-                      </button>
-                      {form.photo && (
+
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                      <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-blue-400" />
+                        <span className="font-semibold text-sm">Import from Existing CV</span>
+                        <span className="text-xs text-muted-foreground ml-1">— AI extracts all sections, you review first</span>
+                      </div>
+                      <div className="p-5">
+                        <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt,.md,.rtf" className="hidden" onChange={handleFileUpload} />
+                        <div
+                          onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={handleDrop}
+                          onClick={() => !parseLoading && fileInputRef.current?.click()}
+                          className={`rounded-xl border-2 border-dashed transition-all cursor-pointer p-6 text-center ${isDragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/40 hover:bg-muted/20"} ${parseLoading ? "pointer-events-none opacity-60" : ""}`}
+                        >
+                          {parseLoading ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                              <p className="text-sm font-medium">Reading your CV…</p>
+                              <p className="text-xs text-muted-foreground">AI extracts all sections — usually 5–10s</p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-2">
+                              <Upload className="w-7 h-7 text-blue-400" />
+                              <p className="text-sm font-semibold">Drop your CV or click to browse</p>
+                              <p className="text-xs text-muted-foreground">You review extracted data before it's applied</p>
+                              <div className="flex gap-1.5 mt-1">
+                                {["PDF", "DOCX", "TXT", "MD"].map(f => (
+                                  <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 border border-blue-400/20 font-medium">{f}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center gap-4 mb-5">
+                        <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePhotoUpload} />
                         <button
                           type="button"
-                          onClick={() => setField("photo", "")}
-                          className="text-xs text-muted-foreground hover:text-red-400 transition-colors border border-border hover:border-red-400/30 px-2.5 py-1 rounded-lg"
+                          onClick={() => photoInputRef.current?.click()}
+                          className="relative w-16 h-16 rounded-full border-2 border-dashed border-border hover:border-primary/60 overflow-hidden bg-muted/30 flex items-center justify-center flex-shrink-0 group transition-all"
                         >
-                          Remove
+                          {form.photo
+                            ? <img src={form.photo} alt="Profile" className="w-full h-full object-cover" />
+                            : <Camera className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                          }
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                            <Camera className="w-4 h-4 text-white" />
+                          </div>
                         </button>
+                        <div>
+                          <p className="text-sm font-medium">Profile Photo</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Shown on sidebar templates. JPG/PNG/WebP.</p>
+                          {form.photo && <button onClick={() => setField("photo", "")} className="text-xs text-red-400 hover:text-red-300 mt-1 transition-colors">Remove photo</button>}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label className="block text-xs font-medium mb-1.5">Full Name *</label><input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="Your full name" className={inputCls} /></div>
+                        <div><label className="block text-xs font-medium mb-1.5">Current Role</label><input value={form.currentRole} onChange={e => setField("currentRole", e.target.value)} placeholder="e.g. Software Engineer" className={inputCls} /></div>
+                        <div><label className="block text-xs font-medium mb-1.5">Email</label><input value={form.email} onChange={e => setField("email", e.target.value)} placeholder="your@email.com" className={inputCls} /></div>
+                        <div><label className="block text-xs font-medium mb-1.5">Phone</label><input value={form.phone} onChange={e => setField("phone", e.target.value)} placeholder="+234 800 000 0000" className={inputCls} /></div>
+                        <div><label className="block text-xs font-medium mb-1.5">Location</label><input value={form.location} onChange={e => setField("location", e.target.value)} placeholder="Lagos, Nigeria" className={inputCls} /></div>
+                        <div><label className="block text-xs font-medium mb-1.5">LinkedIn URL</label><input value={form.linkedin} onChange={e => setField("linkedin", e.target.value)} placeholder="linkedin.com/in/yourprofile" className={inputCls} /></div>
+                      </div>
+                    </div>
+                  </>)}
+
+                  {/* ── Step 2: Target Job ── */}
+                  {wizardStep === 2 && (<>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-orange-400/10 flex items-center justify-center flex-shrink-0"><Target className="w-4 h-4 text-orange-400" /></div>
+                      <div>
+                        <h2 className="font-bold text-lg">Target Job</h2>
+                        <p className="text-xs text-muted-foreground">Define the role — AI tailors every word to it</p>
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div><label className="block text-xs font-medium mb-1.5">Target Role *</label><input value={form.targetRole} onChange={e => setField("targetRole", e.target.value)} placeholder="AI Engineer, Backend Dev..." className={inputCls} /></div>
+                        <div><label className="block text-xs font-medium mb-1.5">Target Company</label><input value={form.targetCompany} onChange={e => setField("targetCompany", e.target.value)} placeholder="Google, Andela, Flutterwave..." className={inputCls} /></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium mb-2">Writing Tone</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {TONE_OPTIONS.map(({ value, label, desc }) => (
+                              <button key={value} onClick={() => setField("tone", value)} className={`rounded-xl border p-2.5 text-left transition-all ${form.tone === value ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}>
+                                <div className="font-semibold text-xs">{label}</div>
+                                <div className="text-[10px] mt-0.5 opacity-70">{desc}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-1.5">🌍 CV Language</label>
+                          <select value={form.language} onChange={e => setField("language", e.target.value)} className={`${inputCls} cursor-pointer`}>
+                            {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                          </select>
+                          <p className="text-[10px] text-muted-foreground mt-1">AI writes the whole CV in this language</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                      <button onClick={() => toggleSection("jd")} className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Target className="w-4 h-4 text-orange-400" />
+                          <span className="font-semibold text-sm">ATS Matching</span>
+                          <span className="text-xs text-muted-foreground">— optional, paste job description to score your CV</span>
+                        </div>
+                        {expandedSections.jd ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                      {expandedSections.jd && (
+                        <div className="px-5 pb-5 border-t border-border space-y-3">
+                          <textarea value={jobDescription} onChange={e => setJobDescription(e.target.value)} placeholder="Paste the full job description here..." rows={5} className={`${textareaCls} mt-3`} />
+                          <Button onClick={tailor} disabled={tailorLoading} variant="outline" className="gap-2 rounded-xl" size="sm">
+                            {tailorLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Analysing...</> : <><Target className="w-4 h-4" />Analyse & Score</>}
+                          </Button>
+                          {atsResult && <AtsPanel ats={atsResult} onApplySummary={s => { setField("summary", s); toast({ title: "Summary applied!" }); }} />}
+                        </div>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </>)}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Full Name *</label>
-                    <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="Your full name" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Email</label>
-                    <input value={form.email} onChange={e => setField("email", e.target.value)} placeholder="your@email.com" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Phone</label>
-                    <input value={form.phone} onChange={e => setField("phone", e.target.value)} placeholder="+1 555 000 0000" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Location</label>
-                    <input value={form.location} onChange={e => setField("location", e.target.value)} placeholder="City, Country" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">LinkedIn URL</label>
-                    <input value={form.linkedin} onChange={e => setField("linkedin", e.target.value)} placeholder="linkedin.com/in/yourprofile" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Current Role</label>
-                    <input value={form.currentRole} onChange={e => setField("currentRole", e.target.value)} placeholder="e.g. Software Engineer at Company" className={inputCls} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Target */}
-              <div className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Briefcase className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Target Position</h2>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Target Role *</label>
-                    <input value={form.targetRole} onChange={e => setField("targetRole", e.target.value)} placeholder="e.g. Product Manager, Senior Engineer..." className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5">Target Company <span className="text-muted-foreground font-normal">(for cover letter)</span></label>
-                    <input value={form.targetCompany} onChange={e => setField("targetCompany", e.target.value)} placeholder="Company you're applying to (for cover letter)" className={inputCls} />
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-xs font-medium mb-2">Writing Tone</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      {TONE_OPTIONS.map(({ value, label, desc }) => (
-                        <button key={value} onClick={() => setField("tone", value)} className={`rounded-xl border p-2.5 text-left transition-all ${form.tone === value ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-border/80"}`}>
-                          <div className="font-semibold text-xs">{label}</div>
-                          <div className="text-[10px] mt-0.5 opacity-70">{desc}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-medium mb-2 flex items-center gap-1">
-                      🌍 CV Language
-                    </h3>
-                    <select
-                      value={form.language}
-                      onChange={e => setField("language", e.target.value)}
-                      className={`${inputCls} cursor-pointer`}
-                    >
-                      {LANGUAGES.map(lang => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      AI will write your entire CV & cover letter in this language
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Summary */}
-              <div className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Professional Summary</h2>
-                  </div>
-                  <AiBtn assistKey="summary-gen" action="experienceSummary" content={form.experience} field="summary" label="Generate Summary" />
-                </div>
-                <textarea
-                  value={form.summary}
-                  onChange={e => setField("summary", e.target.value)}
-                  placeholder="2-3 sentences about your expertise and what you bring to the role..."
-                  rows={3}
-                  className={textareaCls}
-                />
-              </div>
-
-              {/* Section: Experience */}
-              <div className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Work Experience *</h2>
-                  </div>
-                  <div className="flex gap-2">
-                    <AiBtn assistKey="experience-rewrite" action="rewriteProfessionally" content={form.experience} field="experience" label="Rewrite" />
-                    <AiBtn assistKey="experience-ats" action="atsOptimize" content={form.experience} field="experience" label="ATS Optimize" />
-                  </div>
-                </div>
-                <textarea
-                  value={form.experience}
-                  onChange={e => setField("experience", e.target.value)}
-                  placeholder={"Senior Engineer at Company A (2022–Present)\n- Led a team of 6, reduced load time by 40%\n- Architected a platform serving 200k+ users\n\nDeveloper at Company B (2019–2022)\n- Built REST APIs consumed by 100k+ users\n- Reduced infrastructure costs by 30%"}
-                  rows={7}
-                  className={textareaCls}
-                />
-              </div>
-
-              {/* Section: Education + Achievements */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-card border border-border rounded-2xl p-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <GraduationCap className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Education</h2>
-                  </div>
-                  <textarea
-                    value={form.education}
-                    onChange={e => setField("education", e.target.value)}
-                    placeholder={"BSc Computer Science\nUniversity Name (2019)\nFirst Class Honours\n\nAWS Solutions Architect Certification (2022)"}
-                    rows={5}
-                    className={textareaCls}
-                  />
-                </div>
-
-                <div className="bg-card border border-border rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-primary" />
-                      <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Key Achievements</h2>
-                    </div>
-                    <AiBtn assistKey="achievements-improve" action="improveAchievements" content={form.achievements} field="achievements" label="Improve" />
-                  </div>
-                  <textarea
-                    value={form.achievements}
-                    onChange={e => setField("achievements", e.target.value)}
-                    placeholder={"- Speaker at industry conference\n- Built product used by 100k+ users\n- Top performer award 2023"}
-                    rows={5}
-                    className={textareaCls}
-                  />
-                </div>
-              </div>
-
-              {/* Section: Skills */}
-              <div className="bg-card border border-border rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-primary" />
-                    <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Skills</h2>
-                  </div>
-                  <AiBtn assistKey="skills-suggest" action="suggestSkills" content={form.skills.join(", ")} label="Suggest Skills" />
-                </div>
-                <div className="flex gap-2 mb-3">
-                  <input
-                    value={form.skillInput}
-                    onChange={e => setField("skillInput", e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addSkill())}
-                    placeholder="React, Python, Figma, AWS..."
-                    className={`flex-1 ${inputCls}`}
-                  />
-                  <Button onClick={addSkill} variant="outline" size="sm" className="rounded-xl h-auto px-3"><Plus className="w-4 h-4" /></Button>
-                </div>
-                {form.skills.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No skills added yet. Type above or click "Suggest Skills".</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {form.skills.map(s => (
-                      <span key={s} className="inline-flex items-center gap-1 bg-primary/10 border border-primary/20 text-primary text-xs rounded-full px-2.5 py-1">
-                        {s}
-                        <button onClick={() => removeSkill(s)} className="hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Parsed success banner */}
-              {parsedSuccess && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-green-400/30 bg-green-400/5 p-4 space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                  {/* ── Step 3: Experience ── */}
+                  {wizardStep === 3 && (<>
                     <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+                      <div className="w-8 h-8 rounded-full bg-blue-400/10 flex items-center justify-center flex-shrink-0"><Briefcase className="w-4 h-4 text-blue-400" /></div>
                       <div>
-                        <p className="font-semibold text-sm text-green-400">CV imported successfully!</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">All fields have been pre-filled. Review below, then generate your enhanced CV.</p>
+                        <h2 className="font-bold text-lg">Work Experience</h2>
+                        <p className="text-xs text-muted-foreground">AI enhances and reorders — tech roles prioritised over logistics</p>
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-primary" /><h3 className="font-semibold text-sm">Work Experience *</h3></div>
+                        <div className="flex gap-2">
+                          <AiBtn assistKey="experience-rewrite" action="rewriteProfessionally" content={form.experience} field="experience" label="Rewrite" />
+                          <AiBtn assistKey="experience-ats" action="atsOptimize" content={form.experience} field="experience" label="ATS Optimize" />
+                        </div>
+                      </div>
+                      <textarea
+                        value={form.experience}
+                        onChange={e => setField("experience", e.target.value)}
+                        placeholder={"Senior Engineer at Company A (2022–Present)\n- Led a team of 6, reduced load time by 40%\n- Architected a platform serving 200k+ users\n\nDeveloper at Company B (2019–2022)\n- Built REST APIs consumed by 100k+ users"}
+                        rows={10}
+                        className={textareaCls}
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1.5">Separate roles with a blank line. Include company, title, dates, and bullet points.</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                      <button onClick={() => toggleSection("ach")} className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-yellow-400" />
+                          <span className="font-semibold text-sm">Achievements & Certifications</span>
+                          {form.achievements && <span className="text-[10px] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded-full">✓ Added</span>}
+                        </div>
+                        {expandedSections.ach ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                      {expandedSections.ach && (
+                        <div className="px-5 pb-5 border-t border-border">
+                          <div className="flex items-center justify-between mt-3 mb-2">
+                            <p className="text-xs text-muted-foreground">Awards, certs, publications, honors</p>
+                            <AiBtn assistKey="achievements-improve" action="improveAchievements" content={form.achievements} field="achievements" label="Improve" />
+                          </div>
+                          <textarea
+                            value={form.achievements}
+                            onChange={e => setField("achievements", e.target.value)}
+                            placeholder={"Forbes Africa 30 Under 30 (2022)\nAWS Certified Solutions Architect\nSpeaker at PyCon Africa 2023"}
+                            rows={4}
+                            className={textareaCls}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>)}
+
+                  {/* ── Step 4: Skills & Education ── */}
+                  {wizardStep === 4 && (<>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-purple-400/10 flex items-center justify-center flex-shrink-0"><GraduationCap className="w-4 h-4 text-purple-400" /></div>
+                      <div>
+                        <h2 className="font-bold text-lg">Skills & Education</h2>
+                        <p className="text-xs text-muted-foreground">Skills appear as tags in sidebar templates</p>
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /><h3 className="font-semibold text-sm">Skills</h3></div>
+                        <AiBtn assistKey="skills-suggest" action="suggestSkills" content={form.experience} label="Suggest Skills" />
+                      </div>
+                      <div className="flex gap-2 mb-3">
+                        <input value={form.skillInput} onChange={e => setField("skillInput", e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addSkill())} placeholder="Type a skill and press Enter…" className={`flex-1 ${inputCls}`} />
+                        <Button onClick={addSkill} variant="outline" size="sm" className="rounded-xl h-auto px-3"><Plus className="w-4 h-4" /></Button>
+                      </div>
+                      {form.skills.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No skills yet. Add manually or click "Suggest Skills".</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {form.skills.map(s => (
+                            <span key={s} className="inline-flex items-center gap-1 bg-primary/10 border border-primary/20 text-primary text-xs rounded-full px-2.5 py-1">
+                              {s}<button onClick={() => removeSkill(s)} className="hover:text-red-400 transition-colors"><X className="w-3 h-3" /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-3"><GraduationCap className="w-4 h-4 text-primary" /><h3 className="font-semibold text-sm">Education</h3></div>
+                      <textarea
+                        value={form.education}
+                        onChange={e => setField("education", e.target.value)}
+                        placeholder={"BSc Computer Science\nUniversity Name (2019)\nFirst Class Honours\n\nAWS Solutions Architect Certification (2022)"}
+                        rows={5}
+                        className={textareaCls}
+                      />
+                    </div>
+                  </>)}
+
+                  {/* ── Step 5: AI Review ── */}
+                  {wizardStep === 5 && (<>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"><Sparkles className="w-4 h-4 text-primary" /></div>
+                      <div>
+                        <h2 className="font-bold text-lg">AI Review</h2>
+                        <p className="text-xs text-muted-foreground">Fine-tune your summary, then generate your polished CV</p>
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /><h3 className="font-semibold text-sm">Professional Summary</h3></div>
+                        <AiBtn assistKey="summary-gen" action="experienceSummary" content={form.experience} field="summary" label="Generate Summary" />
+                      </div>
+                      <textarea
+                        value={form.summary}
+                        onChange={e => setField("summary", e.target.value)}
+                        placeholder="2–3 sentences about your expertise and what you bring to the role..."
+                        rows={4}
+                        className={textareaCls}
+                      />
+                    </div>
+                    {atsResult && <AtsPanel ats={atsResult} onApplySummary={s => { setField("summary", s); toast({ title: "Summary applied!" }); }} />}
+                    <div className="bg-gradient-to-r from-primary/10 to-green-400/10 border border-primary/20 rounded-2xl p-6 text-center">
+                      <h3 className="font-bold text-lg mb-1">Ready to Generate</h3>
+                      <p className="text-sm text-muted-foreground mb-4">AI crafts a professional CV + cover letter in your chosen tone</p>
+                      <Button
+                        onClick={generate}
+                        disabled={generateLoading}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-10 py-3.5 h-auto text-base font-bold rounded-2xl shadow-[0_0_40px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_rgba(0,229,255,0.4)] transition-all"
+                      >
+                        {generateLoading
+                          ? <><Loader2 className="w-5 h-5 animate-spin" />Generating your CV...</>
+                          : <><Sparkles className="w-5 h-5" />Generate with AI</>}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-3">Takes 10–20 seconds</p>
+                    </div>
+                  </>)}
+
+                  {/* Step navigation */}
+                  <div className="flex justify-between items-center pt-2 pb-6">
+                    <Button onClick={() => setWizardStep(s => Math.max(1, s - 1))} variant="outline" className="rounded-xl gap-1.5" disabled={wizardStep === 1}>
+                      <ChevronLeft className="w-4 h-4" />Back
+                    </Button>
+                    {wizardStep < 5 && (
+                      <Button onClick={() => setWizardStep(s => s + 1)} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl gap-1.5">
+                        Next<ChevronRight className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {wizardStep === 5 && (
+                      <Button onClick={generate} disabled={generateLoading} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl gap-1.5">
+                        {generateLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</> : <><Sparkles className="w-4 h-4" />Generate CV</>}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Right: Sticky live preview ── */}
+                <div className="hidden lg:block">
+                  <div className="sticky top-20 space-y-3">
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Live Preview</span>
+                          {result && <span className="text-green-400 font-medium">· AI Enhanced</span>}
+                        </div>
+                        <div className="flex gap-1 flex-wrap">
+                          {TEMPLATES.map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => setSelectedTemplate(t.id)}
+                              title={t.name}
+                              className={`w-4 h-4 rounded-sm transition-all ${selectedTemplate === t.id ? "ring-2 ring-white ring-offset-1 ring-offset-card" : "opacity-50 hover:opacity-80"}`}
+                              style={{ background: t.sidebarBg ?? t.accent }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="relative overflow-hidden bg-white" style={{ height: 440 }}>
+                        <iframe
+                          key={`live-${selectedTemplate}-${form.name}-${form.experience.length}-${form.skills.length}`}
+                          title="Live CV Preview"
+                          srcDoc={previewHtml}
+                          className="border-0 bg-white absolute top-0 left-0"
+                          sandbox="allow-same-origin"
+                          style={{ width: "154%", height: "154%", transform: "scale(0.65)", transformOrigin: "top left" }}
+                        />
                       </div>
                     </div>
                     <Button
                       onClick={generate}
                       disabled={generateLoading}
-                      className="bg-green-500 hover:bg-green-600 text-white gap-2 rounded-xl shrink-0"
-                      size="sm"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2 py-3 h-auto font-bold rounded-xl shadow-[0_0_30px_rgba(0,229,255,0.2)] hover:shadow-[0_0_40px_rgba(0,229,255,0.35)] transition-all"
                     >
-                      {generateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      Generate Enhanced CV
+                      {generateLoading
+                        ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
+                        : <><Sparkles className="w-4 h-4" />Generate Enhanced CV</>}
                     </Button>
                   </div>
-                  {parseDiagnostics && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
-                        <span className="text-muted-foreground">File type:</span>
-                        <span className="font-medium uppercase">{parseDiagnostics.fileType}</span>
-                      </span>
-                      {parseDiagnostics.pageCount > 0 && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
-                          <span className="text-muted-foreground">Pages:</span>
-                          <span className="font-medium">{parseDiagnostics.pageCount}</span>
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
-                        <span className="text-muted-foreground">Text extracted:</span>
-                        <span className="font-medium">{parseDiagnostics.textExtracted.toLocaleString()} chars</span>
-                      </span>
-                      <span className={`inline-flex items-center gap-1 text-xs border rounded-full px-2.5 py-1 ${parseDiagnostics.ocrUsed ? "bg-amber-400/10 border-amber-400/30 text-amber-400" : "bg-muted/50 border-border"}`}>
-                        <span className="text-muted-foreground">OCR:</span>
-                        <span className="font-medium">{parseDiagnostics.ocrUsed ? "Yes" : "No"}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
-                        <span className="text-muted-foreground">Method:</span>
-                        <span className="font-medium">{parseDiagnostics.method}</span>
-                      </span>
-                    </div>
-                  )}
-                </motion.div>
-              )}
+                </div>
 
-              {/* Section: Upload CV */}
-              <div className="bg-card border border-border rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => setShowUpload(v => !v)}
-                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-blue-400" />
-                    <span className="font-semibold text-sm">Upload Existing CV</span>
-                    <span className="text-xs text-muted-foreground">— PDF, DOCX, TXT, MD supported</span>
-                  </div>
-                  {showUpload ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                </button>
-                {showUpload && (
-                  <div className="px-6 pb-5 border-t border-border">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.docx,.txt,.md,.rtf"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                    />
-                    {/* Drag-and-drop zone */}
-                    <div
-                      onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={handleDrop}
-                      onClick={() => !parseLoading && fileInputRef.current?.click()}
-                      className={`mt-4 rounded-xl border-2 border-dashed transition-all cursor-pointer p-8 text-center ${
-                        isDragging
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/40 hover:bg-muted/20"
-                      } ${parseLoading ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      {parseLoading ? (
-                        <div className="flex flex-col items-center gap-2">
-                          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                          <p className="text-sm font-medium">Extracting & parsing your CV…</p>
-                          <p className="text-xs text-muted-foreground">This usually takes 5–10 seconds</p>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2">
-                          <Upload className="w-8 h-8 text-blue-400" />
-                          <p className="text-sm font-semibold">Drop your CV here or click to browse</p>
-                          <p className="text-xs text-muted-foreground">
-                            PDF, DOCX, TXT, MD · Max 10 MB
-                          </p>
-                          <div className="flex gap-1.5 mt-1 flex-wrap justify-center">
-                            {["PDF", "DOCX", "TXT", "MD"].map(f => (
-                              <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 border border-blue-400/20 font-medium">{f}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-3 text-center">
-                      AI extracts your info and fills the form. Scanned PDFs may not work — try a text-based PDF.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Section: Job Targeting */}
-              <div className="bg-card border border-border rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => setShowJobTarget(v => !v)}
-                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-orange-400" />
-                    <span className="font-semibold text-sm">Job Targeting & ATS Score</span>
-                    <span className="text-xs text-muted-foreground">— Tailor your CV for a specific role</span>
-                  </div>
-                  {showJobTarget ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                </button>
-                {showJobTarget && (
-                  <div className="px-6 pb-5 border-t border-border">
-                    <p className="text-xs text-muted-foreground mt-3 mb-2">
-                      Paste a job description to get your ATS compatibility score, identify missing keywords, and get a tailored summary.
-                    </p>
-                    <textarea
-                      value={jobDescription}
-                      onChange={e => setJobDescription(e.target.value)}
-                      placeholder="Paste the full job description here..."
-                      rows={6}
-                      className={textareaCls}
-                    />
-                    <div className="mt-3">
-                      <Button onClick={tailor} disabled={tailorLoading} variant="outline" className="gap-2 rounded-xl">
-                        {tailorLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Analysing...</> : <><Target className="w-4 h-4" />Analyse & Get ATS Score</>}
-                      </Button>
-                    </div>
-                    {atsResult && (
-                      <AtsPanel ats={atsResult} onApplySummary={s => { setField("summary", s); toast({ title: "Summary applied!" }); }} />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Generate button */}
-              <div className="flex justify-center pt-2 pb-8">
-                <Button
-                  onClick={generate}
-                  disabled={generateLoading}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-10 py-3.5 h-auto text-base font-bold rounded-2xl shadow-[0_0_40px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_rgba(0,229,255,0.4)] transition-all"
-                >
-                  {generateLoading
-                    ? <><Loader2 className="w-5 h-5 animate-spin" />Generating your CV...</>
-                    : <><Sparkles className="w-5 h-5" />Generate with AI</>}
-                </Button>
               </div>
             </motion.div>
           )}
 
-          {/* ─── STEP 2: PREVIEW ─── */}
-          {step === "preview" && result && (
+          {/* Step 6: Preview & Download */}
+          {wizardStep === 6 && result && (
             <motion.div key="preview" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div>
@@ -1495,12 +1683,11 @@ function CvBuilderContent() {
                   <p className="text-muted-foreground text-sm mt-1">Pick a template, preview, then download as PDF.</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button onClick={() => setStep("build")} variant="outline" size="sm" className="rounded-xl gap-1.5">
+                  <Button onClick={() => setWizardStep(5)} variant="outline" size="sm" className="rounded-xl gap-1.5">
                     <ChevronLeft className="w-4 h-4" />Edit
                   </Button>
                   <Button onClick={() => copyText(activeTab)} variant="outline" size="sm" className="rounded-xl gap-1.5">
-                    {copied === activeTab ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                    Copy
+                    {copied === activeTab ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}Copy
                   </Button>
                   <Button onClick={downloadPDF} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl gap-1.5 px-5">
                     <Download className="w-4 h-4" />Download PDF
@@ -1508,19 +1695,13 @@ function CvBuilderContent() {
                 </div>
               </div>
 
-              {/* Template picker */}
-              <div className="mb-6">
-                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <Layout className="w-4 h-4 text-primary" />Choose Template
-                </h2>
+              <div className="mb-5">
+                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2"><Layout className="w-4 h-4 text-primary" />Choose Template</h2>
                 <div className="grid grid-cols-4 gap-3">
-                  {TEMPLATES.map(t => (
-                    <TemplateCard key={t.id} template={t} selected={selectedTemplate === t.id} onSelect={() => setSelectedTemplate(t.id)} />
-                  ))}
+                  {TEMPLATES.map(t => <TemplateCard key={t.id} template={t} selected={selectedTemplate === t.id} onSelect={() => setSelectedTemplate(t.id)} />)}
                 </div>
               </div>
 
-              {/* Tabs */}
               <div className="flex gap-2 mb-4">
                 {(["resume", "cover"] as const).map(tab => (
                   <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${activeTab === tab ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"}`}>
@@ -1529,18 +1710,12 @@ function CvBuilderContent() {
                 ))}
               </div>
 
-              {/* Two-column: content + iframe preview */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Content — editable for cover letter */}
                 <div>
                   <div className="h-1.5 w-full rounded-t-lg" style={{ backgroundColor: TEMPLATES.find(t => t.id === selectedTemplate)?.accent }} />
                   {activeTab === "resume" ? (
                     <div className="bg-white border border-border rounded-b-2xl p-6 leading-relaxed max-h-[600px] overflow-y-auto">
-                      <div
-                        className="prose prose-sm max-w-none"
-                        style={{ color: "#1e293b" }}
-                        dangerouslySetInnerHTML={{ __html: mdInline(result.resume) }}
-                      />
+                      <div className="prose prose-sm max-w-none" style={{ color: "#1e293b" }} dangerouslySetInnerHTML={{ __html: mdInline(result.resume) }} />
                     </div>
                   ) : (
                     <div className="relative">
@@ -1550,18 +1725,12 @@ function CvBuilderContent() {
                         className="w-full bg-white border border-border rounded-b-2xl p-6 text-sm text-gray-800 leading-relaxed resize-none outline-none focus:border-primary/40 transition-colors"
                         style={{ minHeight: 600, fontFamily: "Georgia, serif" }}
                       />
-                      <div className="absolute top-3 right-3 text-[10px] text-gray-400 bg-white/80 px-1.5 py-0.5 rounded">
-                        editable
-                      </div>
+                      <div className="absolute top-3 right-3 text-[10px] text-gray-400 bg-white/80 px-1.5 py-0.5 rounded">editable</div>
                     </div>
                   )}
                 </div>
-
-                {/* Live iframe preview */}
                 <div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-                    <Eye className="w-3.5 h-3.5" />Print Preview
-                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2"><Eye className="w-3.5 h-3.5" />Print Preview</div>
                   <div className="rounded-2xl border border-border overflow-hidden" style={{ height: 600 }}>
                     <iframe
                       key={`${selectedTemplate}-${activeTab}-${editedCoverLetter.length}`}
@@ -1575,7 +1744,7 @@ function CvBuilderContent() {
               </div>
 
               <p className="text-center text-xs text-muted-foreground mt-4">
-                Download opens the print dialog → choose <strong>Save as PDF</strong> in your browser's print dialog
+                Download opens the print dialog → choose <strong>Save as PDF</strong>
               </p>
 
               <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between gap-4 flex-wrap">
