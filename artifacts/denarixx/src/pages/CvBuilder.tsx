@@ -741,9 +741,10 @@ function AtsPanel({ ats, onApplySummary }: { ats: AtsResult; onApplySummary: (s:
   );
 }
 
-function cleanText(s: string): string {
+function cleanText(s: unknown): string {
   if (!s) return "";
-  return s
+  const str = typeof s === "string" ? s : Array.isArray(s) ? (s as unknown[]).join("\n") : String(s);
+  return str
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD\uFFFE\uFFFF]/g, "")
     .replace(/^[·•▪◆▶►→]\s*/gm, "- ")
     .replace(/[ \t]+$/gm, "")
@@ -933,19 +934,20 @@ function CvBuilderContent() {
         throw new Error(`Server error (${res.status}). Please try again.`);
       }
       const data = await res.json();
+      const str = (v: unknown) => (typeof v === "string" ? v : v ? String(v) : "").trim();
       const cleaned: ImportedCV = {
-        name: (data.name || "").trim(),
-        email: (data.email || "").trim(),
-        phone: (data.phone || "").trim(),
-        location: (data.location || "").trim(),
-        linkedin: (data.linkedin || "").trim(),
-        currentRole: (data.currentRole || "").trim(),
-        targetRole: (data.targetRole || "").trim(),
-        summary: cleanText(data.summary || ""),
-        experience: prioritizeExperience(cleanText(data.experience || "")),
-        education: cleanText(data.education || ""),
-        achievements: cleanText(data.achievements || ""),
-        skills: cleanSkills(data.skills || []),
+        name: str(data.name),
+        email: str(data.email),
+        phone: str(data.phone),
+        location: str(data.location),
+        linkedin: str(data.linkedin),
+        currentRole: str(data.currentRole),
+        targetRole: str(data.targetRole),
+        summary: cleanText(data.summary),
+        experience: prioritizeExperience(cleanText(data.experience)),
+        education: cleanText(data.education),
+        achievements: cleanText(data.achievements),
+        skills: cleanSkills(Array.isArray(data.skills) ? data.skills : []),
         photo: data.photo,
         _diagnostics: data._diagnostics,
       };
