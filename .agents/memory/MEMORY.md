@@ -1,5 +1,5 @@
 - [Clerk + Tailwind v4 setup](clerk-tailwind-v4.md) — layer declaration, optimize:false, clerk/themes v1 for react v6 compat
-- [OpenAI model access](openai-direct-key.md) — user's OPENAI_API_KEY project blocks both gpt-4o AND gpt-4o-mini; all 4 AI routes use gpt-4.1-mini; uses OPENAI_API_KEY directly (not Replit proxy)
+- [OpenAI model access](openai-direct-key.md) — proj_7PjLwxei07yZi7izO0MwB1kd blocks ALL GPT-4 family; only gpt-3.5-turbo works; all 4 AI routes use gpt-3.5-turbo
 - [DB schema exports](db-schema-exports.md) — all tables must be exported from lib/db/src/schema/index.ts for push to create them
 - [API server OpenAI import](api-server-openai.md) — never import openai at top-level in api-server routes; use dynamic require("@workspace/integrations-openai-ai-server") inside handler; Orval inline request body schemas cause TS2308 name collision — always use named $ref instead.
 - [Clerk themes shadcn type](clerk-themes-shadcn.md) — @clerk/themes@1.x ships shadcn at runtime but d.ts omits it; suppress with @ts-expect-error on the import line
