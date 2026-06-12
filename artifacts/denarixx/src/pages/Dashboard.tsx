@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
   Zap, User, BookOpen, FileText, Briefcase, Users, BarChart3,
-  LogOut, Trophy, ChevronRight, Sparkles, Lock, Mic, MessageCircle
+  LogOut, Trophy, ChevronRight, Sparkles, Lock, Mic, MessageCircle, Home
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -90,7 +90,13 @@ function DashboardContent() {
             </div>
             <span className="font-bold text-lg tracking-tight">DENARIXX<span className="text-primary">.AI</span></span>
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <a href={basePath || "/"}>
+              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                <Home className="w-4 h-4" />
+                <span className="hidden sm:inline">Home</span>
+              </Button>
+            </a>
             <a href={`${basePath}/profile`}>
               <Button variant="ghost" size="sm" className="gap-2">
                 <User className="w-4 h-4" />
