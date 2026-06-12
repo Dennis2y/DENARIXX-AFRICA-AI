@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
   ChevronLeft, Menu, X
@@ -301,10 +301,10 @@ function DenaPageContent() {
 
           {/* User info */}
           <div className="p-3 border-t border-border">
-            <a href={`${basePath}/dashboard`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ChevronLeft className="w-4 h-4" />
               Back to Dashboard
-            </a>
+            </Link>
           </div>
         </div>
       </motion.aside>
@@ -319,11 +319,11 @@ function DenaPageContent() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <a href={`${basePath}/dashboard`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Back to Dashboard</span>
             <span className="sm:hidden">Dashboard</span>
-          </a>
+          </Link>
           <div className="flex-1">
             {activeConvId ? (
               <p className="text-sm text-muted-foreground truncate">

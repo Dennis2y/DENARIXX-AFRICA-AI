@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useUser, Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   User, MapPin, Globe, Twitter, Linkedin, Github,
@@ -176,11 +176,11 @@ function ProfileContent() {
       {/* Nav */}
       <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 h-16 flex items-center gap-4">
-          <a href={`${basePath}/dashboard`}>
+          <Link to="/dashboard">
             <Button variant="ghost" size="sm" className="gap-2">
               <ArrowLeft className="w-4 h-4" /> Dashboard
             </Button>
-          </a>
+          </Link>
           <h1 className="font-semibold">Edit Profile</h1>
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
@@ -402,7 +402,7 @@ function ProfileContent() {
               {saved && (
                 <p className="text-center text-sm text-muted-foreground">
                   Profile saved.{" "}
-                  <a href={`${basePath}/dashboard`} className="text-primary hover:underline">Back to Dashboard →</a>
+                  <Link to="/dashboard" className="text-primary hover:underline">Back to Dashboard →</Link>
                 </p>
               )}
             </motion.div>

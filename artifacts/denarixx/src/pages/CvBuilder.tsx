@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import {
   FileText, Sparkles, Download, Copy, Check, ChevronLeft,
   Loader2, Plus, X, Wand2, Layout, Eye
@@ -440,10 +440,10 @@ function CvBuilderContent() {
       {/* Nav */}
       <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
-          <a href={`${basePath}/dashboard`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />
             Dashboard
-          </a>
+          </Link>
           <span className="text-border">|</span>
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-green-400" />
@@ -645,12 +645,12 @@ function CvBuilderContent() {
                   <p className="font-semibold text-sm">Want to practice for interviews?</p>
                   <p className="text-muted-foreground text-sm">Use your new CV with the AI Interview Coach.</p>
                 </div>
-                <a href={`${basePath}/interview-coach`}>
+                <Link to="/interview-coach">
                   <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl gap-2" size="sm">
                     <Sparkles className="w-4 h-4" />
                     Interview Coach
                   </Button>
-                </a>
+                </Link>
               </div>
             </motion.div>
           )}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, Zap, Shield, Target, Users, TrendingUp, 
@@ -9,11 +10,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { useJoinWaitlist, useGetWaitlistCount, useGetWaitlistReferrals } from "@workspace/api-client-react";
 import { useUser, Show } from "@clerk/react";
-
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-
 import heroCity from "@/assets/hero-city.png";
 import professionals from "@/assets/professionals.png";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const scrollTo = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -48,17 +48,17 @@ const Navbar = () => {
 
         <div className="hidden md:flex items-center gap-4">
           <Show when="signed-out">
-            <a href={`${basePath}/sign-in`}>
+            <Link to="/sign-in">
               <Button variant="ghost" className="text-foreground">Log In</Button>
-            </a>
-            <a href={`${basePath}/sign-up`}>
+            </Link>
+            <Link to="/sign-up">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">Sign Up Free</Button>
-            </a>
+            </Link>
           </Show>
           <Show when="signed-in">
-            <a href={`${basePath}/dashboard`}>
+            <Link to="/dashboard">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">Go to Dashboard</Button>
-            </a>
+            </Link>
           </Show>
         </div>
 
@@ -82,17 +82,17 @@ const Navbar = () => {
             <a href="#pricing" className="p-2 text-foreground font-medium" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
             <div className="h-px w-full bg-border my-2" />
             <Show when="signed-out">
-              <a href={`${basePath}/sign-in`} className="w-full">
+              <Link to="/sign-in" className="w-full">
                 <Button variant="outline" className="w-full" onClick={() => setMobileMenuOpen(false)}>Log In</Button>
-              </a>
-              <a href={`${basePath}/sign-up`} className="w-full">
+              </Link>
+              <Link to="/sign-up" className="w-full">
                 <Button className="w-full bg-primary text-primary-foreground" onClick={() => setMobileMenuOpen(false)}>Sign Up Free</Button>
-              </a>
+              </Link>
             </Show>
             <Show when="signed-in">
-              <a href={`${basePath}/dashboard`} className="w-full">
+              <Link to="/dashboard" className="w-full">
                 <Button className="w-full bg-primary text-primary-foreground" onClick={() => setMobileMenuOpen(false)}>Dashboard</Button>
-              </a>
+              </Link>
             </Show>
           </motion.div>
         )}
@@ -204,19 +204,19 @@ const Hero = () => {
           transition={{ duration: 0.5, delay: 0.8 }}
           className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center"
         >
-          <a href={`${basePath}/sign-up`} className="w-full sm:w-auto">
+          <Link to="/sign-up" className="w-full sm:w-auto">
             <Button size="lg" className="h-14 px-8 text-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full group relative overflow-hidden">
               <span className="relative z-10 flex items-center gap-2">
                 Get Started Free <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
             </Button>
-          </a>
-          <a href={`${basePath}/sign-in`} className="w-full sm:w-auto">
+          </Link>
+          <Link to="/sign-in" className="w-full sm:w-auto">
             <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full w-full bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
               Log In
             </Button>
-          </a>
+          </Link>
         </motion.div>
       </div>
 
@@ -295,31 +295,31 @@ const Modules = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {modules.map((mod, i) => (
-            <motion.a
-              key={i}
-              href={`${basePath}${mod.href}`}
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-              whileHover={{ y: -6, scale: 1.02 }}
-              className="p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/50 transition-all group cursor-pointer relative overflow-hidden block"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className={`w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${mod.accent}`}>
-                {mod.icon}
-              </div>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="text-base font-bold text-foreground leading-tight">{mod.name}</h3>
-                <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold border ${MODULE_STATUS_STYLE[mod.status]}`}>
-                  {mod.status}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{mod.desc}</p>
-              <p className={`text-xs font-semibold mt-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${mod.accent}`}>
-                Enter module <ArrowRight className="w-3 h-3" />
-              </p>
-            </motion.a>
+            <Link key={i} to={mod.href} className="block">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ y: -6, scale: 1.02 }}
+                className="p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/50 transition-all group cursor-pointer relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className={`w-12 h-12 rounded-lg bg-background border border-border flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${mod.accent}`}>
+                  {mod.icon}
+                </div>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="text-base font-bold text-foreground leading-tight">{mod.name}</h3>
+                  <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold border ${MODULE_STATUS_STYLE[mod.status]}`}>
+                    {mod.status}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{mod.desc}</p>
+                <p className={`text-xs font-semibold mt-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${mod.accent}`}>
+                  Enter module <ArrowRight className="w-3 h-3" />
+                </p>
+              </motion.div>
+            </Link>
           ))}
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import { Users, Search, MapPin, ChevronLeft, Loader2, ArrowRight, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -80,11 +80,11 @@ function MemberCard({ member, index }: { member: Member; index: number }) {
         </div>
       )}
 
-      <a href={`${basePath}/skillswap`}>
+      <Link to="/skillswap">
         <Button size="sm" variant="outline" className="w-full h-7 text-xs gap-1 rounded-lg">
           Connect via SkillSwap <ArrowRight className="w-3 h-3" />
         </Button>
-      </a>
+      </Link>
     </motion.div>
   );
 }
@@ -117,9 +117,9 @@ function CommunityContent() {
     <div className="min-h-screen bg-background text-foreground">
       <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
-          <a href={`${basePath}/dashboard`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />Dashboard
-          </a>
+          </Link>
           <span className="text-border">|</span>
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-pink-400" />
@@ -167,7 +167,7 @@ function CommunityContent() {
             {members.length === 0 ? (
               <>
                 <p className="mb-2">No members yet — be the first!</p>
-                <a href={`${basePath}/profile`} className="text-sm text-primary hover:underline">Complete your profile to appear here →</a>
+                <Link to="/profile" className="text-sm text-primary hover:underline">Complete your profile to appear here →</Link>
               </>
             ) : (
               <p>No members match your search.</p>
@@ -182,9 +182,9 @@ function CommunityContent() {
             <div className="mt-8 rounded-xl border border-pink-400/20 bg-pink-400/5 p-5 text-center">
               <p className="text-sm font-semibold text-pink-400 mb-1">Want to appear here?</p>
               <p className="text-xs text-muted-foreground mb-3">Complete your profile with your role, bio, and skills.</p>
-              <a href={`${basePath}/profile`}>
+              <Link to="/profile">
                 <Button size="sm" className="bg-pink-400 text-background hover:bg-pink-400/90">Edit Profile</Button>
-              </a>
+              </Link>
             </div>
           </>
         )}

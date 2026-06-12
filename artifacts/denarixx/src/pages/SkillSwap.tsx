@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Show, useUser } from "@clerk/react";
-import { Redirect, useLocation } from "wouter";
+import { Redirect, useLocation, Link } from "wouter";
 import {
   BookOpen, Sparkles, Users, Zap, ArrowLeft, Plus, Trash2, Send,
   CheckCircle2, XCircle, Clock, Search, Filter, RefreshCw, ChevronRight,
@@ -57,12 +57,12 @@ function NavBar() {
             <span className="font-bold text-base">SkillSwap <span className="text-primary">AI</span></span>
           </div>
         </div>
-        <a href={`${basePath}/profile`}>
+        <Link to="/profile">
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
             <User className="w-4 h-4" />
             <span className="hidden sm:inline">Profile</span>
           </Button>
-        </a>
+        </Link>
       </div>
     </nav>
   );

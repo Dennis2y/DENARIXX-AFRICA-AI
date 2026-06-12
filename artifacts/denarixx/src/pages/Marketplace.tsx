@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import {
   ArrowLeft, Search, ShoppingCart, Star, MapPin, Tag, Filter
 } from "lucide-react";
@@ -53,10 +53,10 @@ export default function Marketplace() {
         <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
           <div className="container mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <a href={`${basePath}/dashboard`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Dashboard</span>
-              </a>
+              </Link>
               <div className="h-4 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center">

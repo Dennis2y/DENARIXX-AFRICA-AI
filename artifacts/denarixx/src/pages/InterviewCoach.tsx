@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import {
   ChevronLeft, Mic, Send, Loader2, Star, CheckCircle, RotateCcw,
   MessageSquare, Trophy, TrendingUp, Clock, ChevronRight, X
@@ -377,11 +377,11 @@ function CompleteStep({
         <Button onClick={onRestart} variant="outline" className="flex-1 gap-2">
           <RotateCcw className="w-4 h-4" />Try Another Role
         </Button>
-        <a href={`${basePath}/cv-builder`} className="flex-1">
+        <Link to="/cv-builder" className="flex-1">
           <Button className="w-full gap-2">
             <TrendingUp className="w-4 h-4" />Update Your CV
           </Button>
-        </a>
+        </Link>
       </div>
     </motion.div>
   );
@@ -424,9 +424,9 @@ function InterviewCoachContent() {
     <div className="min-h-screen bg-background text-foreground">
       <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
-          <a href={`${basePath}/dashboard`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />Dashboard
-          </a>
+          </Link>
           <span className="text-border">|</span>
           <div className="flex items-center gap-2">
             <Mic className="w-4 h-4 text-primary" />

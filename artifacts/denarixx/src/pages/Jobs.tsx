@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import {
   Briefcase, MapPin, Clock, ChevronLeft, Search, Filter,
   Sparkles, CheckCircle, Send, Loader2, X, Star, TrendingUp
@@ -241,10 +241,10 @@ function JobsContent() {
       {/* Nav */}
       <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
-          <a href={`${basePath}/dashboard`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />
             Dashboard
-          </a>
+          </Link>
           <span className="text-border">|</span>
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-yellow-400" />
@@ -288,12 +288,12 @@ function JobsContent() {
                   <p className="font-semibold text-sm text-yellow-400">Your profile is incomplete</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Add skills to unlock AI job matching scores.</p>
                 </div>
-                <a href={`${basePath}/profile`}>
+                <Link to="/profile">
                   <Button size="sm" className="rounded-xl bg-yellow-400 text-background hover:bg-yellow-400/90 gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
                     Complete Profile
                   </Button>
-                </a>
+                </Link>
               </div>
             )}
 

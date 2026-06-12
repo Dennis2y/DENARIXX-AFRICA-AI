@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, ArrowLeft, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -121,10 +121,10 @@ export default function SpecializedChat({ config }: { config: ModuleConfig }) {
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
           <div className="container mx-auto px-4 h-16 flex items-center gap-4">
-            <a href={`${basePath}/dashboard`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
-            </a>
+            </Link>
             <div className="h-4 w-px bg-border" />
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${config.iconBg}`}>
               <span className={config.accentColor}>{config.icon}</span>

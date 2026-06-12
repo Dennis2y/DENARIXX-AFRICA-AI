@@ -1,5 +1,5 @@
 import { useUser, useClerk, Show } from "@clerk/react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -84,25 +84,25 @@ function DashboardContent() {
       {/* Top nav */}
       <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <a href={basePath || "/"} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center border border-primary/50">
               <Zap className="w-5 h-5 text-primary" />
             </div>
             <span className="font-bold text-lg tracking-tight">DENARIXX<span className="text-primary">.AI</span></span>
-          </a>
+          </Link>
           <div className="flex items-center gap-2">
-            <a href={`${basePath}/home`}>
+            <Link to="/home">
               <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                 <Home className="w-4 h-4" />
                 <span className="hidden sm:inline">Home</span>
               </Button>
-            </a>
-            <a href={`${basePath}/profile`}>
+            </Link>
+            <Link to="/profile">
               <Button variant="ghost" size="sm" className="gap-2">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Profile</span>
               </Button>
-            </a>
+            </Link>
             <Button
               variant="ghost"
               size="sm"
@@ -212,18 +212,18 @@ function DashboardContent() {
               : `You have ${skillCount} skill${skillCount !== 1 ? "s" : ""} listed. Build your CV or talk to DENA for next steps.`}
           </p>
           <div className="flex gap-3 flex-wrap">
-            <a href={`${basePath}/profile`}>
+            <Link to="/profile">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl">
                 {skillCount === 0 ? "Set up profile" : "View profile"}
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
-            </a>
-            <a href={`${basePath}/cv-builder`}>
+            </Link>
+            <Link to="/cv-builder">
               <Button variant="outline" className="rounded-xl gap-2">
                 <FileText className="w-4 h-4" />
                 Build CV
               </Button>
-            </a>
+            </Link>
           </div>
         </motion.div>
       </main>
