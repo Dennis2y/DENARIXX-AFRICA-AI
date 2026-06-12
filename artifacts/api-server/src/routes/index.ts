@@ -5,6 +5,7 @@ import usersRouter from "./users";
 import denaRouter from "./dena";
 import skillswapRouter from "./skillswap";
 import cvBuilderRouter from "./cvbuilder";
+import jobsRouter from "./jobs";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use("/users", usersRouter);
 router.use("/dena", denaRouter);
 router.use("/skillswap", skillswapRouter);
 router.use("/cv-builder", cvBuilderRouter);
+router.use("/jobs", jobsRouter);
 
 export default router;

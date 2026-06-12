@@ -24,7 +24,7 @@ const modules: Module[] = [
   { icon: Sparkles, label: "DENA AI", desc: "Your personal AI assistant", color: "text-cyan-400", bg: "bg-cyan-400/10 border-cyan-400/20", href: `${basePath}/dena`, live: true },
   { icon: BookOpen, label: "SkillSwap AI", desc: "Learn & grow your skills", color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20", href: `${basePath}/skillswap`, live: true },
   { icon: FileText, label: "CV Builder", desc: "AI-powered resume builder", color: "text-green-400", bg: "bg-green-400/10 border-green-400/20", href: `${basePath}/cv-builder`, live: true },
-  { icon: Briefcase, label: "Jobs AI", desc: "Matched jobs for your profile", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20", href: "#", live: false },
+  { icon: Briefcase, label: "Jobs AI", desc: "Matched jobs for your profile", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20", href: `${basePath}/jobs`, live: true },
   { icon: Users, label: "Community", desc: "Connect with professionals", color: "text-pink-400", bg: "bg-pink-400/10 border-pink-400/20", href: "#", live: false },
   { icon: Trophy, label: "Leaderboard", desc: "Your referral rank", color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20", href: "/leaderboard", live: true },
 ];
@@ -53,15 +53,29 @@ function useConnections() {
   });
 }
 
+function useApplications() {
+  return useQuery({
+    queryKey: ["my-applications"],
+    queryFn: async () => {
+      const res = await fetch(`${basePath}/api/jobs/my-applications`, { credentials: "include" });
+      if (!res.ok) return { applications: [] };
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+}
+
 function DashboardContent() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { data: profile } = useProfile();
   const { data: connData } = useConnections();
+  const { data: appData } = useApplications();
 
   const firstName = user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Explorer";
   const skillCount = profile?.skills?.length ?? 0;
   const acceptedConnections = (connData?.connections ?? []).filter((c: any) => c.status === "accepted").length;
+  const applicationCount = appData?.total ?? 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -127,7 +141,7 @@ function DashboardContent() {
           {[
             { label: "Skills", value: skillCount, icon: BookOpen },
             { label: "Connections", value: acceptedConnections, icon: Users },
-            { label: "Reputation", value: profile?.reputationScore ?? 0, icon: Trophy },
+            { label: "Applications", value: applicationCount, icon: Briefcase },
           ].map(({ label, value, icon: Icon }) => (
             <div key={label} className="rounded-xl border border-border bg-card p-4 text-center">
               <Icon className="w-5 h-5 text-muted-foreground mx-auto mb-1" />

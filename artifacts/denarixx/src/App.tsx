@@ -17,6 +17,7 @@ import Profile from "@/pages/Profile";
 import SkillSwap from "@/pages/SkillSwap";
 import DenaPage from "@/pages/Dena";
 import CvBuilder from "@/pages/CvBuilder";
+import Jobs from "@/pages/Jobs";
 import DenaChat from "@/components/DenaChat";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -146,6 +147,7 @@ function Router() {
       <Route path="/skillswap" component={SkillSwap} />
       <Route path="/dena" component={DenaPage} />
       <Route path="/cv-builder" component={CvBuilder} />
+      <Route path="/jobs" component={Jobs} />
       <Route path="/admin" component={Admin} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route component={NotFound} />

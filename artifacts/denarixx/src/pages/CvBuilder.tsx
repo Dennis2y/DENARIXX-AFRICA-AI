@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, Show } from "@clerk/react";
 import { Redirect } from "wouter";
@@ -40,6 +40,7 @@ function CvBuilderContent() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<"resume" | "cover" | null>(null);
   const [activeTab, setActiveTab] = useState<"resume" | "cover">("resume");
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   const [form, setForm] = useState({
     name: user?.fullName ?? "",
@@ -52,6 +53,26 @@ function CvBuilderContent() {
     skills: [] as string[],
     skillInput: "",
   });
+
+  // Pre-fill from profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const res = await fetch(`${basePath}/api/users/me`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setForm(prev => ({
+          ...prev,
+          name: prev.name || data.name || user?.fullName || "",
+          currentRole: prev.currentRole || data.role || "",
+          skills: prev.skills.length > 0 ? prev.skills : (data.skills ?? []).map((s: any) => s.skill),
+        }));
+      } catch {} finally {
+        setProfileLoaded(true);
+      }
+    };
+    loadProfile();
+  }, []);
 
   const [result, setResult] = useState<{ resume: string; coverLetter: string } | null>(null);
 
