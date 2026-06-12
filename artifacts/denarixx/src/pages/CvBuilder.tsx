@@ -4,7 +4,7 @@ import { useUser, Show } from "@clerk/react";
 import { Redirect } from "wouter";
 import {
   FileText, Sparkles, Download, Copy, Check, ChevronLeft,
-  Loader2, Plus, X, Wand2, Layout
+  Loader2, Plus, X, Wand2, Layout, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -153,6 +153,62 @@ const TEMPLATES: Template[] = [
   },
 ];
 
+const SAMPLE_CV = `# Amara Nwosu
+
+**Email:** amara.nwosu@email.com | **Phone:** +234 801 234 5678 | **Location:** Lagos, Nigeria | **LinkedIn:** linkedin.com/in/amaranwosu
+
+## Professional Summary
+
+Results-driven Senior Software Engineer with 6+ years of experience building scalable fintech and e-commerce platforms across Africa. Passionate about leveraging technology to solve real-world problems and mentoring the next generation of African developers.
+
+---
+
+## Experience
+
+**Senior Software Engineer** — Flutterwave, Lagos *(2021 – Present)*
+- Led a team of 8 engineers to redesign the payment gateway, reducing transaction latency by 40%
+- Architected a microservices platform processing $2M+ in daily transactions across 14 African countries
+- Introduced automated testing practices that reduced production bugs by 65%
+
+**Software Developer** — Andela, Remote *(2019 – 2021)*
+- Built and maintained RESTful APIs serving 500k+ daily active users
+- Collaborated with US-based clients on React and Node.js projects, consistently receiving 5-star ratings
+- Contributed to open-source tooling adopted by 12,000+ developers globally
+
+---
+
+## Education
+
+**BSc Computer Science** — University of Lagos *(First Class Honours, 2019)*
+
+**AWS Certified Solutions Architect** — Amazon Web Services *(2022)*
+
+---
+
+## Skills
+
+- **Languages:** JavaScript, TypeScript, Python, Go
+- **Frontend:** React, Next.js, Tailwind CSS
+- **Backend:** Node.js, Express, PostgreSQL, Redis
+- **Cloud:** AWS, Docker, Kubernetes, CI/CD
+
+---
+
+## Key Achievements
+
+- Speaker at AfricaTech Summit 2023 on "Scaling Fintech in Emerging Markets"
+- Built a mobile money integration used by 200,000 users in Nigeria and Ghana
+- Open-source contributor with 1,400+ GitHub stars across personal projects
+`;
+
+function previewTemplate(template: Template) {
+  const html = buildPrintHTML(SAMPLE_CV, "Amara Nwosu", "Senior Software Engineer", template);
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+}
+
 function renderMarkdown(text: string) {
   return text
     .replace(/^# (.+)$/gm, "<h1 class='cv-name'>$1</h1>")
@@ -196,55 +252,77 @@ function TemplatePreview({ template, selected, onClick }: { template: Template; 
   const hasHeader = ["modern", "executive", "creative", "corporate"].includes(template.id);
 
   return (
-    <button
-      onClick={onClick}
-      className={`relative rounded-xl border-2 transition-all text-left overflow-hidden group ${
-        selected ? "border-primary shadow-[0_0_0_3px_rgba(0,229,255,0.2)]" : "border-border hover:border-primary/40"
-      }`}
-    >
-      {/* Mini CV preview */}
-      <div className="bg-white h-40 w-full overflow-hidden relative">
-        {hasHeader && (
-          <div className="w-full h-9 flex flex-col justify-center px-3" style={{ backgroundColor: accent }}>
-            <div className="h-2 w-24 rounded-sm bg-white/60 mb-1" />
-            <div className="h-1.5 w-16 rounded-sm bg-white/40" />
-          </div>
-        )}
-        <div className={`p-3 space-y-2 ${hasHeader ? "" : "pt-3"}`}>
-          {!hasHeader && (
-            <div className="mb-2">
-              <div className="h-2.5 w-28 rounded bg-gray-800/70 mb-1" />
-              <div className="h-1.5 w-20 rounded bg-gray-400/50" />
+    <div className={`relative rounded-xl border-2 transition-all overflow-hidden flex flex-col ${
+      selected ? "border-primary shadow-[0_0_0_3px_rgba(0,229,255,0.2)]" : "border-border hover:border-primary/40"
+    }`}>
+      {/* Clickable mini CV thumbnail */}
+      <button onClick={onClick} className="text-left flex-1">
+        <div className="bg-white h-44 w-full overflow-hidden relative">
+          {hasHeader && (
+            <div className="w-full h-10 flex flex-col justify-center px-3" style={{ backgroundColor: template.id === "creative" ? undefined : accent, background: template.id === "creative" ? `linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)` : undefined }}>
+              <div className="h-2.5 w-28 rounded-sm bg-white/70 mb-1.5" />
+              <div className="h-1.5 w-20 rounded-sm bg-white/45" />
             </div>
           )}
-          {[70, 85, 60, 75, 55].map((w, i) => (
-            <div key={i} className="space-y-1">
-              {i % 2 === 0 && (
-                <div className="h-1.5 w-16 rounded mb-0.5" style={{ backgroundColor: accent + "90" }} />
-              )}
-              <div className="h-1 rounded bg-gray-300/80" style={{ width: `${w}%` }} />
-            </div>
-          ))}
+          <div className="p-3 space-y-2">
+            {!hasHeader && (
+              <div className="mb-3 text-center">
+                <div className="h-3 w-32 rounded mx-auto bg-gray-800/80 mb-1.5" />
+                <div className="h-1.5 w-24 rounded mx-auto bg-gray-400/50" />
+                <div className="h-px w-full bg-gray-200 mt-3 mb-1" />
+              </div>
+            )}
+            {/* Simulated section labels + body lines */}
+            {[
+              { label: true, w: 60 },
+              { label: false, w: 88 },
+              { label: false, w: 72 },
+              { label: true, w: 55 },
+              { label: false, w: 80 },
+              { label: false, w: 65 },
+              { label: false, w: 75 },
+              { label: true, w: 48 },
+              { label: false, w: 70 },
+            ].map((row, i) => (
+              <div key={i}>
+                {row.label ? (
+                  <div className="h-1.5 w-14 rounded mt-2 mb-1" style={{ backgroundColor: accent + "cc" }} />
+                ) : (
+                  <div className="h-1 rounded bg-gray-300/70 mb-0.5" style={{ width: `${row.w}%` }} />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+        {/* Label row */}
+        <div className="px-3 pt-2.5 pb-1 bg-card">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="font-semibold text-sm text-foreground">{template.name}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium" style={{ backgroundColor: accent }}>
+              {template.tag}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">{template.desc}</p>
+        </div>
+      </button>
 
-      {/* Label */}
-      <div className="p-3 bg-card">
-        <div className="flex items-center justify-between mb-0.5">
-          <span className="font-semibold text-sm text-foreground">{template.name}</span>
-          <span className="text-xs px-1.5 py-0.5 rounded-full text-white font-medium" style={{ backgroundColor: accent }}>
-            {template.tag}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground">{template.desc}</p>
+      {/* Preview button */}
+      <div className="px-3 pb-3 bg-card">
+        <button
+          onClick={(e) => { e.stopPropagation(); previewTemplate(template); }}
+          className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border hover:border-primary/40 rounded-lg py-1.5 transition-colors mt-1"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          Preview with sample CV
+        </button>
       </div>
 
       {selected && (
-        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center pointer-events-none">
           <Check className="w-3 h-3 text-primary-foreground" />
         </div>
       )}
-    </button>
+    </div>
   );
 }
 
