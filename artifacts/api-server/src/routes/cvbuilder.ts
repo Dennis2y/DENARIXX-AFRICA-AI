@@ -261,10 +261,7 @@ router.post("/parse", requireAuth, async (req, res) => {
 
     if (ext === "pdf") {
       try {
-        // pdf-parse is externalized so Node.js loads it from node_modules at runtime
-        const pdfParseModule = await import("pdf-parse" as any);
-        const pdfParse: (buf: Buffer) => Promise<{ text: string }> =
-          pdfParseModule.default ?? pdfParseModule;
+        const pdfParse: (buf: Buffer) => Promise<{ text: string }> = require("pdf-parse");
         const data = await pdfParse(buffer);
         cvText = data.text;
       } catch (err) {
@@ -274,7 +271,7 @@ router.post("/parse", requireAuth, async (req, res) => {
       }
     } else if (ext === "docx") {
       try {
-        const mammoth = await import("mammoth" as any) as { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> };
+        const mammoth: { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> } = require("mammoth");
         const result = await mammoth.extractRawText({ buffer });
         cvText = result.value;
       } catch (err) {
