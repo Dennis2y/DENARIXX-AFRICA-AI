@@ -23,6 +23,18 @@ function getOpenAISafe(res: any): OpenAIClient | null {
 
 // ── Match scoring ────────────────────────────────────────────────────────────
 
+const LEVELS = ["junior", "mid", "senior", "executive"] as const;
+type Level = typeof LEVELS[number];
+
+function inferLevel(roleStr: string | null | undefined): Level | null {
+  if (!roleStr) return null;
+  const r = roleStr.toLowerCase();
+  if (r.includes("executive") || r.includes("cto") || r.includes("ceo") || r.includes("vp ") || r.includes("vice president") || r.includes("director")) return "executive";
+  if (r.includes("senior") || r.includes("lead") || r.includes("principal") || r.includes("staff")) return "senior";
+  if (r.includes("junior") || r.includes("entry") || r.includes("intern") || r.includes("associate")) return "junior";
+  return "mid";
+}
+
 function computeMatch(
   job: { requiredSkills: string[]; level: string; location: string; title: string },
   userSkills: string[],
@@ -34,10 +46,12 @@ function computeMatch(
   const required = job.requiredSkills.map(s => s.toLowerCase());
   const userSkillsLower = userSkills.map(s => s.toLowerCase());
 
+  // Skills: up to 60 points
   const matchedLower = required.filter(r => userSkillsLower.some(u => u.includes(r) || r.includes(u)));
   const missingLower = required.filter(r => !userSkillsLower.some(u => u.includes(r) || r.includes(u)));
-  const skillScore = required.length > 0 ? (matchedLower.length / required.length) * 70 : 35;
+  const skillScore = required.length > 0 ? (matchedLower.length / required.length) * 60 : 30;
 
+  // Location: up to 15 points
   let locationScore = 0;
   const jobLoc = job.location.toLowerCase();
   if (jobLoc.includes("remote")) {
@@ -49,20 +63,32 @@ function computeMatch(
     else locationScore = 5;
   }
 
+  // Experience level: up to 15 points (inferred from user role string)
+  let levelScore = 0;
+  const userLevel = inferLevel(userRole);
+  const jobLevel = job.level.toLowerCase() as Level;
+  if (userLevel && LEVELS.includes(jobLevel)) {
+    const diff = Math.abs(LEVELS.indexOf(userLevel) - LEVELS.indexOf(jobLevel));
+    if (diff === 0) levelScore = 15;
+    else if (diff === 1) levelScore = 8;
+    // diff >= 2: 0 pts
+  }
+
+  // Target role title match: up to 10 points
   let roleScore = 0;
   if (userRole) {
     const userRoleLower = userRole.toLowerCase();
     const jobTitleLower = job.title.toLowerCase();
     if (jobTitleLower.includes(userRoleLower) || userRoleLower.includes(jobTitleLower)) {
-      roleScore = 15;
+      roleScore = 10;
     } else {
-      const words = userRoleLower.split(/\s+/).filter(w => w.length > 3);
+      const words = userRoleLower.split(/\s+/).filter(w => w.length > 3 && !["senior", "junior", "lead"].includes(w));
       const hits = words.filter(w => jobTitleLower.includes(w));
-      roleScore = Math.round((hits.length / Math.max(1, words.length)) * 15);
+      roleScore = Math.round((hits.length / Math.max(1, words.length)) * 10);
     }
   }
 
-  const total = Math.min(100, Math.round(skillScore + locationScore + roleScore));
+  const total = Math.min(100, Math.round(skillScore + locationScore + levelScore + roleScore));
   const matchedSkills = job.requiredSkills.filter(s => matchedLower.includes(s.toLowerCase()));
   const missingSkills = job.requiredSkills.filter(s => missingLower.includes(s.toLowerCase()));
   return { matchScore: total, matchedSkills, missingSkills };
@@ -400,11 +426,13 @@ router.post("/:id/cover-letter", requireAuth, async (req, res) => {
 });
 
 // ── POST /api/jobs/:id/tailor-cv ──────────────────────────────────────────────
+// Request:  { cvText?: string; targetRole?: string }
+// Response: { atsScore, missingKeywords, presentKeywords, suggestions, tailoredSummary, tailoredCv }
 
 router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const jobId = Number(req.params.id);
-  const { cvText } = req.body as { cvText?: string };
+  const { cvText, targetRole } = req.body as { cvText?: string; targetRole?: string };
   if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
 
   try {
@@ -418,14 +446,16 @@ router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
     let cvContent = cvText ?? "";
     if (!cvContent) {
       const skillRows = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
-      cvContent = `Role: ${user.role ?? "Professional"}\nSkills: ${skillRows.map(s => s.skill).join(", ")}`;
+      cvContent = `Role: ${targetRole ?? user.role ?? "Professional"}\nSkills: ${skillRows.map(s => s.skill).join(", ")}`;
     }
+
+    const resolvedRole = targetRole ?? user.role ?? job.title;
 
     const openai = getOpenAISafe(res);
     if (!openai) return;
 
-    const systemPrompt = `You are an expert ATS and recruitment consultant. Analyze this CV against the job description.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords>],\n  "suggestions": [<3-5 actionable improvement suggestions>],\n  "tailoredSummary": "<2-3 sentence professional summary tailored to this JD>"\n}`;
-    const userPrompt = `CV:\n${cvContent.slice(0, 2500)}\n\n---\n\nJob: ${job.title} at ${job.company}\nJob Description: ${job.description}\nRequired Skills: ${job.requiredSkills.join(", ")}`;
+    const systemPrompt = `You are an expert ATS and recruitment consultant. Analyse this CV against the job description for the target role.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords already present>],\n  "suggestions": [<3-5 actionable steps to improve the CV for this specific role>],\n  "tailoredSummary": "<2-3 sentence professional summary, tailored to this JD and target role>"\n}`;
+    const userPrompt = `Target role: ${resolvedRole}\n\nCV:\n${cvContent.slice(0, 2500)}\n\n---\n\nJob: ${job.title} at ${job.company}\nJob Description: ${job.description}\nRequired Skills: ${job.requiredSkills.join(", ")}`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -435,8 +465,14 @@ router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? "";
-    try { res.json(JSON.parse(raw)); }
-    catch { const m = raw.match(/\{[\s\S]*\}/); if (m) try { res.json(JSON.parse(m[0])); return; } catch {} res.status(500).json({ error: "Failed to parse AI response." }); }
+    let parsed: Record<string, unknown> | null = null;
+    try { parsed = JSON.parse(raw); }
+    catch { const m = raw.match(/\{[\s\S]*\}/); if (m) try { parsed = JSON.parse(m[0]); } catch {} }
+
+    if (!parsed) { res.status(500).json({ error: "Failed to parse AI response." }); return; }
+
+    // Return both tailoredSummary and tailoredCv (aliases) for forward compat
+    res.json({ ...parsed, tailoredCv: parsed.tailoredSummary });
   } catch (err: any) {
     req.log.error({ err }, "tailor-cv failed");
     const msg = err?.status === 429 ? "Rate limit. Try again shortly." : "AI unavailable.";

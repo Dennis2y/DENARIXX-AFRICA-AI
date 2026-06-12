@@ -23,18 +23,24 @@
 - [x] **Cover letter display** — collapsible in My Applications
 
 ### API Endpoints (all under `/api/jobs`)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | List jobs with match scores, matchedSkills, missingSkills, saved flag |
-| GET | `/my-applications` | User's applications with coverLetter field |
-| GET | `/saved` | User's saved jobs |
-| POST | `/:id/apply` | Submit application with optional cover letter |
-| POST | `/:id/save` | Save a job |
-| DELETE | `/:id/save` | Unsave a job |
-| POST | `/:id/match-explain` | AI match analysis (gpt-3.5-turbo) |
-| POST | `/:id/cover-letter` | AI cover letter generation |
-| POST | `/:id/tailor-cv` | ATS analysis + tailored summary |
-| PATCH | `/applications/:appId/status` | Update application status |
+| Method | Path | Request | Response |
+|--------|------|---------|----------|
+| GET | `/` | — | `{ jobs[], total }` — includes matchScore, matchedSkills, missingSkills, saved |
+| GET | `/my-applications` | — | `{ applications[] }` — includes coverLetter |
+| GET | `/saved` | — | `{ jobs[] }` |
+| POST | `/:id/apply` | `{ coverLetter? }` | `{ application }` |
+| POST | `/:id/save` | — | `{ saved: true }` |
+| DELETE | `/:id/save` | — | `{ saved: false }` |
+| POST | `/:id/match-explain` | — | `{ summary, matchedSkills, missingSkills, suggestions }` |
+| POST | `/:id/cover-letter` | — | `{ coverLetter }` |
+| POST | `/:id/tailor-cv` | `{ cvText?, targetRole? }` | `{ atsScore, missingKeywords, presentKeywords, suggestions, tailoredSummary, tailoredCv }` |
+| PATCH | `/applications/:appId/status` | `{ status }` | `{ application }` |
+
+### Match Scoring Algorithm
+Skills (60pts) + Location (15pts) + Experience Level (15pts) + Role Title (10pts) = 100pts max
+- **Level** inferred from user's role string: "senior"/"lead"/"principal" → senior, "junior"/"entry"/"intern" → junior, etc.
+- **Level scoring**: exact match = 15pts, 1 level apart = 8pts, 2+ apart = 0pts
+- **Location**: "remote" in job = 15pts, country match = 15pts, any location = 5pts
 
 ### Database
 - [x] `saved_jobs` table — `(user_id, job_id)` unique constraint, cascades on delete
