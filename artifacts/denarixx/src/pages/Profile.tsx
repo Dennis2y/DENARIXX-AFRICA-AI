@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser, Show } from "@clerk/react";
 import { Redirect } from "wouter";
 import { motion } from "framer-motion";
 import {
   User, MapPin, Globe, Twitter, Linkedin, Github,
-  Plus, X, ArrowLeft, Save, Loader2, Check
+  Plus, X, ArrowLeft, Save, Loader2, Check, Camera
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,10 @@ function ProfileContent() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [newSkill, setNewSkill] = useState("");
   const [newLevel, setNewLevel] = useState<string>("intermediate");
+  const [dbAvatarUrl, setDbAvatarUrl] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     bio: "",
@@ -58,6 +62,7 @@ function ProfileContent() {
           githubHandle: data.githubHandle ?? "",
           role: data.role ?? "",
         });
+        if (data.avatarUrl) setDbAvatarUrl(data.avatarUrl);
         if (Array.isArray(data.skills) && data.skills.length > 0) {
           setSkills(data.skills.map((s: any) => ({ skill: s.skill, level: s.level })));
         }
@@ -66,6 +71,59 @@ function ProfileContent() {
     };
     load();
   }, []);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5MB");
+      return;
+    }
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setUploadingAvatar(true);
+    try {
+      // Step 1: get presigned upload URL from backend
+      const urlRes = await fetch(`${basePath}/api/storage/uploads/request-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: upload file directly to GCS via presigned URL
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+
+      // Step 3: save serving URL to user profile in DB
+      const servingUrl = `${basePath}/api/storage${objectPath}`;
+      await fetch(`${basePath}/api/users/me`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ avatarUrl: servingUrl }),
+      });
+      setDbAvatarUrl(servingUrl);
+      setAvatarPreview(null);
+    } catch {
+      setAvatarPreview(null);
+      alert("Photo upload failed. Please try again.");
+    } finally {
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleChange = (field: string, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -148,16 +206,57 @@ function ProfileContent() {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-5 mb-8"
             >
-              {user?.imageUrl ? (
-                <img src={user.imageUrl} alt="avatar" className="w-20 h-20 rounded-full border-2 border-primary/50 object-cover" />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/50 flex items-center justify-center">
-                  <User className="w-10 h-10 text-primary" />
-                </div>
-              )}
+              <div className="relative group shrink-0">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  title="Upload profile photo"
+                >
+                  {(avatarPreview || dbAvatarUrl || user?.imageUrl) ? (
+                    <img
+                      src={avatarPreview ?? dbAvatarUrl ?? user?.imageUrl ?? ""}
+                      alt="avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-primary/20 flex items-center justify-center">
+                      <User className="w-10 h-10 text-primary" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {uploadingAvatar ? (
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-5 h-5 text-white" />
+                    )}
+                  </div>
+                </button>
+                {uploadingAvatar && (
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                    <Loader2 className="w-3 h-3 text-primary-foreground animate-spin" />
+                  </div>
+                )}
+                {!uploadingAvatar && dbAvatarUrl && (
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </div>
               <div>
                 <h2 className="text-xl font-bold">{firstName}</h2>
                 <p className="text-sm text-muted-foreground">{user?.emailAddresses?.[0]?.emailAddress}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {uploadingAvatar ? "Uploading photo..." : "Click photo to change"}
+                </p>
                 {profileComplete ? (
                   <p className="text-xs text-green-400 mt-1 flex items-center gap-1"><Check className="w-3 h-3" />Profile ready for AI matching</p>
                 ) : (

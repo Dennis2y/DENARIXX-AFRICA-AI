@@ -9,11 +9,13 @@ import jobsRouter from "./jobs";
 import interviewCoachRouter from "./interviewCoach";
 import communityRouter from "./community";
 import messagesRouter from "./messages";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(waitlistRouter);
+router.use("/storage", storageRouter);
 router.use("/users", usersRouter);
 router.use("/dena", denaRouter);
 router.use("/skillswap", skillswapRouter);
