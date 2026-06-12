@@ -106,3 +106,18 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Ken Burns — continuous zoom + pan, GPU-accelerated */
+@keyframes kenburns {
+  0%   { transform: scale(1.0) translate(0px, 0px); }
+  25%  { transform: scale(1.12) translate(-20px, -10px); }
+  50%  { transform: scale(1.22) translate(0px, -20px); }
+  75%  { transform: scale(1.12) translate(20px, -10px); }
+  100% { transform: scale(1.0) translate(0px, 0px); }
+}
+
+.hero-kenburns {
+  animation: kenburns 24s ease-in-out infinite;
+  will-change: transform;
+  transform-origin: center center;
+}

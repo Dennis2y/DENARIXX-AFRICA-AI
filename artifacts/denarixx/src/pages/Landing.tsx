@@ -116,15 +116,12 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-background/5 via-transparent to-background z-10" />
         {/* Side vignette */}
         <div className="absolute inset-0 bg-gradient-to-r from-background/30 via-transparent to-background/30 z-10" />
-        {/* Ken Burns — slow zoom-in + drift */}
-        <motion.img
+        {/* Ken Burns — GPU-driven CSS keyframe: zoom + 4-corner pan, always moving */}
+        <img
           src={heroCity}
           alt="Futuristic African City"
-          className="w-full h-full object-cover"
-          initial={{ scale: 1.08, x: 12 }}
-          animate={{ scale: 1.18, x: -12 }}
-          transition={{ duration: 20, ease: "linear", repeat: Infinity, repeatType: "reverse" }}
-          style={{ filter: "brightness(0.85) saturate(1.2)" }}
+          className="hero-kenburns w-full h-full object-cover"
+          style={{ filter: "brightness(0.88) saturate(1.25)" }}
         />
       </motion.div>
 
