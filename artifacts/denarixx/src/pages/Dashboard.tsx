@@ -91,7 +91,7 @@ function DashboardContent() {
             <span className="font-bold text-lg tracking-tight">DENARIXX<span className="text-primary">.AI</span></span>
           </a>
           <div className="flex items-center gap-2">
-            <a href={basePath || "/"}>
+            <a href={`${basePath}/home`}>
               <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                 <Home className="w-4 h-4" />
                 <span className="hidden sm:inline">Home</span>
