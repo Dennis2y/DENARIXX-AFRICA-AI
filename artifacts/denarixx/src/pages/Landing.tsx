@@ -35,9 +35,7 @@ const Navbar = () => {
     <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? "bg-background/80 backdrop-blur-lg border-b border-border" : "bg-transparent"}`}>
       <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center border border-primary/50">
-            <Zap className="w-5 h-5 text-primary" />
-          </div>
+          <img src="/denarixx-logo.png" alt="DENARIXX" className="h-9 w-9 rounded object-contain" />
           <span className="font-bold text-xl tracking-tight">DENARIXX<span className="text-primary">.AI</span></span>
         </div>
         
@@ -110,11 +108,24 @@ const Hero = () => {
 
   return (
     <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
-      {/* Background */}
+      {/* Background with Ken Burns zoom + parallax scroll */}
       <motion.div style={{ y: y1, opacity }} className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-background/20 z-10" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background z-10" />
-        <img src={heroCity} alt="Futuristic African City" className="w-full h-full object-cover opacity-90" />
+        {/* Subtle dark overlay — light enough to see the city clearly */}
+        <div className="absolute inset-0 bg-background/10 z-10" />
+        {/* Bottom fade to blend into page */}
+        <div className="absolute inset-0 bg-gradient-to-b from-background/5 via-transparent to-background z-10" />
+        {/* Side vignette */}
+        <div className="absolute inset-0 bg-gradient-to-r from-background/30 via-transparent to-background/30 z-10" />
+        {/* Ken Burns — slow zoom-in + drift */}
+        <motion.img
+          src={heroCity}
+          alt="Futuristic African City"
+          className="w-full h-full object-cover"
+          initial={{ scale: 1.08, x: 12 }}
+          animate={{ scale: 1.18, x: -12 }}
+          transition={{ duration: 20, ease: "linear", repeat: Infinity, repeatType: "reverse" }}
+          style={{ filter: "brightness(0.85) saturate(1.2)" }}
+        />
       </motion.div>
 
       {/* Glowing Orbs */}
