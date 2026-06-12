@@ -95,6 +95,13 @@ function AiChatPanel({
     const msg = (text ?? input).trim();
     if (!msg || streaming) return;
     setInput("");
+
+    // Capture history before this message (skip welcome, skip empty)
+    const history = messages
+      .slice(1)
+      .filter(m => m.content.trim())
+      .map(m => ({ role: m.role, content: m.content }));
+
     setMessages(prev => [...prev, { role: "user", content: msg }]);
     setStreaming(true);
 
@@ -103,7 +110,12 @@ function AiChatPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: msg, moduleContext: config.moduleContext }),
+        body: JSON.stringify({
+          message: msg,
+          moduleContext: config.moduleContext,
+          history,
+          overrideSystemPrompt: true,
+        }),
       });
       if (!res.ok || !res.body) throw new Error("Failed");
       const reader = res.body.getReader();

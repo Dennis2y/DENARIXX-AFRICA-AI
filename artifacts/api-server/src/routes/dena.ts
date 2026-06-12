@@ -43,10 +43,12 @@ function buildSystemPrompt(userContext?: { name?: string | null; role?: string |
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
-  const { message, conversationId, moduleContext } = req.body as {
+  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt } = req.body as {
     message: string;
     conversationId?: number;
     moduleContext?: string;
+    history?: Array<{ role: "user" | "assistant"; content: string }>;
+    overrideSystemPrompt?: boolean;
   };
 
   if (!message || typeof message !== "string") {
@@ -81,7 +83,7 @@ router.post("/chat", async (req, res) => {
     }
   }
 
-  // Load message history from DB (if conversationId) or empty
+  // Load message history — from DB if conversationId, from inline payload if module chat
   let history: Array<{ role: "user" | "assistant"; content: string }> = [];
   if (resolvedConvId) {
     try {
@@ -90,6 +92,10 @@ router.post("/chat", async (req, res) => {
         .orderBy(asc(messages.createdAt));
       history = dbMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
     } catch {}
+  } else if (Array.isArray(inlineHistory) && inlineHistory.length > 0) {
+    history = inlineHistory
+      .filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+      .slice(-20);
   }
 
   // Save user message to DB
@@ -102,9 +108,18 @@ router.post("/chat", async (req, res) => {
   }
 
   const openai = getOpenAI();
-  let systemPrompt = buildSystemPrompt(userContext);
-  if (moduleContext) {
-    systemPrompt += `\n\n--- Module Context ---\n${moduleContext}\nFocus your responses on this domain. Be specific, practical, and Africa-aware.`;
+  let systemPrompt: string;
+  if (overrideSystemPrompt && moduleContext) {
+    // Module chat: use only the module's own system prompt — no DENA career base
+    const userCtxLines: string[] = [];
+    if (userContext?.name) userCtxLines.push(`User name: ${userContext.name}`);
+    if (userContext?.location) userCtxLines.push(`User location: ${userContext.location}`);
+    systemPrompt = moduleContext + (userCtxLines.length ? `\n\n--- User Context ---\n${userCtxLines.join("\n")}` : "");
+  } else {
+    systemPrompt = buildSystemPrompt(userContext);
+    if (moduleContext) {
+      systemPrompt += `\n\n--- Module Context ---\n${moduleContext}\nFocus your responses on this domain. Be specific, practical, and Africa-aware.`;
+    }
   }
 
   try {
