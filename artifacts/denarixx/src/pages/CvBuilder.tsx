@@ -1069,6 +1069,7 @@ function CvBuilderContent() {
       const data: GenerateResult = await res.json();
       setResult(data);
       setEditedCoverLetter(data.coverLetter);
+      try { localStorage.setItem("denarixx_last_cv", data.resume); } catch {}
       setWizardStep(6);
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });

@@ -1,3 +1,4 @@
 - [JIT User Provisioning](jit-user-provisioning.md) — GET /api/users/me must upsert on email, not plain INSERT — avoids duplicate key 500 on re-login.
 - [CV Builder wizard architecture](cv-builder-wizard.md) — 6-step wizard with import review modal, live preview panel, data cleanup pipeline; utilities are module-level before CvBuilderContent
 - [OpenAI model constraint](openai-model.md) — only gpt-3.5-turbo works; project blocks GPT-4 family models
+- [Jobs AI architecture](jobs-ai-architecture.md) — match scoring weights, saved_jobs table, localStorage CV key, Express route ordering for static-before-param

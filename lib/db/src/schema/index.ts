@@ -9,3 +9,4 @@ export * from "./jobs";
 export * from "./jobApplications";
 export * from "./interviewSessions";
 export * from "./directMessages";
+export * from "./savedJobs";
