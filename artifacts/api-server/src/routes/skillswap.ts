@@ -195,7 +195,7 @@ Return a JSON array of the top 6 listing IDs in match order, most relevant first
 Only return valid JSON, no other text.`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 200,
       response_format: { type: "json_object" },
