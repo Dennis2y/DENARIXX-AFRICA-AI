@@ -51,7 +51,9 @@ const Navbar = () => {
             <a href={`${basePath}/sign-in`}>
               <Button variant="ghost" className="text-foreground">Log In</Button>
             </a>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => scrollTo("waitlist")}>Get Early Access</Button>
+            <a href={`${basePath}/sign-up`}>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">Sign Up Free</Button>
+            </a>
           </Show>
           <Show when="signed-in">
             <a href={`${basePath}/dashboard`}>
@@ -83,7 +85,9 @@ const Navbar = () => {
               <a href={`${basePath}/sign-in`} className="w-full">
                 <Button variant="outline" className="w-full" onClick={() => setMobileMenuOpen(false)}>Log In</Button>
               </a>
-              <Button className="w-full bg-primary text-primary-foreground" onClick={() => { scrollTo("waitlist"); setMobileMenuOpen(false); }}>Get Early Access</Button>
+              <a href={`${basePath}/sign-up`} className="w-full">
+                <Button className="w-full bg-primary text-primary-foreground" onClick={() => setMobileMenuOpen(false)}>Sign Up Free</Button>
+              </a>
             </Show>
             <Show when="signed-in">
               <a href={`${basePath}/dashboard`} className="w-full">
@@ -200,15 +204,19 @@ const Hero = () => {
           transition={{ duration: 0.5, delay: 0.8 }}
           className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center"
         >
-          <Button size="lg" onClick={() => scrollTo("waitlist")} className="h-14 px-8 text-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full sm:w-auto group relative overflow-hidden">
-            <span className="relative z-10 flex items-center gap-2">
-              Join the Waitlist <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => scrollTo("modules")} className="h-14 px-8 text-lg rounded-full w-full sm:w-auto bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
-            <Play className="w-5 h-5 mr-2" /> Explore Platform
-          </Button>
+          <a href={`${basePath}/sign-up`} className="w-full sm:w-auto">
+            <Button size="lg" className="h-14 px-8 text-lg bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-full group relative overflow-hidden">
+              <span className="relative z-10 flex items-center gap-2">
+                Get Started Free <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+            </Button>
+          </a>
+          <a href={`${basePath}/sign-in`} className="w-full sm:w-auto">
+            <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full w-full bg-background/50 backdrop-blur-sm border-border hover:bg-muted">
+              Log In
+            </Button>
+          </a>
         </motion.div>
       </div>
 
