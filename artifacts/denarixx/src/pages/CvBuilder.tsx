@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUser, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
+  Camera,
   FileText, Sparkles, Download, Copy, Check, ChevronLeft,
   Loader2, Plus, X, Wand2, Layout, Eye, Upload, Target,
   ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
@@ -22,7 +23,7 @@ interface CvFormData {
   name: string; email: string; phone: string; location: string; linkedin: string;
   targetRole: string; targetCompany: string; currentRole: string;
   summary: string; experience: string; education: string; achievements: string;
-  skills: string[]; skillInput: string; tone: Tone; language: string;
+  skills: string[]; skillInput: string; tone: Tone; language: string; photo: string;
 }
 
 const LANGUAGES = [
@@ -132,14 +133,21 @@ function renderMarkdown(text: string) {
     .replace(/\n/g, "<br/>");
 }
 
-function buildPrintHTML(content: string, name: string, role: string, template: Template): string {
+function buildPrintHTML(content: string, name: string, role: string, template: Template, photo?: string): string {
   const hasHeader = ["professional", "executive", "tech", "creative"].includes(template.id);
-  const headerHTML = hasHeader
-    ? `<div class="header"><h1>${name}</h1><div class="subtitle">${role}</div></div><div class="body">`
-    : `<h1>${name}</h1><div class="subtitle">${role}</div>`;
+  const photoImg = photo
+    ? `<img class="${hasHeader ? "hdr-photo" : "hdr-photo-center"}" src="${photo}" alt="" />`
+    : "";
+  let headerHTML: string;
+  if (hasHeader) {
+    headerHTML = `<div class="header"><div class="hdr-inner"><div class="hdr-text"><h1>${name}</h1><div class="subtitle">${role}</div></div>${photoImg}</div></div><div class="body">`;
+  } else {
+    headerHTML = `${photoImg}<h1>${name}</h1><div class="subtitle">${role}</div>`;
+  }
   const closeBody = hasHeader ? "</div>" : "";
+  const photoCSS = `.hdr-inner{display:flex;align-items:center;justify-content:space-between}.hdr-text{flex:1}.hdr-photo{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.35);flex-shrink:0;margin-left:20px}.hdr-photo-center{width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #1e293b;display:block;margin:0 auto 16px}`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${name} — Resume</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}${template.printCSS}.cv-name{font-size:26px;font-weight:bold;margin-bottom:4px}</style>
+<style>*{box-sizing:border-box;margin:0;padding:0}${template.printCSS}${photoCSS}.cv-name{font-size:26px;font-weight:bold;margin-bottom:4px}</style>
 </head><body>${headerHTML}${renderMarkdown(content)}${closeBody}</body></html>`;
 }
 
@@ -280,6 +288,7 @@ function CvBuilderContent() {
   const { user } = useUser();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("build");
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("professional");
@@ -304,7 +313,7 @@ function CvBuilderContent() {
     phone: "", location: "", linkedin: "",
     targetRole: "", targetCompany: "", currentRole: "",
     summary: "", experience: "", education: "", achievements: "",
-    skills: [], skillInput: "", tone: "professional", language: "English",
+    skills: [], skillInput: "", tone: "professional", language: "English", photo: "",
   });
 
   useEffect(() => {
@@ -428,6 +437,23 @@ function CvBuilderContent() {
     if (file) parseFile(file);
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please select a JPG, PNG, or WebP image.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image too large", description: "Please use an image under 5 MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setField("photo", reader.result as string);
+    reader.readAsDataURL(file);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  };
+
   const tailor = async () => {
     if (!jobDescription.trim()) {
       toast({ title: "Paste a job description first", variant: "destructive" }); return;
@@ -487,14 +513,14 @@ function CvBuilderContent() {
   const previewHtml = useMemo(() => {
     if (!result) return "";
     const t = TEMPLATES.find(x => x.id === selectedTemplate) ?? TEMPLATES[0];
-    return buildPrintHTML(result.resume, form.name, form.targetRole, t);
-  }, [result, selectedTemplate, form.name, form.targetRole]);
+    return buildPrintHTML(result.resume, form.name, form.targetRole, t, form.photo || undefined);
+  }, [result, selectedTemplate, form.name, form.targetRole, form.photo]);
 
   const downloadPDF = () => {
     const content = activeTab === "resume" ? result?.resume : editedCoverLetter;
     if (!content) return;
     const t = TEMPLATES.find(x => x.id === selectedTemplate) ?? TEMPLATES[0];
-    const html = buildPrintHTML(content, form.name, form.targetRole, t);
+    const html = buildPrintHTML(content, form.name, form.targetRole, t, form.photo || undefined);
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, "_blank");
@@ -585,6 +611,54 @@ function CvBuilderContent() {
                   <User className="w-4 h-4 text-primary" />
                   <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Personal Information</h2>
                 </div>
+
+                {/* Photo picker */}
+                <div className="flex items-center gap-4 mb-5">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="relative w-20 h-20 rounded-full border-2 border-dashed border-border hover:border-primary/60 overflow-hidden bg-muted/30 flex items-center justify-center shrink-0 group transition-all"
+                  >
+                    {form.photo ? (
+                      <img src={form.photo} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Camera className="w-5 h-5 text-white" />
+                    </div>
+                  </button>
+                  <div>
+                    <p className="text-sm font-medium">Profile Photo</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">JPG, PNG or WebP · appears on your CV</p>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        className="text-xs text-primary hover:text-primary/80 transition-colors border border-primary/20 bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-lg"
+                      >
+                        {form.photo ? "Change photo" : "Upload photo"}
+                      </button>
+                      {form.photo && (
+                        <button
+                          type="button"
+                          onClick={() => setField("photo", "")}
+                          className="text-xs text-muted-foreground hover:text-red-400 transition-colors border border-border hover:border-red-400/30 px-2.5 py-1 rounded-lg"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1.5">Full Name *</label>
@@ -986,7 +1060,7 @@ function CvBuilderContent() {
                     <iframe
                       key={`${selectedTemplate}-${activeTab}-${editedCoverLetter.length}`}
                       title="CV Preview"
-                      srcDoc={activeTab === "resume" ? previewHtml : buildPrintHTML(editedCoverLetter, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0])}
+                      srcDoc={activeTab === "resume" ? previewHtml : buildPrintHTML(editedCoverLetter, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0], form.photo || undefined)}
                       className="w-full h-full border-0 bg-white"
                       sandbox="allow-same-origin"
                     />
