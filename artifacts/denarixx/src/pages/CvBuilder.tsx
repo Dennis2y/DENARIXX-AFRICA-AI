@@ -18,12 +18,17 @@ type TemplateId = "professional" | "executive" | "tech" | "graduate" | "creative
 type Tone = "professional" | "creative" | "executive";
 type AssistKey = "summary-gen" | "experience-rewrite" | "achievements-improve" | "skills-suggest" | "experience-ats";
 
-interface FormData {
+interface CvFormData {
   name: string; email: string; phone: string; location: string; linkedin: string;
   targetRole: string; targetCompany: string; currentRole: string;
   summary: string; experience: string; education: string; achievements: string;
-  skills: string[]; skillInput: string; tone: Tone;
+  skills: string[]; skillInput: string; tone: Tone; language: string;
 }
+
+const LANGUAGES = [
+  "English", "French", "Arabic", "Portuguese", "Spanish", "Swahili",
+  "German", "Chinese (Simplified)", "Hausa", "Yoruba", "Amharic", "Zulu",
+];
 
 interface GenerateResult { resume: string; coverLetter: string; }
 
@@ -290,14 +295,16 @@ function CvBuilderContent() {
   const [copied, setCopied] = useState<"resume" | "cover" | null>(null);
   const [activeTab, setActiveTab] = useState<"resume" | "cover">("resume");
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
+  const [parsedSuccess, setParsedSuccess] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const [form, setForm] = useState<FormData>({
+  const [form, setForm] = useState<CvFormData>({
     name: user?.fullName ?? "",
     email: user?.primaryEmailAddress?.emailAddress ?? "",
     phone: "", location: "", linkedin: "",
     targetRole: "", targetCompany: "", currentRole: "",
     summary: "", experience: "", education: "", achievements: "",
-    skills: [], skillInput: "", tone: "professional",
+    skills: [], skillInput: "", tone: "professional", language: "English",
   });
 
   useEffect(() => {
@@ -321,7 +328,7 @@ function CvBuilderContent() {
     load();
   }, []);
 
-  const setField = <K extends keyof FormData>(key: K, val: FormData[K]) =>
+  const setField = <K extends keyof CvFormData>(key: K, val: CvFormData[K]) =>
     setForm(prev => ({ ...prev, [key]: val }));
 
   const addSkill = () => {
@@ -331,7 +338,7 @@ function CvBuilderContent() {
 
   const removeSkill = (skill: string) => setForm(p => ({ ...p, skills: p.skills.filter(x => x !== skill) }));
 
-  const assist = async (key: AssistKey, action: string, content: string, field?: keyof FormData) => {
+  const assist = async (key: AssistKey, action: string, content: string, field?: keyof CvFormData) => {
     if (!content.trim() && action !== "suggestSkills" && action !== "experienceSummary") {
       toast({ title: "Nothing to improve", description: "Add some content first.", variant: "destructive" });
       return;
@@ -341,7 +348,7 @@ function CvBuilderContent() {
       const res = await fetch(`${basePath}/api/cv-builder/assist`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, content, targetRole: form.targetRole, skills: form.skills, experience: form.experience }),
+        body: JSON.stringify({ action, content, targetRole: form.targetRole, skills: form.skills, experience: form.experience, language: form.language }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
       const data = await res.json();
@@ -360,16 +367,26 @@ function CvBuilderContent() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const parseFile = async (file: File) => {
+    const SUPPORTED = ["pdf", "docx", "txt", "md", "rtf"];
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!SUPPORTED.includes(ext)) {
+      toast({ title: "Unsupported file type", description: `Please upload a PDF, DOCX, TXT, or MD file.`, variant: "destructive" });
+      return;
+    }
     setParseLoading(true);
+    setParsedSuccess(false);
     try {
-      const text = await file.text();
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const fileBase64 = btoa(binary);
+
       const res = await fetch(`${basePath}/api/cv-builder/parse`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cvText: text }),
+        body: JSON.stringify({ fileBase64, filename: file.name }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Parse failed");
       const data = await res.json();
@@ -388,13 +405,27 @@ function CvBuilderContent() {
         achievements: data.achievements || prev.achievements,
         skills: data.skills?.length > 0 ? [...new Set([...prev.skills, ...data.skills])] : prev.skills,
       }));
-      toast({ title: "CV imported!", description: "Your data has been extracted. Review and adjust below." });
+      setParsedSuccess(true);
+      setShowUpload(false);
+      toast({ title: "CV imported! ✨", description: "Fields have been populated. Review, then Generate your enhanced CV." });
     } catch (err: any) {
-      toast({ title: "Import failed", description: err.message ?? "Try a .txt or .md file.", variant: "destructive" });
+      toast({ title: "Import failed", description: err.message ?? "Check file format and try again.", variant: "destructive" });
     } finally {
       setParseLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) parseFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) parseFile(file);
   };
 
   const tailor = async () => {
@@ -412,7 +443,7 @@ function CvBuilderContent() {
       const res = await fetch(`${basePath}/api/cv-builder/tailor`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cvContent, jobDescription, targetRole: form.targetRole }),
+        body: JSON.stringify({ cvContent, jobDescription, targetRole: form.targetRole, language: form.language }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
       setAtsResult(await res.json());
@@ -438,7 +469,7 @@ function CvBuilderContent() {
           experience: form.experience, skills: form.skills, education: form.education,
           achievements: form.achievements, tone: form.tone, summary: form.summary,
           email: form.email, phone: form.phone, location: form.location,
-          linkedin: form.linkedin, targetCompany: form.targetCompany,
+          linkedin: form.linkedin, targetCompany: form.targetCompany, language: form.language,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Generation failed");
@@ -492,7 +523,7 @@ function CvBuilderContent() {
   const textareaCls = `${inputCls} resize-none`;
 
   const AiBtn = ({ assistKey, action, content, field, label }: {
-    assistKey: AssistKey; action: string; content: string; field?: keyof FormData; label: string;
+    assistKey: AssistKey; action: string; content: string; field?: keyof CvFormData; label: string;
   }) => (
     <button
       onClick={() => assist(assistKey, action, content, field)}
@@ -598,15 +629,34 @@ function CvBuilderContent() {
                     <input value={form.targetCompany} onChange={e => setField("targetCompany", e.target.value)} placeholder="Company you're applying to (for cover letter)" className={inputCls} />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <h3 className="text-xs font-medium mb-2">Writing Tone</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {TONE_OPTIONS.map(({ value, label, desc }) => (
-                      <button key={value} onClick={() => setField("tone", value)} className={`rounded-xl border p-2.5 text-left transition-all ${form.tone === value ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-border/80"}`}>
-                        <div className="font-semibold text-xs">{label}</div>
-                        <div className="text-[10px] mt-0.5 opacity-70">{desc}</div>
-                      </button>
-                    ))}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-xs font-medium mb-2">Writing Tone</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {TONE_OPTIONS.map(({ value, label, desc }) => (
+                        <button key={value} onClick={() => setField("tone", value)} className={`rounded-xl border p-2.5 text-left transition-all ${form.tone === value ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-border/80"}`}>
+                          <div className="font-semibold text-xs">{label}</div>
+                          <div className="text-[10px] mt-0.5 opacity-70">{desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-medium mb-2 flex items-center gap-1">
+                      🌍 CV Language
+                    </h3>
+                    <select
+                      value={form.language}
+                      onChange={e => setField("language", e.target.value)}
+                      className={`${inputCls} cursor-pointer`}
+                    >
+                      {LANGUAGES.map(lang => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      AI will write your entire CV & cover letter in this language
+                    </p>
                   </div>
                 </div>
               </div>
@@ -717,6 +767,31 @@ function CvBuilderContent() {
                 )}
               </div>
 
+              {/* Parsed success banner */}
+              {parsedSuccess && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border border-green-400/30 bg-green-400/5 p-4 flex items-center justify-between gap-4 flex-wrap"
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-sm text-green-400">CV imported successfully!</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">All fields have been pre-filled. Review below, then generate your enhanced CV.</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={generate}
+                    disabled={generateLoading}
+                    className="bg-green-500 hover:bg-green-600 text-white gap-2 rounded-xl shrink-0"
+                    size="sm"
+                  >
+                    {generateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    Generate Enhanced CV
+                  </Button>
+                </motion.div>
+              )}
+
               {/* Section: Upload CV */}
               <div className="bg-card border border-border rounded-2xl overflow-hidden">
                 <button
@@ -726,24 +801,55 @@ function CvBuilderContent() {
                   <div className="flex items-center gap-2">
                     <Upload className="w-4 h-4 text-blue-400" />
                     <span className="font-semibold text-sm">Upload Existing CV</span>
-                    <span className="text-xs text-muted-foreground">— Parse & import your current resume</span>
+                    <span className="text-xs text-muted-foreground">— PDF, DOCX, TXT, MD supported</span>
                   </div>
                   {showUpload ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                 </button>
                 {showUpload && (
                   <div className="px-6 pb-5 border-t border-border">
-                    <p className="text-xs text-muted-foreground mt-3 mb-3">
-                      Upload a <strong>.txt</strong> or <strong>.md</strong> file. AI will extract your info and populate the form above. For PDFs, copy-paste the text into a .txt file first.
-                    </p>
-                    <input ref={fileInputRef} type="file" accept=".txt,.md,.csv" className="hidden" onChange={handleFileUpload} />
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={parseLoading}
-                      variant="outline"
-                      className="gap-2 rounded-xl"
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.txt,.md,.rtf"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+                    {/* Drag-and-drop zone */}
+                    <div
+                      onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={handleDrop}
+                      onClick={() => !parseLoading && fileInputRef.current?.click()}
+                      className={`mt-4 rounded-xl border-2 border-dashed transition-all cursor-pointer p-8 text-center ${
+                        isDragging
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/40 hover:bg-muted/20"
+                      } ${parseLoading ? "pointer-events-none opacity-60" : ""}`}
                     >
-                      {parseLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Parsing CV...</> : <><Upload className="w-4 h-4" />Choose File & Import</>}
-                    </Button>
+                      {parseLoading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                          <p className="text-sm font-medium">Extracting & parsing your CV…</p>
+                          <p className="text-xs text-muted-foreground">This usually takes 5–10 seconds</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <Upload className="w-8 h-8 text-blue-400" />
+                          <p className="text-sm font-semibold">Drop your CV here or click to browse</p>
+                          <p className="text-xs text-muted-foreground">
+                            PDF, DOCX, TXT, MD · Max 10 MB
+                          </p>
+                          <div className="flex gap-1.5 mt-1 flex-wrap justify-center">
+                            {["PDF", "DOCX", "TXT", "MD"].map(f => (
+                              <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 border border-blue-400/20 font-medium">{f}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-3 text-center">
+                      AI extracts your info and fills the form. Scanned PDFs may not work — try a text-based PDF.
+                    </p>
                   </div>
                 )}
               </div>
