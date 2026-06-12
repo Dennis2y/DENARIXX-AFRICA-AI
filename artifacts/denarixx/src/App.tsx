@@ -161,11 +161,16 @@ function Router() {
       <Route path="/interview-coach" component={InterviewCoach} />
       <Route path="/community" component={Community} />
       <Route path="/messages" component={Messages} />
+      <Route path="/business" component={BusinessAI} />
       <Route path="/business-ai" component={BusinessAI} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/farm" component={FarmAI} />
       <Route path="/farm-ai" component={FarmAI} />
+      <Route path="/health" component={HealthAI} />
       <Route path="/health-ai" component={HealthAI} />
+      <Route path="/invest" component={InvestAI} />
       <Route path="/invest-ai" component={InvestAI} />
+      <Route path="/government" component={GovAI} />
       <Route path="/gov-ai" component={GovAI} />
       <Route path="/admin" component={Admin} />
       <Route path="/leaderboard" component={Leaderboard} />
