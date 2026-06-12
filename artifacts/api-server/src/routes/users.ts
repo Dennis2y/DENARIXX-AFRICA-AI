@@ -24,7 +24,7 @@ router.get("/me", requireAuth, async (req, res) => {
       return;
     }
 
-    // JIT provision — create user row on first access
+    // JIT provision — upsert user row on first access from this Clerk session
     const { getAuth } = await import("@clerk/express");
     const auth = getAuth(req);
     const email = (auth as any)?.sessionClaims?.email ?? "";
@@ -33,6 +33,10 @@ router.get("/me", requireAuth, async (req, res) => {
     const [created] = await db
       .insert(usersTable)
       .values({ clerkUserId, email, name })
+      .onConflictDoUpdate({
+        target: usersTable.email,
+        set: { clerkUserId, name: name ?? undefined },
+      })
       .returning();
 
     res.status(201).json({ ...created, skills: [] });

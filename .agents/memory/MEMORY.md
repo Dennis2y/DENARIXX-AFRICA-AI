@@ -1,7 +1,1 @@
-- [Clerk + Tailwind v4 setup](clerk-tailwind-v4.md) — layer declaration, optimize:false, clerk/themes v1 for react v6 compat
-- [OpenAI model access](openai-direct-key.md) — proj_7PjLwxei07yZi7izO0MwB1kd blocks ALL GPT-4 family; only gpt-3.5-turbo works; all 4 AI routes use gpt-3.5-turbo
-- [DB schema exports](db-schema-exports.md) — all tables must be exported from lib/db/src/schema/index.ts for push to create them
-- [API server OpenAI import](api-server-openai.md) — never import openai at top-level in api-server routes; use dynamic require("@workspace/integrations-openai-ai-server") inside handler; Orval inline request body schemas cause TS2308 name collision — always use named $ref instead.
-- [Clerk themes shadcn type](clerk-themes-shadcn.md) — @clerk/themes@1.x ships shadcn at runtime but d.ts omits it; suppress with @ts-expect-error on the import line
-- [DENA conversation persistence](dena-persistence.md) — conversations table needed clerkUserId column (added via push); POST /chat saves user+assistant messages to DB after streaming; X-Conversation-Id response header carries the resolved conversationId
-- [PDF OCR pipeline on Replit NixOS](pdf-ocr-pipeline.md) — pdf-parse v2 class API, pdfjs-dist legacy ESM, tesseract.js WASM, no system tesseract, no native canvas
+- [JIT User Provisioning](jit-user-provisioning.md) — GET /api/users/me must upsert on email, not plain INSERT — avoids duplicate key 500 on re-login.
