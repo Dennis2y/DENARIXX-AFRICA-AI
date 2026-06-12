@@ -3,6 +3,7 @@ import { db, waitlistTable } from "@workspace/db";
 import { eq, desc, count, sql } from "drizzle-orm";
 import { JoinWaitlistBody } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
+import { sendWelcomeEmail } from "../email";
 
 const router: IRouter = Router();
 
@@ -93,6 +94,15 @@ router.post("/waitlist", async (req, res) => {
       .returning();
 
     req.log.info({ email, country, referredBy }, "Waitlist signup");
+
+    // Fire welcome email without blocking the response
+    sendWelcomeEmail({
+      name: name ?? null,
+      email,
+      referralCode: entry.referralCode!,
+      referredByCode: referredBy ?? null,
+    }).catch((err) => req.log.warn({ err }, "Welcome email failed (non-fatal)"));
+
     res.status(201).json({
       id: entry.id,
       email: entry.email,

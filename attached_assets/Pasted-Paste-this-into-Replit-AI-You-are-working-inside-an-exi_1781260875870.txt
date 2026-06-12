@@ -1,0 +1,78 @@
+Paste this into Replit AI:
+
+You are working inside an existing Replit project.
+
+First, clone and analyze the repository:
+
+git clone https://github.com/Dennis2y/DENARIXX-AFRICA-AI.git
+cd DENARIXX-AFRICA-AI
+
+Then perform a complete audit of the repository.
+
+Your tasks:
+
+1. Analyze the entire codebase structure.
+2. Identify all completed modules.
+3. Identify all incomplete modules.
+4. Identify missing dependencies.
+5. Identify broken imports.
+6. Identify missing environment variables.
+7. Check if authentication is fully implemented.
+8. Check if Prisma schema is complete.
+9. Check if the AI layer is fully implemented.
+10. Check if the frontend routes are functional.
+11. Check if the backend API routes are functional.
+12. Check if database migrations exist.
+13. Check if the application can run locally.
+14. Generate a detailed completion report.
+
+After analysis:
+
+DO NOT rebuild the project from scratch.
+
+Continue development from the existing codebase.
+
+Implement and complete the following modules if missing:
+
+* User Authentication
+* User Profiles
+* DENA AI Assistant
+* SkillSwap AI
+* Learning Roadmaps
+* CV Builder
+* Interview Coach
+* Jobs AI
+* Community Feed
+* Messaging System
+* Notifications
+* Dashboard Analytics
+* Admin Dashboard
+
+Requirements:
+
+* Preserve existing architecture.
+* Preserve existing folder structure.
+* Preserve existing UI design.
+* Use Next.js 15.
+* Use Fastify backend.
+* Use PostgreSQL + Prisma.
+* Use TypeScript everywhere.
+* Use reusable components from packages/ui.
+* Use packages/ai for all AI integrations.
+* Keep the platform scalable for millions of users.
+
+Before making any changes:
+
+Generate a DEVELOPMENT_STATUS.md file showing:
+
+* Completed
+* In Progress
+* Missing
+* Blocked
+
+Then continue implementation module by module until the platform is a functional MVP.
+
+Never delete existing code unless it is clearly broken.
+Always extend and improve the current implementation.
+
+This prompt tells Replit to clone your GitHub repo, inspect what CTO.new already built, and continue from there instead of replacing it.
