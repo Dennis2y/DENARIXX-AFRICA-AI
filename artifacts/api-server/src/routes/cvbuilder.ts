@@ -31,13 +31,13 @@ router.post("/generate", requireAuth, async (req, res) => {
   const {
     name, targetRole, currentRole, experience, skills = [], education,
     achievements, tone = "professional", summary, email, phone, location,
-    linkedin, targetCompany, language = "English",
+    linkedin, targetCompany, language = "English", spokenLanguages,
   } = req.body as {
     name: string; targetRole: string; currentRole?: string; experience: string;
     skills?: string[]; education?: string; achievements?: string;
     tone?: "professional" | "creative" | "executive"; summary?: string;
     email?: string; phone?: string; location?: string; linkedin?: string;
-    targetCompany?: string; language?: string;
+    targetCompany?: string; language?: string; spokenLanguages?: string;
   };
 
   if (!name || !targetRole || !experience) {
@@ -90,6 +90,9 @@ Degrees, institutions, and years.
 ## Achievements & Certifications
 Notable accomplishments with impact.
 
+## Languages
+List every spoken/written language with proficiency level (e.g. Native, Fluent, B1, Intermediate).
+
 ---
 
 Then immediately output:
@@ -105,6 +108,7 @@ Experience: ${experience}
 ${resolvedSkills.length ? `Skills: ${resolvedSkills.join(", ")}` : ""}
 ${education ? `Education: ${education}` : ""}
 ${achievements ? `Achievements: ${achievements}` : ""}
+${spokenLanguages ? `Languages (spoken/written): ${spokenLanguages}` : ""}
 Tone: ${tone}`;
 
   const openai = getOpenAISafe(res);
@@ -471,12 +475,14 @@ Return ONLY a valid JSON object (no markdown, no code blocks, no trailing text):
   "experience": "<ALL work experience entries — company, title, dates, and bullet points — formatted as plain readable text preserving every role and bullet point>",
   "education": "<ALL education entries — institution, degree, dates, grades>",
   "achievements": "<ALL achievements, certifications, awards, and publications>",
-  "skills": [<complete array of every skill, tool, technology, language mentioned>]
+  "languages": "<ALL spoken/written languages and proficiency levels — e.g. English (Fluent), German (B1), Twi (Native)>",
+  "skills": [<complete array of every technical skill, tool, and technology mentioned — NOT spoken languages>]
 }
 
 Rules:
-- Copy experience, education, and achievements in FULL — never paraphrase or drop entries
+- Copy experience, education, achievements, and languages in FULL — never paraphrase or drop entries
 - Include every skill mentioned anywhere in the document
+- Put spoken/written languages ONLY in the "languages" field, not in "skills"
 - If a field is absent from the CV, return an empty string or empty array`;
 
   const MAX_CV_CHARS = 12000;

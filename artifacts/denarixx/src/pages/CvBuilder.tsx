@@ -23,6 +23,7 @@ interface CvFormData {
   name: string; email: string; phone: string; location: string; linkedin: string;
   targetRole: string; targetCompany: string; currentRole: string;
   summary: string; experience: string; education: string; achievements: string;
+  spokenLanguages: string;
   skills: string[]; skillInput: string; tone: Tone; language: string; photo: string;
 }
 
@@ -799,7 +800,7 @@ function buildRawPreviewHTML(form: CvFormData, template: Template): string {
 interface ImportedCV {
   name: string; email: string; phone: string; location: string; linkedin: string;
   currentRole: string; targetRole: string; summary: string; experience: string;
-  education: string; achievements: string; skills: string[]; photo?: string;
+  education: string; achievements: string; spokenLanguages: string; skills: string[]; photo?: string;
   _diagnostics?: { fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string };
 }
 
@@ -840,7 +841,7 @@ function CvBuilderContent() {
     email: user?.primaryEmailAddress?.emailAddress ?? "",
     phone: "", location: "", linkedin: "",
     targetRole: "", targetCompany: "", currentRole: "",
-    summary: "", experience: "", education: "", achievements: "",
+    summary: "", experience: "", education: "", achievements: "", spokenLanguages: "",
     skills: [], skillInput: "", tone: "professional", language: "English", photo: "",
   });
 
@@ -947,6 +948,7 @@ function CvBuilderContent() {
         experience: prioritizeExperience(cleanText(data.experience)),
         education: cleanText(data.education),
         achievements: cleanText(data.achievements),
+        spokenLanguages: cleanText(data.languages ?? data.spokenLanguages),
         skills: cleanSkills(Array.isArray(data.skills) ? data.skills : []),
         photo: data.photo,
         _diagnostics: data._diagnostics,
@@ -977,6 +979,7 @@ function CvBuilderContent() {
       experience: importedData.experience || prev.experience,
       education: importedData.education || prev.education,
       achievements: importedData.achievements || prev.achievements,
+      spokenLanguages: importedData.spokenLanguages || prev.spokenLanguages,
       skills: importedData.skills.length > 0 ? [...new Set([...prev.skills, ...importedData.skills])] : prev.skills,
       photo: importedData.photo || prev.photo,
     }));
@@ -1059,6 +1062,7 @@ function CvBuilderContent() {
           achievements: form.achievements, tone: form.tone, summary: form.summary,
           email: form.email, phone: form.phone, location: form.location,
           linkedin: form.linkedin, targetCompany: form.targetCompany, language: form.language,
+          spokenLanguages: form.spokenLanguages,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Generation failed");
@@ -1565,6 +1569,20 @@ function CvBuilderContent() {
                         onChange={e => setField("education", e.target.value)}
                         placeholder={"BSc Computer Science\nUniversity Name (2019)\nFirst Class Honours\n\nAWS Solutions Architect Certification (2022)"}
                         rows={5}
+                        className={textareaCls}
+                      />
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-base">🌐</span>
+                        <h3 className="font-semibold text-sm">Languages</h3>
+                        <span className="text-xs text-muted-foreground ml-1">— spoken / written</span>
+                      </div>
+                      <textarea
+                        value={form.spokenLanguages}
+                        onChange={e => setField("spokenLanguages", e.target.value)}
+                        placeholder={"English (Fluent)\nFrench (Intermediate)\nSwahili (Native)\nGerman (B1)"}
+                        rows={4}
                         className={textareaCls}
                       />
                     </div>
