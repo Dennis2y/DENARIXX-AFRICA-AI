@@ -247,6 +247,121 @@ Return ONLY a valid JSON object (no markdown, no code blocks):
   }
 });
 
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+/** Extract raw JPEG images embedded in a PDF binary (covers most scanner-generated PDFs). */
+function extractJpegsFromBuffer(buf: Buffer): Buffer[] {
+  const result: Buffer[] = [];
+  let i = 0;
+  while (i < buf.length - 1) {
+    if (buf[i] === 0xFF && buf[i + 1] === 0xD8) {
+      let j = i + 2;
+      while (j < buf.length - 1) {
+        if (buf[j] === 0xFF && buf[j + 1] === 0xD9) {
+          const jpeg = buf.subarray(i, j + 2);
+          if (jpeg.length > 5000) result.push(jpeg); // skip tiny artifacts
+          i = j + 2;
+          break;
+        }
+        j++;
+      }
+      if (j >= buf.length - 1) break;
+    } else {
+      i++;
+    }
+  }
+  return result;
+}
+
+interface PdfExtractResult {
+  text: string;
+  pageCount: number;
+  ocrUsed: boolean;
+  method: "pdf-parse" | "pdfjs-text" | "ocr-jpeg" | "ocr-failed" | "plain";
+}
+
+async function extractTextFromPdf(
+  buffer: Buffer,
+  log: { info: (...a: unknown[]) => void; warn: (...a: unknown[]) => void; error: (...a: unknown[]) => void },
+): Promise<PdfExtractResult> {
+  let pageCount = 0;
+
+  // ── Tier 1: pdf-parse v2 (class-based API) ──────────────────────────────
+  try {
+    const { PDFParse } = require("pdf-parse") as { PDFParse: new (opts: Record<string, unknown>) => { getText: () => Promise<{ text: string; pages: number }> } };
+    const parser = new PDFParse({ data: buffer, verbosity: 0 });
+    const data = await parser.getText();
+    pageCount = data.pages ?? 0;
+    const text = (data.text ?? "").trim();
+    if (text.length >= 80) {
+      log.info({ textLen: text.length, pages: pageCount }, "pdf-parse: text extracted OK");
+      return { text, pageCount, ocrUsed: false, method: "pdf-parse" };
+    }
+    log.info({ textLen: text.length, pages: pageCount }, "pdf-parse: minimal text — trying pdfjs");
+  } catch (e) {
+    log.warn({ err: e }, "pdf-parse failed");
+  }
+
+  // ── Tier 2: pdfjs-dist text extraction (handles more PDF encodings) ─────
+  try {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs" as string);
+    const resolvedWorker = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    (pdfjs as any).GlobalWorkerOptions.workerSrc = `file://${resolvedWorker}`;
+
+    const doc = await (pdfjs as any).getDocument({ data: new Uint8Array(buffer) }).promise;
+    pageCount = doc.numPages ?? pageCount;
+    let text = "";
+    for (let p = 1; p <= Math.min(doc.numPages, 15); p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      text += (tc.items as { str: string }[]).map(it => it.str).join(" ") + "\n";
+    }
+    text = text.trim();
+    if (text.length >= 80) {
+      log.info({ textLen: text.length, pages: pageCount }, "pdfjs: text extracted OK");
+      return { text, pageCount, ocrUsed: false, method: "pdfjs-text" };
+    }
+    log.info({ textLen: text.length, pages: pageCount }, "pdfjs: minimal text — attempting OCR");
+  } catch (e) {
+    log.warn({ err: e }, "pdfjs text extraction failed");
+  }
+
+  // ── Tier 3: OCR — extract embedded JPEGs + tesseract.js ─────────────────
+  try {
+    const jpegs = extractJpegsFromBuffer(buffer);
+    log.info({ jpegCount: jpegs.length }, "JPEG images extracted from PDF for OCR");
+    if (jpegs.length === 0) throw new Error("no embedded JPEG images found");
+
+    const { createWorker } = require("tesseract.js") as typeof import("tesseract.js");
+    const worker = await createWorker("eng", 1, {
+      cachePath: "/tmp/tesseract-cache",
+      logger: () => undefined,
+    } as Parameters<typeof createWorker>[2]);
+
+    let ocrText = "";
+    for (const jpeg of jpegs.slice(0, Math.max(pageCount, 5))) {
+      const { data } = await worker.recognize(jpeg);
+      ocrText += data.text + "\n";
+    }
+    await worker.terminate();
+
+    const text = ocrText.trim();
+    log.info({ ocrLen: text.length }, "OCR complete");
+    return { text, pageCount, ocrUsed: true, method: "ocr-jpeg" };
+  } catch (e) {
+    log.warn({ err: e }, "OCR failed");
+  }
+
+  return {
+    text: "",
+    pageCount,
+    ocrUsed: true,
+    method: "ocr-failed",
+  };
+}
+
+// ── route ─────────────────────────────────────────────────────────────────────
+
 // POST /api/cv-builder/parse  — accepts base64-encoded file OR raw cvText
 router.post("/parse", requireAuth, async (req, res) => {
   const { fileBase64, filename, cvText: cvTextBody } = req.body as {
@@ -254,39 +369,57 @@ router.post("/parse", requireAuth, async (req, res) => {
   };
 
   let cvText = cvTextBody ?? "";
+  const diagnostics: {
+    fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string;
+  } = { fileType: "text", pageCount: 0, textExtracted: 0, ocrUsed: false, method: "plain" };
 
   if (fileBase64 && filename) {
     const buffer = Buffer.from(fileBase64, "base64");
     const ext = (filename as string).split(".").pop()?.toLowerCase() ?? "";
+    diagnostics.fileType = ext;
 
     if (ext === "pdf") {
+      let result: PdfExtractResult;
       try {
-        const pdfParse: (buf: Buffer) => Promise<{ text: string }> = require("pdf-parse");
-        const data = await pdfParse(buffer);
-        cvText = data.text;
-      } catch (err) {
-        req.log.error({ err }, "PDF text extraction failed");
-        res.status(400).json({ error: "Could not extract text from this PDF. Try copy-pasting the content into a .txt file instead." });
+        result = await extractTextFromPdf(buffer, req.log);
+      } catch {
+        result = { text: "", pageCount: 0, ocrUsed: false, method: "ocr-failed" };
+      }
+
+      diagnostics.pageCount = result.pageCount;
+      diagnostics.ocrUsed = result.ocrUsed;
+      diagnostics.method = result.method;
+
+      if (result.method === "ocr-failed" || result.text.length < 50) {
+        const msg = result.ocrUsed
+          ? "This appears to be a scanned document. OCR processing was attempted but no readable text was found. Try a text-based PDF or paste your CV text directly."
+          : "Could not extract text from this PDF. It may be a scanned/image PDF. Try saving it as a text PDF or paste your CV content directly.";
+        res.status(400).json({ error: msg, diagnostics });
         return;
       }
+      cvText = result.text;
+
     } else if (ext === "docx") {
       try {
         const mammoth: { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> } = require("mammoth");
-        const result = await mammoth.extractRawText({ buffer });
-        cvText = result.value;
+        const r = await mammoth.extractRawText({ buffer });
+        cvText = r.value;
+        diagnostics.method = "mammoth";
       } catch (err) {
-        req.log.error({ err }, "DOCX text extraction failed");
-        res.status(400).json({ error: "Could not extract text from this DOCX file." });
+        req.log.error({ err }, "DOCX extraction failed");
+        res.status(400).json({ error: "Could not extract text from this DOCX file.", diagnostics });
         return;
       }
     } else {
-      // .txt, .md, .rtf — read as UTF-8
       cvText = buffer.toString("utf-8");
+      diagnostics.method = "plain";
     }
   }
 
+  diagnostics.textExtracted = cvText.trim().length;
+
   if (!cvText || cvText.trim().length < 50) {
-    res.status(400).json({ error: "Not enough text found (need at least 50 characters). For scanned PDFs, try a text-based PDF or copy-paste the content into a .txt file." });
+    res.status(400).json({ error: "Not enough text found (need at least 50 characters). For scanned PDFs, try a text-based PDF or paste your CV content directly.", diagnostics });
     return;
   }
 
@@ -321,11 +454,14 @@ Return ONLY a valid JSON object (no markdown, no code blocks):
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? "";
     try {
-      res.json(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      res.json({ ...parsed, _diagnostics: diagnostics });
     } catch {
       const match = raw.match(/\{[\s\S]*\}/);
-      if (match) res.json(JSON.parse(match[0]));
-      else res.status(500).json({ error: "Failed to parse your CV structure. Please try again." });
+      if (match) {
+        try { res.json({ ...JSON.parse(match[0]), _diagnostics: diagnostics }); return; } catch { /* fall through */ }
+      }
+      res.status(500).json({ error: "Failed to parse your CV structure. Please try again.", _diagnostics: diagnostics });
     }
   } catch (err: any) {
     req.log.error({ err }, "CV parse failed");

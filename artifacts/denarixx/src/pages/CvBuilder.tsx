@@ -305,6 +305,9 @@ function CvBuilderContent() {
   const [activeTab, setActiveTab] = useState<"resume" | "cover">("resume");
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
   const [parsedSuccess, setParsedSuccess] = useState(false);
+  const [parseDiagnostics, setParseDiagnostics] = useState<{
+    fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string;
+  } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const [form, setForm] = useState<CvFormData>({
@@ -385,6 +388,7 @@ function CvBuilderContent() {
     }
     setParseLoading(true);
     setParsedSuccess(false);
+    setParseDiagnostics(null);
     try {
       const arrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -407,6 +411,7 @@ function CvBuilderContent() {
         throw new Error(`Server error (${res.status}). Please try again.`);
       }
       const data = await res.json();
+      if (data._diagnostics) setParseDiagnostics(data._diagnostics);
       setForm(prev => ({
         ...prev,
         name: data.name || prev.name,
@@ -424,7 +429,8 @@ function CvBuilderContent() {
       }));
       setParsedSuccess(true);
       setShowUpload(false);
-      toast({ title: "CV imported! ✨", description: "Fields have been populated. Review, then Generate your enhanced CV." });
+      const ocrNote = data._diagnostics?.ocrUsed ? " (OCR was used)" : "";
+      toast({ title: "CV imported! ✨", description: `Fields have been populated${ocrNote}. Review, then Generate your enhanced CV.` });
     } catch (err: any) {
       toast({ title: "Import failed", description: err.message ?? "Check file format and try again.", variant: "destructive" });
     } finally {
@@ -853,24 +859,52 @@ function CvBuilderContent() {
               {parsedSuccess && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-green-400/30 bg-green-400/5 p-4 flex items-center justify-between gap-4 flex-wrap"
+                  className="rounded-2xl border border-green-400/30 bg-green-400/5 p-4 space-y-3"
                 >
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
-                    <div>
-                      <p className="font-semibold text-sm text-green-400">CV imported successfully!</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">All fields have been pre-filled. Review below, then generate your enhanced CV.</p>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
+                      <div>
+                        <p className="font-semibold text-sm text-green-400">CV imported successfully!</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">All fields have been pre-filled. Review below, then generate your enhanced CV.</p>
+                      </div>
                     </div>
+                    <Button
+                      onClick={generate}
+                      disabled={generateLoading}
+                      className="bg-green-500 hover:bg-green-600 text-white gap-2 rounded-xl shrink-0"
+                      size="sm"
+                    >
+                      {generateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      Generate Enhanced CV
+                    </Button>
                   </div>
-                  <Button
-                    onClick={generate}
-                    disabled={generateLoading}
-                    className="bg-green-500 hover:bg-green-600 text-white gap-2 rounded-xl shrink-0"
-                    size="sm"
-                  >
-                    {generateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    Generate Enhanced CV
-                  </Button>
+                  {parseDiagnostics && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
+                        <span className="text-muted-foreground">File type:</span>
+                        <span className="font-medium uppercase">{parseDiagnostics.fileType}</span>
+                      </span>
+                      {parseDiagnostics.pageCount > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
+                          <span className="text-muted-foreground">Pages:</span>
+                          <span className="font-medium">{parseDiagnostics.pageCount}</span>
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
+                        <span className="text-muted-foreground">Text extracted:</span>
+                        <span className="font-medium">{parseDiagnostics.textExtracted.toLocaleString()} chars</span>
+                      </span>
+                      <span className={`inline-flex items-center gap-1 text-xs border rounded-full px-2.5 py-1 ${parseDiagnostics.ocrUsed ? "bg-amber-400/10 border-amber-400/30 text-amber-400" : "bg-muted/50 border-border"}`}>
+                        <span className="text-muted-foreground">OCR:</span>
+                        <span className="font-medium">{parseDiagnostics.ocrUsed ? "Yes" : "No"}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs bg-muted/50 border border-border rounded-full px-2.5 py-1">
+                        <span className="text-muted-foreground">Method:</span>
+                        <span className="font-medium">{parseDiagnostics.method}</span>
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               )}
 

@@ -4,3 +4,4 @@
 - [API server OpenAI import](api-server-openai.md) — never import openai at top-level in api-server routes; use dynamic require("@workspace/integrations-openai-ai-server") inside handler; Orval inline request body schemas cause TS2308 name collision — always use named $ref instead.
 - [Clerk themes shadcn type](clerk-themes-shadcn.md) — @clerk/themes@1.x ships shadcn at runtime but d.ts omits it; suppress with @ts-expect-error on the import line
 - [DENA conversation persistence](dena-persistence.md) — conversations table needed clerkUserId column (added via push); POST /chat saves user+assistant messages to DB after streaming; X-Conversation-Id response header carries the resolved conversationId
+- [PDF OCR pipeline on Replit NixOS](pdf-ocr-pipeline.md) — pdf-parse v2 class API, pdfjs-dist legacy ESM, tesseract.js WASM, no system tesseract, no native canvas
