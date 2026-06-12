@@ -297,6 +297,10 @@ function DenaPageContent() {
           >
             <Menu className="w-5 h-5" />
           </button>
+          <a href={`${basePath}/dashboard`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors lg:hidden">
+            <ChevronLeft className="w-4 h-4" />
+            Home
+          </a>
           <div className="flex-1">
             {activeConvId ? (
               <p className="text-sm text-muted-foreground truncate">
