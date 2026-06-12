@@ -397,7 +397,15 @@ function CvBuilderContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileBase64, filename: file.name }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Parse failed");
+      if (!res.ok) {
+        const ct = res.headers.get("content-type") ?? "";
+        if (ct.includes("application/json")) {
+          const j = await res.json();
+          throw new Error(j.error ?? "Parse failed");
+        }
+        if (res.status === 413) throw new Error("File too large. Please use a file under 20 MB.");
+        throw new Error(`Server error (${res.status}). Please try again.`);
+      }
       const data = await res.json();
       setForm(prev => ({
         ...prev,
