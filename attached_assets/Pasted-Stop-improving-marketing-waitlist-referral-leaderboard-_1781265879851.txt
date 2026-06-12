@@ -1,0 +1,89 @@
+Stop improving marketing, waitlist, referral, leaderboard, email, and landing page features. These are now complete.
+
+The next goal is to turn Denarixx Africa AI from a waitlist platform into a usable MVP product.
+
+Preserve all existing code and design. Do not rebuild from scratch. Do not remove the current waitlist, referral system, admin dashboard, leaderboard, or landing page.
+
+Build the first complete user journey:
+
+Sign Up
+→ Create Profile
+→ Open DENA AI
+→ Use SkillSwap AI
+→ Generate CV
+→ Apply for Jobs
+
+Implementation order:
+
+1. Authentication
+- Add user signup
+- Add login
+- Add logout
+- Add protected routes
+- Add logged-in dashboard
+- Use the existing project stack and database
+
+2. User Profile System
+- Create profile setup page
+- Fields: full name, country, city, role, bio, skills, experience level, portfolio links, career goal
+- Save profile to database
+- Show profile completion progress
+
+3. DENA AI Assistant
+- Build a real AI chat page
+- Add floating DENA AI assistant
+- Connect to OpenAI if API key exists
+- Save conversation history
+- Make DENA help users with skills, jobs, CVs, business, and learning
+
+4. SkillSwap AI
+- Create SkillSwap page
+- Users can add skills they can teach
+- Users can add skills they want to learn
+- Users can browse other users
+- Add basic AI matching
+- Add connect/request button
+
+5. AI CV Builder
+- Create CV Builder page
+- Use profile data to generate CV
+- Generate cover letter
+- Allow editing
+- Add PDF export
+
+6. Jobs AI
+- Create Jobs page
+- Add sample jobs seeded in database
+- Users can browse jobs
+- Users can save jobs
+- Users can apply for jobs
+- Add AI job match score based on profile skills
+
+7. User Dashboard
+- Dashboard should show:
+  - Profile completion
+  - DENA AI shortcut
+  - SkillSwap matches
+  - CV status
+  - Saved jobs
+  - Job applications
+  - Referral stats
+
+Also create these files:
+- PRODUCT_STATUS.md
+- USER_JOURNEY_STATUS.md
+
+In PRODUCT_STATUS.md, show:
+- Completed
+- Partially completed
+- Missing
+- Next priority
+
+In USER_JOURNEY_STATUS.md, test and document whether this flow works:
+Sign Up → Create Profile → Open DENA AI → Use SkillSwap AI → Generate CV → Apply for Jobs
+
+Important:
+Do not add more “Coming Soon” pages.
+Do not create fake placeholder-only pages.
+Every page must have working UI and database/API connection where needed.
+Focus on making the MVP usable.
