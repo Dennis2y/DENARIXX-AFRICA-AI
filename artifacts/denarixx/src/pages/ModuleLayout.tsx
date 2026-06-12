@@ -68,16 +68,18 @@ export type ModuleLayoutConfig = {
 
 function AiChatPanel({
   config,
-  onPrompt,
   externalPrompt,
+  externalWorkflow,
 }: {
   config: ModuleLayoutConfig;
-  onPrompt?: (p: string) => void;
   externalPrompt?: string;
+  externalWorkflow?: string | null;
 }) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: config.welcome },
   ]);
+  // activeWorkflow: set from Quick Action label on mount, or from first typed message
+  const [activeWorkflow, setActiveWorkflow] = useState<string | null>(externalWorkflow ?? null);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -87,8 +89,12 @@ function AiChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Fire initial prompt when component mounts with an externalPrompt
   useEffect(() => {
-    if (externalPrompt) send(externalPrompt);
+    if (externalPrompt) {
+      send(externalPrompt);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalPrompt]);
 
   async function send(text?: string) {
@@ -96,7 +102,13 @@ function AiChatPanel({
     if (!msg || streaming) return;
     setInput("");
 
-    // Capture history before this message (skip welcome, skip empty)
+    // Lock in the active workflow: use Quick Action label if set, else first user message
+    const currentWorkflow = activeWorkflow ?? msg.substring(0, 80);
+    if (!activeWorkflow) {
+      setActiveWorkflow(currentWorkflow);
+    }
+
+    // Capture conversation history before this message (skip welcome, skip empty)
     const history = messages
       .slice(1)
       .filter(m => m.content.trim())
@@ -115,6 +127,7 @@ function AiChatPanel({
           moduleContext: config.moduleContext,
           history,
           overrideSystemPrompt: true,
+          activeWorkflow: currentWorkflow,
         }),
       });
       if (!res.ok || !res.body) throw new Error("Failed");
@@ -151,6 +164,13 @@ function AiChatPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {activeWorkflow && (
+        <div className={`px-4 py-1.5 border-b border-border/50 flex items-center gap-2 ${config.accentBg}`}>
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${config.accentText}`}>
+            Active: {activeWorkflow.length > 60 ? activeWorkflow.substring(0, 60) + "…" : activeWorkflow}
+          </span>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <AnimatePresence initial={false}>
           {messages.map((m, i) => (
@@ -222,14 +242,17 @@ function AiChatPanel({
 
 export default function ModuleLayout({ config }: { config: ModuleLayoutConfig }) {
   const [, setLocation] = useLocation();
+  const [chatKey, setChatKey] = useState(0);
   const [pendingPrompt, setPendingPrompt] = useState<string | undefined>();
+  const [pendingWorkflow, setPendingWorkflow] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"dashboard" | "chat">("dashboard");
-  const promptKey = useRef(0);
 
-  function triggerPrompt(prompt: string) {
+  function triggerPrompt(prompt: string, workflowLabel?: string) {
     setMobileTab("chat");
-    promptKey.current += 1;
-    setPendingPrompt(prompt + `\u200B`.repeat(promptKey.current));
+    // Increment key to remount AiChatPanel with a fresh conversation state
+    setChatKey(k => k + 1);
+    setPendingWorkflow(workflowLabel ?? null);
+    setPendingPrompt(prompt);
   }
 
   return (
@@ -298,7 +321,7 @@ export default function ModuleLayout({ config }: { config: ModuleLayoutConfig })
                 {config.quickActions.map((action, i) => (
                   <button
                     key={i}
-                    onClick={() => triggerPrompt(action.prompt)}
+                    onClick={() => triggerPrompt(action.prompt, action.label)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-transparent hover:border-border hover:bg-muted/50 transition-all text-left group`}
                   >
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${config.accentBg} ${config.accentBorder} border group-hover:scale-105 transition-transform`}>
@@ -331,12 +354,13 @@ export default function ModuleLayout({ config }: { config: ModuleLayoutConfig })
             </div>
           </div>
 
-          {/* Chat panel */}
+          {/* Chat panel — key forces full remount on Quick Action click, giving a fresh conversation */}
           <div className={`flex-1 min-w-0 ${mobileTab === "chat" ? "flex" : "hidden"} lg:flex flex-col min-h-0`}>
             <AiChatPanel
-              key={config.name}
+              key={chatKey}
               config={config}
               externalPrompt={pendingPrompt}
+              externalWorkflow={pendingWorkflow}
             />
           </div>
         </div>

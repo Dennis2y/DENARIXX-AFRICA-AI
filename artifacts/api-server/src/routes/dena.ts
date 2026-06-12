@@ -43,12 +43,13 @@ function buildSystemPrompt(userContext?: { name?: string | null; role?: string |
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
-  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt } = req.body as {
+  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt, activeWorkflow } = req.body as {
     message: string;
     conversationId?: number;
     moduleContext?: string;
     history?: Array<{ role: "user" | "assistant"; content: string }>;
     overrideSystemPrompt?: boolean;
+    activeWorkflow?: string;
   };
 
   if (!message || typeof message !== "string") {
@@ -114,7 +115,23 @@ router.post("/chat", async (req, res) => {
     const userCtxLines: string[] = [];
     if (userContext?.name) userCtxLines.push(`User name: ${userContext.name}`);
     if (userContext?.location) userCtxLines.push(`User location: ${userContext.location}`);
-    systemPrompt = moduleContext + (userCtxLines.length ? `\n\n--- User Context ---\n${userCtxLines.join("\n")}` : "");
+
+    // Inject activeWorkflow prominently at the TOP so the model never loses task context
+    let prompt = moduleContext;
+    if (activeWorkflow) {
+      const wf = activeWorkflow.trim();
+      const topInjection =
+        `=== ACTIVE WORKFLOW: "${wf}" ===\n` +
+        `This entire conversation is about: ${wf}\n` +
+        `Every user reply — including single words like a country name, "yes/no", or a number — is their answer to YOUR last question, advancing the "${wf}" task.\n` +
+        `NEVER respond generically. ALWAYS continue the "${wf}" workflow with the user's answer.\n\n`;
+      const bottomReminder =
+        `\n\n=== REMINDER ===\n` +
+        `Active task: "${wf}". Short user replies are answers to your questions. Keep advancing this task.`;
+      prompt = topInjection + moduleContext + bottomReminder;
+    }
+
+    systemPrompt = prompt + (userCtxLines.length ? `\n\n--- User Context ---\n${userCtxLines.join("\n")}` : "");
   } else {
     systemPrompt = buildSystemPrompt(userContext);
     if (moduleContext) {
