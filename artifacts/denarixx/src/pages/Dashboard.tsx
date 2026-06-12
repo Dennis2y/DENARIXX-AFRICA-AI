@@ -125,8 +125,8 @@ function DashboardContent() {
           className="mb-10"
         >
           <div className="flex items-center gap-4 mb-2">
-            {(profile.data?.avatarUrl || user?.imageUrl) ? (
-              <img src={profile.data?.avatarUrl || user?.imageUrl} alt="avatar" className="w-14 h-14 rounded-full border-2 border-primary/50 object-cover" />
+            {(profile?.avatarUrl || user?.imageUrl) ? (
+              <img src={profile?.avatarUrl || user?.imageUrl} alt="avatar" className="w-14 h-14 rounded-full border-2 border-primary/50 object-cover" />
             ) : (
               <div className="w-14 h-14 rounded-full bg-primary/20 border-2 border-primary/50 flex items-center justify-center">
                 <User className="w-7 h-7 text-primary" />
