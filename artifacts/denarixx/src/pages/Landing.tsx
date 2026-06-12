@@ -933,8 +933,12 @@ const WaitlistCTA = () => {
         setErrorMsg("");
       },
       onError: (err: unknown) => {
-        const e = err as { response?: { data?: { error?: string } } };
-        setErrorMsg(e?.response?.data?.error ?? "Something went wrong. Please try again.");
+        const e = err as { status?: number; data?: { error?: string } };
+        if (e?.status === 409) {
+          setErrorMsg("This email is already on the waitlist. Check your inbox for your referral link!");
+        } else {
+          setErrorMsg(e?.data?.error ?? "Something went wrong. Please try again.");
+        }
       },
     },
   });
