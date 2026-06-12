@@ -884,11 +884,13 @@ function CvBuilderContent() {
         education: data.education || prev.education,
         achievements: data.achievements || prev.achievements,
         skills: data.skills?.length > 0 ? [...new Set([...prev.skills, ...data.skills])] : prev.skills,
+        photo: data.photo || prev.photo,
       }));
       setParsedSuccess(true);
       setShowUpload(false);
-      const ocrNote = data._diagnostics?.ocrUsed ? " (OCR was used)" : "";
-      toast({ title: "CV imported! ✨", description: `Fields have been populated${ocrNote}. Review, then Generate your enhanced CV.` });
+      const ocrNote = data._diagnostics?.ocrUsed ? " (OCR)" : "";
+      const photoNote = data.photo ? " · Photo extracted ✓" : "";
+      toast({ title: "CV imported! ✨", description: `All fields populated${ocrNote}${photoNote}. Review and generate.` });
     } catch (err: any) {
       toast({ title: "Import failed", description: err.message ?? "Check file format and try again.", variant: "destructive" });
     } finally {

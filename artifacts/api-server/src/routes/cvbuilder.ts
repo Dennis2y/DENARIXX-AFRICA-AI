@@ -401,10 +401,40 @@ router.post("/parse", requireAuth, async (req, res) => {
 
     } else if (ext === "docx") {
       try {
-        const mammoth: { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> } = require("mammoth");
-        const r = await mammoth.extractRawText({ buffer });
-        cvText = r.value;
+        const mammoth = require("mammoth") as any;
+        const extractedImages: string[] = [];
+
+        const htmlResult = await mammoth.convertToHtml(
+          { buffer },
+          {
+            convertImage: mammoth.images.inline(async (element: any) => {
+              try {
+                const data: string = await element.read("base64");
+                const mimeType: string = element.contentType || "image/png";
+                if (data && data.length < 4 * 1024 * 1024) {
+                  extractedImages.push(`data:${mimeType};base64,${data}`);
+                }
+              } catch { /* ignore individual image errors */ }
+              return {};
+            }),
+          }
+        );
+
+        cvText = htmlResult.value
+          .replace(/<img[^>]*>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+
         diagnostics.method = "mammoth";
+
+        if (extractedImages.length > 0) {
+          (diagnostics as any).photo = extractedImages[0];
+        }
       } catch (err) {
         req.log.error({ err }, "DOCX extraction failed");
         res.status(400).json({ error: "Could not extract text from this DOCX file.", diagnostics });
@@ -426,46 +456,66 @@ router.post("/parse", requireAuth, async (req, res) => {
   const openai = getOpenAISafe(res);
   if (!openai) return;
 
-  const systemPrompt = `You are an expert CV parser. Extract structured information from the provided CV text.
+  const systemPrompt = `You are an expert CV/resume parser. Extract ALL structured information from the CV text — do not truncate, summarise, or skip any content.
 
-Return ONLY a valid JSON object (no markdown, no code blocks):
+Return ONLY a valid JSON object (no markdown, no code blocks, no trailing text):
 {
-  "name": "<full name or empty string>",
-  "email": "<email or empty string>",
-  "phone": "<phone or empty string>",
-  "location": "<city, country or empty string>",
-  "linkedin": "<linkedin URL or empty string>",
-  "currentRole": "<current/most recent job title or empty string>",
-  "targetRole": "<inferred best-fit target role or empty string>",
-  "summary": "<professional summary if present or empty string>",
-  "experience": "<work experience as readable plain text, chronological, or empty string>",
-  "education": "<education details or empty string>",
-  "achievements": "<key achievements and certifications or empty string>",
-  "skills": [<array of skill strings extracted from the CV>]
-}`;
+  "name": "<full name>",
+  "email": "<email address>",
+  "phone": "<phone number>",
+  "location": "<city and country>",
+  "linkedin": "<full LinkedIn URL or username>",
+  "currentRole": "<most recent job title>",
+  "targetRole": "<best-fit target role inferred from CV>",
+  "summary": "<professional summary or objective verbatim, or empty string>",
+  "experience": "<ALL work experience entries — company, title, dates, and bullet points — formatted as plain readable text preserving every role and bullet point>",
+  "education": "<ALL education entries — institution, degree, dates, grades>",
+  "achievements": "<ALL achievements, certifications, awards, and publications>",
+  "skills": [<complete array of every skill, tool, technology, language mentioned>]
+}
+
+Rules:
+- Copy experience, education, and achievements in FULL — never paraphrase or drop entries
+- Include every skill mentioned anywhere in the document
+- If a field is absent from the CV, return an empty string or empty array`;
+
+  const MAX_CV_CHARS = 12000;
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
-      messages: [{ role: "system", content: systemPrompt }, { role: "user", content: cvText.slice(0, 3500) }],
-      temperature: 0.1,
-      max_tokens: 1000,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Parse this CV:\n\n${cvText.slice(0, MAX_CV_CHARS)}` },
+      ],
+      temperature: 0.05,
+      max_tokens: 3000,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const photo = (diagnostics as any).photo as string | undefined;
+
+    const tryParse = (s: string) => {
+      const parsed = JSON.parse(s);
+      const response: Record<string, unknown> = { ...parsed, _diagnostics: diagnostics };
+      if (photo) response.photo = photo;
+      return response;
+    };
+
     try {
-      const parsed = JSON.parse(raw);
-      res.json({ ...parsed, _diagnostics: diagnostics });
+      res.json(tryParse(raw));
     } catch {
       const match = raw.match(/\{[\s\S]*\}/);
       if (match) {
-        try { res.json({ ...JSON.parse(match[0]), _diagnostics: diagnostics }); return; } catch { /* fall through */ }
+        try { res.json(tryParse(match[0])); return; } catch { /* fall through */ }
       }
       res.status(500).json({ error: "Failed to parse your CV structure. Please try again.", _diagnostics: diagnostics });
     }
   } catch (err: any) {
     req.log.error({ err }, "CV parse failed");
-    const msg = err?.status === 401 ? "Invalid OpenAI API key." : err?.status === 429 ? "Rate limit reached. Please try again shortly." : "CV parsing is temporarily unavailable.";
+    const msg = err?.status === 401 ? "Invalid OpenAI API key."
+      : err?.status === 429 ? "Rate limit reached. Please try again shortly."
+      : "CV parsing is temporarily unavailable.";
     res.status(500).json({ error: msg });
   }
 });
