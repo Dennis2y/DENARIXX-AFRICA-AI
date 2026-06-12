@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
   Zap, User, BookOpen, FileText, Briefcase, Users, BarChart3,
-  LogOut, Settings, Trophy, ChevronRight, Sparkles, Lock
+  LogOut, Settings, Trophy, ChevronRight, Sparkles, Lock, Mic
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -22,11 +22,12 @@ type Module = {
 
 const modules: Module[] = [
   { icon: Sparkles, label: "DENA AI", desc: "Your personal AI assistant", color: "text-cyan-400", bg: "bg-cyan-400/10 border-cyan-400/20", href: `${basePath}/dena`, live: true },
-  { icon: BookOpen, label: "SkillSwap AI", desc: "Learn & grow your skills", color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20", href: `${basePath}/skillswap`, live: true },
+  { icon: BookOpen, label: "SkillSwap AI", desc: "Trade & grow skills with peers", color: "text-purple-400", bg: "bg-purple-400/10 border-purple-400/20", href: `${basePath}/skillswap`, live: true },
   { icon: FileText, label: "CV Builder", desc: "AI-powered resume builder", color: "text-green-400", bg: "bg-green-400/10 border-green-400/20", href: `${basePath}/cv-builder`, live: true },
+  { icon: Mic, label: "Interview Coach", desc: "Practice with AI feedback", color: "text-primary", bg: "bg-primary/10 border-primary/20", href: `${basePath}/interview-coach`, live: true },
   { icon: Briefcase, label: "Jobs AI", desc: "Matched jobs for your profile", color: "text-yellow-400", bg: "bg-yellow-400/10 border-yellow-400/20", href: `${basePath}/jobs`, live: true },
-  { icon: Users, label: "Community", desc: "Connect with professionals", color: "text-pink-400", bg: "bg-pink-400/10 border-pink-400/20", href: "#", live: false },
-  { icon: Trophy, label: "Leaderboard", desc: "Your referral rank", color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20", href: "/leaderboard", live: true },
+  { icon: Users, label: "Community", desc: "Connect with African talent", color: "text-pink-400", bg: "bg-pink-400/10 border-pink-400/20", href: `${basePath}/community`, live: true },
+  { icon: Trophy, label: "Leaderboard", desc: "Your referral rank", color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20", href: `${basePath}/leaderboard`, live: true },
 ];
 
 function useProfile() {
