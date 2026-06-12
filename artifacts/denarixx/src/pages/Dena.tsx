@@ -27,6 +27,28 @@ function renderMarkdown(text: string) {
     .replace(/\n/g, "<br/>");
 }
 
+function TypewriterText({ text, isActive }: { text: string; isActive: boolean }) {
+  const [pos, setPos] = useState(() => (isActive ? 0 : text.length));
+
+  useEffect(() => {
+    if (!isActive) { setPos(text.length); return; }
+    if (pos >= text.length) return;
+    const t = setTimeout(() => setPos(p => Math.min(p + 3, text.length)), 8);
+    return () => clearTimeout(t);
+  }, [isActive, pos, text]);
+
+  if (!isActive) return <span dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
+  const displayed = text.slice(0, pos);
+  const done = pos >= text.length;
+  return (
+    <span
+      dangerouslySetInnerHTML={{
+        __html: renderMarkdown(displayed) + (!done ? '<span style="display:inline-block;width:2px;height:0.9em;background:currentColor;opacity:0.8;margin-left:1px;vertical-align:middle;border-radius:1px;animation:pulse 1s cubic-bezier(0.4,0,0.6,1) infinite"></span>' : ""),
+      }}
+    />
+  );
+}
+
 function timeAgo(iso: string) {
   const d = new Date(iso);
   const diff = Date.now() - d.getTime();
@@ -342,13 +364,16 @@ function DenaPageContent() {
                         ? "bg-primary text-primary-foreground rounded-br-sm"
                         : "bg-card border border-border text-foreground rounded-bl-sm"
                     }`}
-                    dangerouslySetInnerHTML={{
-                      __html: renderMarkdown(msg.content) ||
-                        (streaming && i === messages.length - 1
-                          ? '<span class="inline-block w-2 h-4 bg-current animate-pulse rounded-sm opacity-70" />'
-                          : "")
-                    }}
-                  />
+                  >
+                    {msg.role === "user" ? (
+                      msg.content
+                    ) : (
+                      <TypewriterText
+                        text={msg.content}
+                        isActive={streaming && i === messages.length - 1 && msg.content.length > 0}
+                      />
+                    )}
+                  </div>
                 </motion.div>
               ))}
               {streaming && messages[messages.length - 1]?.content === "" && (

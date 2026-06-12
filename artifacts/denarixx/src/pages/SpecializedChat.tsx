@@ -17,6 +17,28 @@ function renderMarkdown(text: string) {
     .replace(/\n/g, "<br/>");
 }
 
+function TypewriterText({ text, isActive }: { text: string; isActive: boolean }) {
+  const [pos, setPos] = useState(() => (isActive ? 0 : text.length));
+
+  useEffect(() => {
+    if (!isActive) { setPos(text.length); return; }
+    if (pos >= text.length) return;
+    const t = setTimeout(() => setPos(p => Math.min(p + 3, text.length)), 8);
+    return () => clearTimeout(t);
+  }, [isActive, pos, text]);
+
+  if (!isActive) return <span dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
+  const displayed = text.slice(0, pos);
+  const done = pos >= text.length;
+  return (
+    <span
+      dangerouslySetInnerHTML={{
+        __html: renderMarkdown(displayed) + (!done ? '<span style="display:inline-block;width:2px;height:0.9em;background:currentColor;opacity:0.8;margin-left:1px;vertical-align:middle;border-radius:1px;animation:pulse 1s cubic-bezier(0.4,0,0.6,1) infinite"></span>' : ""),
+      }}
+    />
+  );
+}
+
 export type ModuleConfig = {
   name: string;
   tagline: string;
@@ -134,8 +156,16 @@ export default function SpecializedChat({ config }: { config: ModuleConfig }) {
                       ? "bg-primary text-primary-foreground rounded-tr-sm"
                       : "bg-card border border-border rounded-tl-sm"
                   }`}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) || (streaming && i === messages.length - 1 ? '<span class="animate-pulse">●●●</span>' : "") }}
-                />
+                >
+                  {m.role === "user" ? (
+                    m.content
+                  ) : (
+                    <TypewriterText
+                      text={m.content}
+                      isActive={streaming && i === messages.length - 1 && m.content.length > 0}
+                    />
+                  )}
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
