@@ -1,9 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,7 +18,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { useGenerateCv, type CvGenerateResponse } from "@/hooks/useCvBuilder";
+import {
+  useGenerateCv,
+  useImportCv,
+  type CvGenerateResponse,
+  type ParsedCvData,
+} from "@/hooks/useCvBuilder";
 import { useUser } from "@/context/UserContext";
 
 type Tab = "form" | "cv" | "letter";
@@ -27,6 +35,7 @@ function Field({
   placeholder,
   multiline,
   keyboardType,
+  highlight,
 }: {
   label: string;
   value: string;
@@ -34,6 +43,7 @@ function Field({
   placeholder?: string;
   multiline?: boolean;
   keyboardType?: "default" | "numeric";
+  highlight?: boolean;
 }) {
   const colors = useColors();
 
@@ -54,8 +64,10 @@ function Field({
           multiline && styles.textarea,
           {
             color: colors.foreground,
-            backgroundColor: colors.card,
-            borderColor: colors.border,
+            backgroundColor: highlight
+              ? colors.primary + "11"
+              : colors.card,
+            borderColor: highlight ? colors.primary + "66" : colors.border,
             borderRadius: colors.radius / 2,
           },
         ]}
@@ -102,14 +114,164 @@ function OutputSection({
   );
 }
 
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  const colors = useColors();
+  if (!value) return null;
+  return (
+    <View style={styles.reviewRow}>
+      <Text style={[styles.reviewLabel, { color: colors.mutedForeground }]}>
+        {label}
+      </Text>
+      <Text
+        style={[styles.reviewValue, { color: colors.foreground }]}
+        numberOfLines={3}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function ImportReviewModal({
+  visible,
+  parsed,
+  colors,
+  insets,
+  onApply,
+  onDismiss,
+}: {
+  visible: boolean;
+  parsed: ParsedCvData | null;
+  colors: ReturnType<typeof useColors>;
+  insets: { top: number; bottom: number };
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  if (!parsed) return null;
+  const skillsPreview = Array.isArray(parsed.skills)
+    ? parsed.skills.slice(0, 8).join(", ") +
+      (parsed.skills.length > 8 ? `  +${parsed.skills.length - 8} more` : "")
+    : "";
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onDismiss}
+    >
+      <View style={styles.modalOverlay}>
+        <View
+          style={[
+            styles.modalSheet,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+              paddingBottom: insets.bottom + 16,
+            },
+          ]}
+        >
+          <View
+            style={[styles.modalHandle, { backgroundColor: colors.border }]}
+          />
+
+          <View style={styles.modalHeader}>
+            <View
+              style={[
+                styles.modalIconBg,
+                { backgroundColor: colors.primary + "22" },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="check-circle-outline"
+                size={24}
+                color={colors.primary}
+              />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+              CV Imported
+            </Text>
+            <Text
+              style={[styles.modalSubtitle, { color: colors.mutedForeground }]}
+            >
+              Review the extracted fields below, then apply to pre-fill the form.
+            </Text>
+          </View>
+
+          <ScrollView
+            style={styles.reviewScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <ReviewRow label="Name" value={parsed.name} />
+            <ReviewRow label="Target Role" value={parsed.targetRole || parsed.currentRole} />
+            <ReviewRow label="Location" value={parsed.location} />
+            <ReviewRow label="Skills" value={skillsPreview} />
+            <ReviewRow label="Education" value={parsed.education} />
+            <ReviewRow label="Experience" value={parsed.experience} />
+          </ScrollView>
+
+          <View style={styles.modalActions}>
+            <Pressable
+              onPress={onDismiss}
+              style={[
+                styles.modalBtn,
+                styles.modalBtnSecondary,
+                { borderColor: colors.border, borderRadius: colors.radius },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.modalBtnText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                Discard
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={onApply}
+              style={[
+                styles.modalBtn,
+                styles.modalBtnPrimary,
+                {
+                  backgroundColor: colors.primary,
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="check"
+                size={16}
+                color={colors.primaryForeground}
+              />
+              <Text
+                style={[
+                  styles.modalBtnText,
+                  { color: colors.primaryForeground },
+                ]}
+              >
+                Apply to Form
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function CvBuilderScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile, updateProfile } = useUser();
   const generateCv = useGenerateCv();
+  const importCv = useImportCv();
 
   const [tab, setTab] = useState<Tab>("form");
   const [result, setResult] = useState<CvGenerateResponse | null>(null);
+  const [parsedCv, setParsedCv] = useState<ParsedCvData | null>(null);
+  const [reviewVisible, setReviewVisible] = useState(false);
+  const [highlightedFields, setHighlightedFields] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -142,6 +304,71 @@ export default function CvBuilderScreen() {
     } catch {
       Alert.alert("Error", "Could not generate CV. Please try again.");
     }
+  };
+
+  const handlePickFile = async () => {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "text/plain"],
+        copyToCacheDirectory: true,
+      });
+
+      if (picked.canceled || !picked.assets?.length) return;
+
+      const asset = picked.assets[0];
+      const filename = asset.name ?? "document";
+      const uri = asset.uri;
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      let payload: { fileBase64: string; filename: string } | { cvText: string };
+
+      if (filename.toLowerCase().endsWith(".txt")) {
+        const text = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        payload = { cvText: text };
+      } else {
+        const base64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        payload = { fileBase64: base64, filename };
+      }
+
+      const data = await importCv.mutateAsync(payload);
+      setParsedCv(data);
+      setReviewVisible(true);
+    } catch (err: any) {
+      const msg =
+        err?.message?.replace(/^Import failed: \d+$/, "Could not import this file.") ??
+        "Could not import your CV. Please try again.";
+      Alert.alert("Import Failed", msg);
+    }
+  };
+
+  const handleApplyImport = async () => {
+    if (!parsedCv) return;
+
+    const skillsStr = Array.isArray(parsedCv.skills)
+      ? parsedCv.skills.join(", ")
+      : "";
+
+    await updateProfile({
+      name: parsedCv.name || profile.name,
+      role: parsedCv.targetRole || parsedCv.currentRole || profile.role,
+      location: parsedCv.location || profile.location,
+      skills: skillsStr || profile.skills,
+      education: parsedCv.education || profile.education,
+      experience: parsedCv.experience || profile.experience,
+    });
+
+    setReviewVisible(false);
+    setParsedCv(null);
+    setHighlightedFields(true);
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    setTimeout(() => setHighlightedFields(false), 3000);
   };
 
   return (
@@ -236,17 +463,85 @@ export default function CvBuilderScreen() {
             </Text>
           </View>
 
+          <Pressable
+            onPress={handlePickFile}
+            disabled={importCv.isPending}
+            style={({ pressed }) => [
+              styles.importBtn,
+              {
+                borderColor: importCv.isPending
+                  ? colors.primary + "44"
+                  : colors.primary,
+                borderRadius: colors.radius,
+                backgroundColor: importCv.isPending
+                  ? colors.primary + "08"
+                  : colors.primary + "11",
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+            testID="import-cv-btn"
+          >
+            {importCv.isPending ? (
+              <View style={styles.btnRow}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={[styles.importBtnText, { color: colors.primary }]}>
+                  Reading your CV…
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.btnRow}>
+                <MaterialCommunityIcons
+                  name="file-upload-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text style={[styles.importBtnText, { color: colors.primary }]}>
+                  Upload CV to pre-fill
+                </Text>
+                <Text
+                  style={[styles.importBtnHint, { color: colors.mutedForeground }]}
+                >
+                  PDF or TXT
+                </Text>
+              </View>
+            )}
+          </Pressable>
+
+          {highlightedFields && (
+            <View
+              style={[
+                styles.importedBanner,
+                {
+                  backgroundColor: colors.primary + "18",
+                  borderColor: colors.primary + "44",
+                  borderRadius: colors.radius / 2,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="check-circle"
+                size={15}
+                color={colors.primary}
+              />
+              <Text style={[styles.importedBannerText, { color: colors.primary }]}>
+                Fields pre-filled from your CV — review and edit below
+              </Text>
+            </View>
+          )}
+
           <Field
             label="FULL NAME *"
             value={profile.name}
             onChange={(v) => updateProfile({ name: v })}
             placeholder="e.g. Amara Osei"
+            highlight={highlightedFields && !!profile.name}
           />
           <Field
             label="TARGET ROLE *"
             value={profile.role}
             onChange={(v) => updateProfile({ role: v })}
             placeholder="e.g. Software Engineer"
+            highlight={highlightedFields && !!profile.role}
           />
           <Field
             label="YEARS OF EXPERIENCE"
@@ -260,12 +555,14 @@ export default function CvBuilderScreen() {
             value={profile.location}
             onChange={(v) => updateProfile({ location: v })}
             placeholder="e.g. Lagos, Nigeria"
+            highlight={highlightedFields && !!profile.location}
           />
           <Field
             label="SKILLS (comma-separated)"
             value={profile.skills}
             onChange={(v) => updateProfile({ skills: v })}
             placeholder="e.g. React, Python, SQL, Leadership"
+            highlight={highlightedFields && !!profile.skills}
           />
           <Field
             label="EDUCATION"
@@ -273,6 +570,7 @@ export default function CvBuilderScreen() {
             onChange={(v) => updateProfile({ education: v })}
             placeholder="e.g. BSc Computer Science, University of Ghana"
             multiline
+            highlight={highlightedFields && !!profile.education}
           />
           <Field
             label="WORK EXPERIENCE"
@@ -280,6 +578,7 @@ export default function CvBuilderScreen() {
             onChange={(v) => updateProfile({ experience: v })}
             placeholder="Describe your roles, responsibilities and achievements..."
             multiline
+            highlight={highlightedFields && !!profile.experience}
           />
 
           <Pressable
@@ -366,6 +665,18 @@ export default function CvBuilderScreen() {
           </Pressable>
         </ScrollView>
       )}
+
+      <ImportReviewModal
+        visible={reviewVisible}
+        parsed={parsedCv}
+        colors={colors}
+        insets={{ top: insets.top, bottom: insets.bottom }}
+        onApply={handleApplyImport}
+        onDismiss={() => {
+          setReviewVisible(false);
+          setParsedCv(null);
+        }}
+      />
     </View>
   );
 }
@@ -419,6 +730,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     lineHeight: 20,
+  },
+  importBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    alignItems: "center",
+  },
+  importBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  importBtnHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginLeft: 2,
+  },
+  importedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+  },
+  importedBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   field: {
     gap: 6,
@@ -494,5 +834,89 @@ const styles = StyleSheet.create({
   regenText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    paddingTop: 12,
+    maxHeight: "85%",
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  modalHeader: {
+    paddingHorizontal: 20,
+    gap: 6,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  modalIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  reviewScroll: {
+    paddingHorizontal: 20,
+    flexGrow: 0,
+  },
+  reviewRow: {
+    marginBottom: 12,
+    gap: 2,
+  },
+  reviewLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  reviewValue: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 19,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  modalBtnSecondary: {
+    borderWidth: 1,
+  },
+  modalBtnPrimary: {},
+  modalBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
 });

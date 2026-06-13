@@ -1,9 +1,37 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db, usersTable, userSkillsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+// ── lightweight IP rate limiter for the unauthenticated /import route ─────────
+const IMPORT_RATE_LIMIT = 10;      // requests
+const IMPORT_RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const IMPORT_MAX_BASE64_BYTES = 5 * 1024 * 1024; // 5 MB encoded (~3.75 MB file)
+const IMPORT_ALLOWED_EXTS = new Set(["pdf", "txt"]);
+
+const importHits = new Map<string, { count: number; resetAt: number }>();
+
+function checkImportRateLimit(req: Request, res: Response): boolean {
+  const ip =
+    (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ??
+    req.socket.remoteAddress ??
+    "unknown";
+  const now = Date.now();
+  const entry = importHits.get(ip);
+
+  if (!entry || now >= entry.resetAt) {
+    importHits.set(ip, { count: 1, resetAt: now + IMPORT_RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= IMPORT_RATE_LIMIT) {
+    res.status(429).json({ error: "Too many import requests. Please wait 15 minutes and try again." });
+    return false;
+  }
+  entry.count++;
+  return true;
+}
 
 function getOpenAI() {
   const { openai } = require("@workspace/integrations-openai-ai-server");
@@ -366,16 +394,18 @@ async function extractTextFromPdf(
 
 // ── route ─────────────────────────────────────────────────────────────────────
 
-// POST /api/cv-builder/parse  — accepts base64-encoded file OR raw cvText
-router.post("/parse", requireAuth, async (req, res) => {
-  const { fileBase64, filename, cvText: cvTextBody } = req.body as {
-    fileBase64?: string; filename?: string; cvText?: string;
-  };
+type ParseBody = { fileBase64?: string; filename?: string; cvText?: string };
+type ParseDiagnostics = { fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string };
+
+async function runCvParse(
+  body: ParseBody,
+  log: { info: (...a: unknown[]) => void; warn: (...a: unknown[]) => void; error: (...a: unknown[]) => void },
+  res: Parameters<Parameters<typeof router.post>[1]>[1],
+): Promise<void> {
+  const { fileBase64, filename, cvText: cvTextBody } = body;
 
   let cvText = cvTextBody ?? "";
-  const diagnostics: {
-    fileType: string; pageCount: number; textExtracted: number; ocrUsed: boolean; method: string;
-  } = { fileType: "text", pageCount: 0, textExtracted: 0, ocrUsed: false, method: "plain" };
+  const diagnostics: ParseDiagnostics = { fileType: "text", pageCount: 0, textExtracted: 0, ocrUsed: false, method: "plain" };
 
   if (fileBase64 && filename) {
     const buffer = Buffer.from(fileBase64, "base64");
@@ -385,7 +415,7 @@ router.post("/parse", requireAuth, async (req, res) => {
     if (ext === "pdf") {
       let result: PdfExtractResult;
       try {
-        result = await extractTextFromPdf(buffer, req.log);
+        result = await extractTextFromPdf(buffer, log);
       } catch {
         result = { text: "", pageCount: 0, ocrUsed: false, method: "ocr-failed" };
       }
@@ -418,7 +448,7 @@ router.post("/parse", requireAuth, async (req, res) => {
                 if (data && data.length < 4 * 1024 * 1024) {
                   extractedImages.push(`data:${mimeType};base64,${data}`);
                 }
-              } catch { /* ignore individual image errors */ }
+              } catch { }
               return {};
             }),
           }
@@ -440,7 +470,7 @@ router.post("/parse", requireAuth, async (req, res) => {
           (diagnostics as any).photo = extractedImages[0];
         }
       } catch (err) {
-        req.log.error({ err }, "DOCX extraction failed");
+        log.error({ err }, "DOCX extraction failed");
         res.status(400).json({ error: "Could not extract text from this DOCX file.", diagnostics });
         return;
       }
@@ -457,7 +487,7 @@ router.post("/parse", requireAuth, async (req, res) => {
     return;
   }
 
-  const openai = getOpenAISafe(res);
+  const openai = getOpenAISafe(res as any);
   if (!openai) return;
 
   const systemPrompt = `You are an expert CV/resume parser. Extract ALL structured information from the CV text — do not truncate, summarise, or skip any content.
@@ -513,17 +543,46 @@ Rules:
     } catch {
       const match = raw.match(/\{[\s\S]*\}/);
       if (match) {
-        try { res.json(tryParse(match[0])); return; } catch { /* fall through */ }
+        try { res.json(tryParse(match[0])); return; } catch { }
       }
       res.status(500).json({ error: "Failed to parse your CV structure. Please try again.", _diagnostics: diagnostics });
     }
   } catch (err: any) {
-    req.log.error({ err }, "CV parse failed");
+    log.error({ err }, "CV parse failed");
     const msg = err?.status === 401 ? "Invalid OpenAI API key."
       : err?.status === 429 ? "Rate limit reached. Please try again shortly."
       : "CV parsing is temporarily unavailable.";
     res.status(500).json({ error: msg });
   }
+}
+
+// POST /api/cv-builder/parse  — accepts base64-encoded file OR raw cvText (authenticated)
+router.post("/parse", requireAuth, async (req, res) => {
+  return runCvParse(req.body as ParseBody, req.log, res);
+});
+
+// POST /api/cv-builder/import  — unauthenticated CV import for mobile clients
+// Protected by: IP rate limiting, strict payload size cap, extension allowlist
+router.post("/import", async (req, res) => {
+  if (!checkImportRateLimit(req, res)) return;
+
+  const body = req.body as ParseBody;
+
+  if (body.fileBase64) {
+    // Reject oversized payloads early — before any heavy processing
+    if (body.fileBase64.length > IMPORT_MAX_BASE64_BYTES) {
+      res.status(413).json({ error: "File too large. Maximum supported size is ~3.75 MB." });
+      return;
+    }
+    // Enforce file-type allowlist before PDF/OCR pipeline
+    const ext = (body.filename ?? "").split(".").pop()?.toLowerCase() ?? "";
+    if (!IMPORT_ALLOWED_EXTS.has(ext)) {
+      res.status(415).json({ error: "Unsupported file type. Please upload a PDF or TXT file." });
+      return;
+    }
+  }
+
+  return runCvParse(body, req.log, res);
 });
 
 export default router;
