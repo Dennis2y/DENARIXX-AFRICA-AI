@@ -687,7 +687,25 @@ function JobsContent() {
     }
   }, []);
 
-  useEffect(() => { fetchJobs(); fetchApplications(); }, []);
+  useEffect(() => {
+    // Load latest saved CV from server → cache to localStorage → then fetch jobs
+    // so match scores use the most up-to-date CV even on a new device
+    const init = async () => {
+      try {
+        const r = await fetch(`${basePath}/api/resumes/latest`, { credentials: "include" });
+        if (r.ok) {
+          const data = await r.json();
+          const md = data?.resume?.resumeMarkdown;
+          if (md) {
+            try { localStorage.setItem("denarixx_last_cv", md); } catch {}
+          }
+        }
+      } catch {}
+      fetchJobs();
+      fetchApplications();
+    };
+    init();
+  }, []);
   useEffect(() => { if (tab === "saved") fetchSaved(); }, [tab]);
 
   // ── Handlers

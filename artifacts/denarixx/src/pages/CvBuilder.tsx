@@ -7,7 +7,7 @@ import {
   FileText, Sparkles, Download, Copy, Check, ChevronLeft, ChevronRight,
   Loader2, Plus, X, Wand2, Layout, Eye, Upload, Target,
   ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
-  TrendingUp, User, Briefcase, GraduationCap, Trophy, Zap,
+  TrendingUp, User, Briefcase, GraduationCap, Trophy, Zap, Clock, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +40,15 @@ interface AtsResult {
   presentKeywords: string[];
   suggestions: string[];
   tailoredSummary?: string;
+}
+
+interface SavedResume {
+  id: number;
+  title: string;
+  targetRole: string | null;
+  createdAt: string;
+  resumeMarkdown: string;
+  coverLetterMarkdown: string | null;
 }
 
 interface Template {
@@ -835,6 +844,9 @@ function CvBuilderContent() {
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ ach: false, jd: false, exp: true });
+  const [savedResumes, setSavedResumes] = useState<SavedResume[]>([]);
+  const [savedResumesLoading, setSavedResumesLoading] = useState(false);
+  const [currentResumeId, setCurrentResumeId] = useState<number | null>(null);
 
   const [form, setForm] = useState<CvFormData>({
     name: user?.fullName ?? "",
@@ -865,6 +877,22 @@ function CvBuilderContent() {
     };
     load();
   }, []);
+
+  const fetchSavedResumes = async () => {
+    setSavedResumesLoading(true);
+    try {
+      const r = await fetch(`${basePath}/api/resumes`, { credentials: "include" });
+      if (!r.ok) return;
+      const list: SavedResume[] = (await r.json()).resumes ?? [];
+      setSavedResumes(list);
+      if (list.length > 0 && list[0].resumeMarkdown) {
+        try { localStorage.setItem("denarixx_last_cv", list[0].resumeMarkdown); } catch {}
+      }
+    } catch {}
+    finally { setSavedResumesLoading(false); }
+  };
+
+  useEffect(() => { fetchSavedResumes(); }, []);
 
   const setField = <K extends keyof CvFormData>(key: K, val: CvFormData[K]) =>
     setForm(prev => ({ ...prev, [key]: val }));
@@ -1070,6 +1098,28 @@ function CvBuilderContent() {
       setResult(data);
       setEditedCoverLetter(data.coverLetter);
       try { localStorage.setItem("denarixx_last_cv", data.resume); } catch {}
+      // Save to server — fire-and-forget so it doesn't block the UI
+      setCurrentResumeId(null);
+      fetch(`${basePath}/api/resumes`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resumeMarkdown: data.resume,
+          coverLetterMarkdown: data.coverLetter,
+          targetRole: form.targetRole || null,
+          targetCompany: form.targetCompany || null,
+          tone: form.tone,
+          language: form.language,
+          formSnapshot: form,
+        }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(saved => {
+          if (saved?.resume?.id) setCurrentResumeId(saved.resume.id);
+          fetchSavedResumes();
+        })
+        .catch(() => {});
       setWizardStep(6);
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
@@ -1738,6 +1788,62 @@ function CvBuilderContent() {
                   </Link>
                 </div>
               </div>
+
+              {/* Saved versions */}
+              {(savedResumes.length > 0 || savedResumesLoading) && (
+                <div className="mb-5 rounded-xl border border-border bg-card/50 p-4">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
+                    Saved versions
+                    {savedResumesLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+                    <span className="text-xs text-muted-foreground font-normal ml-auto">Synced across devices</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {savedResumes.slice(0, 6).map(r => (
+                      <div key={r.id} className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border transition-colors ${
+                        r.id === currentResumeId
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border hover:border-primary/20"
+                      }`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{r.title}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3" />
+                            {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                            {r.id === currentResumeId && (
+                              <span className="ml-1 text-primary font-medium">· current</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              setResult({ resume: r.resumeMarkdown, coverLetter: r.coverLetterMarkdown ?? "" });
+                              setEditedCoverLetter(r.coverLetterMarkdown ?? "");
+                              setCurrentResumeId(r.id);
+                              try { localStorage.setItem("denarixx_last_cv", r.resumeMarkdown); } catch {}
+                            }}
+                            className="text-xs text-primary hover:underline px-2 py-1 rounded-lg hover:bg-primary/5 transition-colors"
+                          >
+                            Load
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await fetch(`${basePath}/api/resumes/${r.id}`, { method: "DELETE", credentials: "include" });
+                              setSavedResumes(prev => prev.filter(x => x.id !== r.id));
+                              if (r.id === currentResumeId) setCurrentResumeId(null);
+                            }}
+                            className="text-xs text-muted-foreground hover:text-destructive p-1 rounded-lg hover:bg-destructive/5 transition-colors"
+                            title="Delete this version"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mb-5">
                 <h2 className="text-sm font-semibold mb-3 flex items-center gap-2"><Layout className="w-4 h-4 text-primary" />Choose Template</h2>
