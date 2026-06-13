@@ -148,6 +148,7 @@ async function notifyMatchingCandidates(
           location: job.location,
           matchScore,
           jobId: job.id,
+          userId: candidate.id,
         }).catch(err => {
           logger.error({ err, candidateId: candidate.id }, "Failed to send job-match email");
         }),
@@ -731,7 +732,7 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
           .from(jobs).where(eq(jobs.id, appRow.jobId)).limit(1)
           .then(([job]) => {
             if (!job) return;
-            return sendApplicationStatusEmail({ name: applicant.name, email: applicant.email, jobTitle: job.title, company: job.company, status });
+            return sendApplicationStatusEmail({ name: applicant.name, email: applicant.email, jobTitle: job.title, company: job.company, status, userId: applicant.id });
           });
       })
       .catch(emailErr => req.log.error({ err: emailErr }, "Failed to send application status email"));

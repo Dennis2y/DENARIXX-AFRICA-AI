@@ -1,4 +1,6 @@
 import { Resend } from "resend";
+import { db, emailLogsTable } from "@workspace/db";
+import { logger } from "./lib/logger";
 
 let resend: Resend | null = null;
 
@@ -6,6 +8,26 @@ function getResend(): Resend | null {
   if (!process.env.RESEND_API_KEY) return null;
   if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
   return resend;
+}
+
+async function writeEmailLog(entry: {
+  userId: number | null;
+  emailType: string;
+  recipient: string;
+  resendMessageId?: string | null;
+  errorReason?: string | null;
+}): Promise<void> {
+  try {
+    await db.insert(emailLogsTable).values({
+      userId: entry.userId,
+      emailType: entry.emailType,
+      recipient: entry.recipient,
+      resendMessageId: entry.resendMessageId ?? null,
+      errorReason: entry.errorReason ?? null,
+    });
+  } catch (dbErr) {
+    logger.error({ err: dbErr, emailType: entry.emailType, recipient: entry.recipient }, "Failed to write email log");
+  }
 }
 
 function getAppDomain(): string {
@@ -401,18 +423,33 @@ export async function sendApplicationStatusEmail(params: {
   jobTitle: string;
   company: string;
   status: string;
+  userId?: number | null;
 }): Promise<void> {
   const client = getResend();
   if (!client) return;
 
   const { subject, html } = buildApplicationStatusEmail(params);
 
-  await client.emails.send({
-    from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
-    to: [params.email],
-    subject,
-    html,
-  });
+  try {
+    const result = await client.emails.send({
+      from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+      to: [params.email],
+      subject,
+      html,
+    });
+    if (result.error) {
+      const reason = result.error.message ?? JSON.stringify(result.error);
+      await writeEmailLog({ userId: params.userId ?? null, emailType: "application_status", recipient: params.email, errorReason: reason });
+      throw new Error(`Resend API error: ${reason}`);
+    }
+    await writeEmailLog({ userId: params.userId ?? null, emailType: "application_status", recipient: params.email, resendMessageId: result.data?.id });
+  } catch (err) {
+    if (!(err instanceof Error && err.message.startsWith("Resend API error:"))) {
+      const reason = err instanceof Error ? err.message : String(err);
+      await writeEmailLog({ userId: params.userId ?? null, emailType: "application_status", recipient: params.email, errorReason: reason });
+    }
+    throw err;
+  }
 }
 
 function buildJobMatchEmail(params: {
@@ -558,18 +595,33 @@ export async function sendJobMatchEmail(params: {
   location: string;
   matchScore: number;
   jobId: number;
+  userId?: number | null;
 }): Promise<void> {
   const client = getResend();
   if (!client) return;
 
   const { subject, html } = buildJobMatchEmail(params);
 
-  await client.emails.send({
-    from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
-    to: [params.email],
-    subject,
-    html,
-  });
+  try {
+    const result = await client.emails.send({
+      from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+      to: [params.email],
+      subject,
+      html,
+    });
+    if (result.error) {
+      const reason = result.error.message ?? JSON.stringify(result.error);
+      await writeEmailLog({ userId: params.userId ?? null, emailType: "job_match", recipient: params.email, errorReason: reason });
+      throw new Error(`Resend API error: ${reason}`);
+    }
+    await writeEmailLog({ userId: params.userId ?? null, emailType: "job_match", recipient: params.email, resendMessageId: result.data?.id });
+  } catch (err) {
+    if (!(err instanceof Error && err.message.startsWith("Resend API error:"))) {
+      const reason = err instanceof Error ? err.message : String(err);
+      await writeEmailLog({ userId: params.userId ?? null, emailType: "job_match", recipient: params.email, errorReason: reason });
+    }
+    throw err;
+  }
 }
 
 export async function sendWelcomeEmail(params: {
@@ -577,16 +629,31 @@ export async function sendWelcomeEmail(params: {
   email: string;
   referralCode: string;
   referredByCode: string | null;
+  userId?: number | null;
 }): Promise<void> {
   const client = getResend();
-  if (!client) return; // No API key configured — skip silently
+  if (!client) return;
 
   const { subject, html } = buildWelcomeEmail(params);
 
-  await client.emails.send({
-    from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
-    to: [params.email],
-    subject,
-    html,
-  });
+  try {
+    const result = await client.emails.send({
+      from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+      to: [params.email],
+      subject,
+      html,
+    });
+    if (result.error) {
+      const reason = result.error.message ?? JSON.stringify(result.error);
+      await writeEmailLog({ userId: params.userId ?? null, emailType: "welcome", recipient: params.email, errorReason: reason });
+      throw new Error(`Resend API error: ${reason}`);
+    }
+    await writeEmailLog({ userId: params.userId ?? null, emailType: "welcome", recipient: params.email, resendMessageId: result.data?.id });
+  } catch (err) {
+    if (!(err instanceof Error && err.message.startsWith("Resend API error:"))) {
+      const reason = err instanceof Error ? err.message : String(err);
+      await writeEmailLog({ userId: params.userId ?? null, emailType: "welcome", recipient: params.email, errorReason: reason });
+    }
+    throw err;
+  }
 }

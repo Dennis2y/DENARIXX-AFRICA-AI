@@ -11,3 +11,4 @@ export * from "./interviewSessions";
 export * from "./directMessages";
 export * from "./savedJobs";
 export * from "./resumes";
+export * from "./emailLogs";
