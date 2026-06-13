@@ -49,7 +49,7 @@ router.get("/me", requireAuth, async (req, res) => {
 // PATCH /api/users/me — update current user profile
 router.patch("/me", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const { name, bio, location, website, twitterHandle, linkedinUrl, githubHandle, role, country, avatarUrl, userType } = req.body;
+  const { name, bio, location, website, twitterHandle, linkedinUrl, githubHandle, role, country, avatarUrl, userType, emailNotifications } = req.body;
 
   // userType can be set to "employer" by the user themselves;
   // "admin" can only be set by someone already with userType="admin"
@@ -83,6 +83,7 @@ router.patch("/me", requireAuth, async (req, res) => {
         ...(country !== undefined && { country }),
         ...(avatarUrl !== undefined && { avatarUrl }),
         ...(resolvedUserType !== undefined && { userType: resolvedUserType }),
+        ...(emailNotifications !== undefined && { emailNotifications: Boolean(emailNotifications) }),
         updatedAt: new Date(),
       })
       .where(eq(usersTable.clerkUserId, clerkUserId))

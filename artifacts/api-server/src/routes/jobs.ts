@@ -629,7 +629,7 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
 
   try {
     const [user] = await db
-      .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name })
+      .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name, emailNotifications: usersTable.emailNotifications })
       .from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
@@ -641,13 +641,15 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
     const [updated] = await db.update(jobApplications).set({ status }).where(eq(jobApplications.id, appId)).returning();
     res.json({ application: updated });
 
-    db.select({ title: jobs.title, company: jobs.company })
-      .from(jobs).where(eq(jobs.id, app.jobId)).limit(1)
-      .then(([job]) => {
-        if (!job) return;
-        return sendApplicationStatusEmail({ name: user.name, email: user.email, jobTitle: job.title, company: job.company, status });
-      })
-      .catch((emailErr) => { req.log.error({ err: emailErr }, "Failed to send application status email"); });
+    if (user.emailNotifications !== false) {
+      db.select({ title: jobs.title, company: jobs.company })
+        .from(jobs).where(eq(jobs.id, app.jobId)).limit(1)
+        .then(([job]) => {
+          if (!job) return;
+          return sendApplicationStatusEmail({ name: user.name, email: user.email, jobTitle: job.title, company: job.company, status });
+        })
+        .catch((emailErr) => { req.log.error({ err: emailErr }, "Failed to send application status email"); });
+    }
   } catch (err) {
     req.log.error({ err }, "Failed to update application status");
     res.status(500).json({ error: "Failed to update status" });

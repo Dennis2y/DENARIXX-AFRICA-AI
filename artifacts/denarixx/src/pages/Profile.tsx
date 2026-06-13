@@ -4,7 +4,7 @@ import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
 import {
   User, MapPin, Globe, Twitter, Linkedin, Github,
-  Plus, X, ArrowLeft, Save, Loader2, Check, Camera
+  Plus, X, ArrowLeft, Save, Loader2, Check, Camera, Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,8 @@ function ProfileContent() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [emailNotifications, setEmailNotifications] = useState(true);
+
   const [form, setForm] = useState({
     bio: "",
     location: "",
@@ -63,6 +65,7 @@ function ProfileContent() {
           role: data.role ?? "",
         });
         if (data.avatarUrl) setDbAvatarUrl(data.avatarUrl);
+        if (typeof data.emailNotifications === "boolean") setEmailNotifications(data.emailNotifications);
         if (Array.isArray(data.skills) && data.skills.length > 0) {
           setSkills(data.skills.map((s: any) => ({ skill: s.skill, level: s.level })));
         }
@@ -146,7 +149,7 @@ function ProfileContent() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, emailNotifications }),
       });
       await fetch(`${base}/api/users/me/skills`, {
         method: "PUT",
@@ -382,6 +385,32 @@ function ProfileContent() {
                     ))}
                   </div>
                 </div>
+              </section>
+
+              {/* Notifications */}
+              <section className="rounded-xl border border-border bg-card p-6">
+                <h3 className="font-semibold text-primary mb-4 flex items-center gap-2">
+                  <Bell className="w-4 h-4" />Notifications
+                </h3>
+                <label className="flex items-center justify-between gap-4 cursor-pointer select-none">
+                  <div>
+                    <p className="text-sm font-medium">Notify me about application updates</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Receive an email when an employer updates the status of your application
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={emailNotifications}
+                    onClick={() => setEmailNotifications((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 ${emailNotifications ? "bg-primary" : "bg-muted"}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${emailNotifications ? "translate-x-5" : "translate-x-0"}`}
+                    />
+                  </button>
+                </label>
               </section>
 
               {/* Save */}
