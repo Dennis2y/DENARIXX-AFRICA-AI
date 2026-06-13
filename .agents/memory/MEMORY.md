@@ -6,3 +6,5 @@
 - [Expo workflow health check](expo-workflow-health-check.md) — restart_workflow always fails for Expo mobile artifact; health check likely checks Expo dev domain, not localhost:24951; start workflow from Replit UI instead
 - [Express route TS patterns](express-route-ts-patterns.md) — `return res.json()` required to avoid TS7030; `String(req.params.id)` needed because params type is `string | string[]`
 - [Employer portal auth pattern](employer-portal-auth.md) — PATCH status: join jobApplications+jobs to get postedByUserId, check caller.id === postedByUserId; email goes to applicant (appRow.applicantUserId), not caller
+- [resumes.ts auth bug](resumes-auth-bug.md) — resumes.ts used dbUser (never set); all routes must use clerkUserId → getDbUser() pattern; dbUser is never populated by requireAuth
+- [post-merge lib declarations](post-merge-libs.md) — post-merge.sh must run typecheck:libs after db push; omitting it leaves stale declarations after every schema-adding task merge
