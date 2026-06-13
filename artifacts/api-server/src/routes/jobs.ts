@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable } from "@workspace/db";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { sendApplicationStatusEmail } from "../email";
 
 const router: IRouter = Router();
 
@@ -250,15 +251,35 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
   }
 
   try {
-    const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name })
+      .from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    const [app] = await db.select({ id: jobApplications.id, userId: jobApplications.userId })
+    const [app] = await db
+      .select({ id: jobApplications.id, userId: jobApplications.userId, jobId: jobApplications.jobId })
       .from(jobApplications).where(eq(jobApplications.id, appId)).limit(1);
     if (!app || app.userId !== user.id) { res.status(404).json({ error: "Application not found" }); return; }
 
     const [updated] = await db.update(jobApplications).set({ status }).where(eq(jobApplications.id, appId)).returning();
     res.json({ application: updated });
+
+    // Fire-and-forget email notification — fetch job details then send
+    db.select({ title: jobs.title, company: jobs.company })
+      .from(jobs).where(eq(jobs.id, app.jobId)).limit(1)
+      .then(([job]) => {
+        if (!job) return;
+        return sendApplicationStatusEmail({
+          name: user.name,
+          email: user.email,
+          jobTitle: job.title,
+          company: job.company,
+          status,
+        });
+      })
+      .catch((emailErr) => {
+        req.log.error({ err: emailErr }, "Failed to send application status email");
+      });
   } catch (err) {
     req.log.error({ err }, "Failed to update application status");
     res.status(500).json({ error: "Failed to update status" });

@@ -220,6 +220,201 @@ function buildWelcomeEmail(params: {
   return { subject, html };
 }
 
+function buildApplicationStatusEmail(params: {
+  name: string | null;
+  email: string;
+  jobTitle: string;
+  company: string;
+  status: string;
+}): { subject: string; html: string } {
+  const { name, jobTitle, company, status } = params;
+  const firstName = name ? name.trim().split(" ")[0] : "there";
+  const domain = getAppDomain();
+  const applicationsUrl = `${domain}/jobs?tab=applications`;
+
+  const STATUS_LABELS: Record<string, { label: string; emoji: string; color: string; message: string }> = {
+    reviewing: {
+      label: "Under Review",
+      emoji: "🔍",
+      color: "#7B61FF",
+      message: "Great news — the hiring team is reviewing your application. Stay tuned!",
+    },
+    interview: {
+      label: "Interview Stage",
+      emoji: "🎯",
+      color: "#00E5FF",
+      message: "Congratulations! You've been shortlisted for an interview. Check your email and be ready.",
+    },
+    offered: {
+      label: "Offer Extended",
+      emoji: "🎉",
+      color: "#00FF94",
+      message: "Amazing — you've received a job offer! Log in to view the details and next steps.",
+    },
+    rejected: {
+      label: "Application Closed",
+      emoji: "📋",
+      color: "#94A3B8",
+      message: "Thank you for applying. Unfortunately, this position has been filled. Keep going — the right opportunity is out there.",
+    },
+    applied: {
+      label: "Application Submitted",
+      emoji: "✅",
+      color: "#00E5FF",
+      message: "Your application has been submitted successfully. We'll keep you updated on any changes.",
+    },
+  };
+
+  const info = STATUS_LABELS[status] ?? {
+    label: status.charAt(0).toUpperCase() + status.slice(1),
+    emoji: "📬",
+    color: "#94A3B8",
+    message: "Your application status has been updated.",
+  };
+
+  const subject = `${info.emoji} Application Update: ${jobTitle} at ${company}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0B1020;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0B1020;padding:32px 16px;">
+  <tr>
+    <td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+              <tr>
+                <td style="background-color:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.3);border-radius:10px;padding:8px 16px;display:inline-block;">
+                  <span style="color:#00E5FF;font-size:20px;font-weight:900;letter-spacing:-0.5px;">DENARIXX<span style="color:#7B61FF;">.AI</span></span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Main card -->
+        <tr>
+          <td style="background-color:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;">
+
+            <!-- Top accent bar -->
+            <tr>
+              <td style="background:linear-gradient(90deg,${info.color},#7B61FF);height:3px;display:block;"></td>
+            </tr>
+
+            <!-- Hero content -->
+            <tr>
+              <td style="padding:48px 40px 40px;">
+                <p style="margin:0 0 8px;font-size:40px;text-align:center;">${info.emoji}</p>
+                <h1 style="margin:0 0 12px;font-size:26px;font-weight:900;color:#FFFFFF;text-align:center;line-height:1.2;">
+                  Application Update
+                </h1>
+                <p style="margin:0 0 32px;font-size:15px;color:#94A3B8;text-align:center;line-height:1.6;">
+                  Hi ${firstName}, here's the latest on your application.
+                </p>
+
+                <!-- Status badge -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                  <tr>
+                    <td style="background-color:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 24px;">
+                      <p style="margin:0 0 4px;font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Status</p>
+                      <p style="margin:0;font-size:20px;font-weight:900;color:${info.color};">${info.label}</p>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Job info -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                  <tr>
+                    <td style="background-color:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:20px 24px;">
+                      <p style="margin:0 0 4px;font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Position</p>
+                      <p style="margin:0 0 14px;font-size:17px;font-weight:800;color:#FFFFFF;">${jobTitle}</p>
+                      <p style="margin:0 0 4px;font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Company</p>
+                      <p style="margin:0;font-size:15px;font-weight:600;color:#CBD5E1;">${company}</p>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Message -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                  <tr>
+                    <td style="background-color:rgba(${info.color === '#00FF94' ? '0,255,148' : info.color === '#00E5FF' ? '0,229,255' : info.color === '#7B61FF' ? '123,97,255' : '148,163,184'},0.06);border:1px solid rgba(${info.color === '#00FF94' ? '0,255,148' : info.color === '#00E5FF' ? '0,229,255' : info.color === '#7B61FF' ? '123,97,255' : '148,163,184'},0.15);border-radius:12px;padding:16px 20px;text-align:center;">
+                      <p style="margin:0;font-size:14px;color:#CBD5E1;line-height:1.6;">${info.message}</p>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- CTA -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                  <tr>
+                    <td align="center">
+                      <a href="${applicationsUrl}" style="display:inline-block;background:linear-gradient(135deg,#00E5FF,#7B61FF);color:#000000;font-weight:900;font-size:15px;padding:14px 36px;border-radius:50px;text-decoration:none;letter-spacing:0.3px;">
+                        View My Applications →
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background-color:#0B1020;border-top:1px solid rgba(255,255,255,0.06);padding:24px 40px;text-align:center;">
+                <p style="margin:0 0 6px;font-size:12px;color:#475569;">
+                  <strong style="color:#00E5FF;">DENARIXX AFRICA AI</strong> · Headquartered in Ghana, building for 54 nations
+                </p>
+                <p style="margin:0;font-size:11px;color:#334155;">
+                  You're receiving this because you applied for jobs at ${domain}
+                </p>
+              </td>
+            </tr>
+
+          </td>
+        </tr>
+
+        <!-- Bottom spacer -->
+        <tr><td style="padding-top:24px;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#334155;">© ${new Date().getFullYear()} DENARIXX AFRICA AI. All rights reserved.</p>
+        </td></tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
+
+  return { subject, html };
+}
+
+export async function sendApplicationStatusEmail(params: {
+  name: string | null;
+  email: string;
+  jobTitle: string;
+  company: string;
+  status: string;
+}): Promise<void> {
+  const client = getResend();
+  if (!client) return;
+
+  const { subject, html } = buildApplicationStatusEmail(params);
+
+  await client.emails.send({
+    from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+    to: [params.email],
+    subject,
+    html,
+  });
+}
+
 export async function sendWelcomeEmail(params: {
   name: string | null;
   email: string;
