@@ -681,6 +681,95 @@ router.patch("/:id/moderate", requireAuth, async (req, res) => {
   }
 });
 
+// ── PATCH /api/jobs/:id ────────────────────────────────────────────────────────
+// Employer updates their own listing's fields. Admin can edit any listing.
+// Editing resets moderationStatus to "pending" so the listing is re-reviewed.
+
+router.patch("/:id", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const jobId = Number(String(req.params.id));
+  if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
+
+  const { title, company, location, description, requiredSkills, salary, jobType, level, remoteType, country } =
+    req.body as {
+      title?: string;
+      company?: string;
+      location?: string;
+      description?: string;
+      requiredSkills?: string[];
+      salary?: string | null;
+      jobType?: string;
+      level?: string;
+      remoteType?: string;
+      country?: string | null;
+    };
+
+  try {
+    const [user] = await db.select({ id: usersTable.id, userType: usersTable.userType }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const [job] = await db.select({ id: jobs.id, postedByUserId: jobs.postedByUserId }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+
+    const isOwner = job.postedByUserId === user.id;
+    const isAdmin = user.userType === "admin";
+    if (!isOwner && !isAdmin) { res.status(403).json({ error: "You can only edit your own listings" }); return; }
+
+    const updates: Record<string, unknown> = {};
+    if (title?.trim()) updates.title = title.trim();
+    if (company?.trim()) updates.company = company.trim();
+    if (location?.trim()) updates.location = location.trim();
+    if (description?.trim()) updates.description = description.trim();
+    if (Array.isArray(requiredSkills)) updates.requiredSkills = requiredSkills.filter(Boolean);
+    if ("salary" in req.body) updates.salary = salary ?? null;
+    if (jobType) updates.jobType = jobType;
+    if (level) updates.level = level;
+    if (remoteType) updates.remoteType = remoteType;
+    if ("country" in req.body) updates.country = country ?? null;
+
+    if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No fields to update" }); return; }
+
+    // Reset moderation so admin can review edits
+    if (!isAdmin) updates.moderationStatus = "pending";
+
+    const [updated] = await db.update(jobs).set(updates).where(eq(jobs.id, jobId)).returning();
+    if (!updated) { res.status(404).json({ error: "Job not found" }); return; }
+
+    res.json({ job: updated });
+  } catch (err) {
+    req.log.error({ err }, "Failed to update job listing");
+    res.status(500).json({ error: "Failed to update listing" });
+  }
+});
+
+// ── DELETE /api/jobs/:id ───────────────────────────────────────────────────────
+// Employer closes/removes their own listing. Admin can delete any listing.
+// Soft-deletes (isActive=false) to preserve application history.
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const jobId = Number(String(req.params.id));
+  if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
+
+  try {
+    const [user] = await db.select({ id: usersTable.id, userType: usersTable.userType }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const [job] = await db.select({ id: jobs.id, postedByUserId: jobs.postedByUserId }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+
+    const isOwner = job.postedByUserId === user.id;
+    const isAdmin = user.userType === "admin";
+    if (!isOwner && !isAdmin) { res.status(403).json({ error: "You can only close your own listings" }); return; }
+
+    await db.update(jobs).set({ isActive: false }).where(eq(jobs.id, jobId));
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to close job listing");
+    res.status(500).json({ error: "Failed to close listing" });
+  }
+});
+
 // ── GET /api/jobs/my-applications ─────────────────────────────────────────────
 
 router.get("/my-applications", requireAuth, async (req, res) => {

@@ -27,6 +27,8 @@ import {
   FileText,
   User,
   Mail,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -345,6 +347,228 @@ function ApplicantsModal({
   );
 }
 
+function EditJobModal({
+  job,
+  onClose,
+  onSuccess,
+}: {
+  job: MyJob;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [form, setFormState] = useState<PostJobPayload>({
+    title: job.title,
+    company: job.company,
+    location: job.location,
+    description: "",
+    requiredSkills: "",
+    salary: job.salary ?? "",
+    jobType: job.jobType,
+    level: job.level,
+    remoteType: job.remoteType ?? "on-site",
+    country: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(`${BASE}/api/jobs/${job.id}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          const j = data.job ?? data;
+          setFormState({
+            title: j.title ?? job.title,
+            company: j.company ?? job.company,
+            location: j.location ?? job.location,
+            description: j.description ?? "",
+            requiredSkills: Array.isArray(j.requiredSkills) ? j.requiredSkills.join(", ") : "",
+            salary: j.salary ?? "",
+            jobType: j.jobType ?? job.jobType,
+            level: j.level ?? job.level,
+            remoteType: j.remoteType ?? job.remoteType ?? "on-site",
+            country: j.country ?? "",
+          });
+        }
+      } catch {}
+      setLoadingDetails(false);
+    }
+    load();
+  }, [job.id]);
+
+  function set(key: keyof PostJobPayload, value: string) {
+    setFormState((f) => ({ ...f, [key]: value }));
+    setFieldError(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim() || !form.company.trim() || !form.location.trim() || !form.description.trim()) {
+      setFieldError("Title, company, location, and description are required.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${BASE}/api/jobs/${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...form,
+          requiredSkills: form.requiredSkills.split(",").map((s) => s.trim()).filter(Boolean),
+          salary: form.salary || null,
+          country: form.country || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Failed to update job");
+      }
+      toast({ title: "Listing updated", description: "Your changes have been submitted for re-review." });
+      onSuccess();
+      onClose();
+    } catch (e: any) {
+      setFieldError(e.message ?? "Something went wrong");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const inputClass =
+    "w-full px-3 py-2.5 rounded-xl bg-background/60 border border-border text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition";
+  const labelClass = "block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+      >
+        <div className="flex items-center justify-between p-6 border-b border-border">
+          <div>
+            <h2 className="text-xl font-bold">Edit Listing</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Changes will be re-reviewed before going live.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loadingDetails ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            <span>Loading…</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Job Title *</label>
+                <input className={inputClass} value={form.title} onChange={(e) => set("title", e.target.value)} required />
+              </div>
+              <div>
+                <label className={labelClass}>Company *</label>
+                <input className={inputClass} value={form.company} onChange={(e) => set("company", e.target.value)} required />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Location *</label>
+                <input className={inputClass} value={form.location} onChange={(e) => set("location", e.target.value)} required />
+              </div>
+              <div>
+                <label className={labelClass}>Country</label>
+                <input className={inputClass} placeholder="e.g. Nigeria" value={form.country} onChange={(e) => set("country", e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Description *</label>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={5}
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Required Skills</label>
+              <input
+                className={inputClass}
+                placeholder="Comma-separated, e.g. React, TypeScript, Node.js"
+                value={form.requiredSkills}
+                onChange={(e) => set("requiredSkills", e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Salary / Compensation</label>
+              <input className={inputClass} placeholder="e.g. $3,000–5,000/month" value={form.salary} onChange={(e) => set("salary", e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Job Type</label>
+                <select className={inputClass} value={form.jobType} onChange={(e) => set("jobType", e.target.value)}>
+                  <option value="full-time">Full-time</option>
+                  <option value="part-time">Part-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Level</label>
+                <select className={inputClass} value={form.level} onChange={(e) => set("level", e.target.value)}>
+                  <option value="junior">Junior</option>
+                  <option value="mid">Mid</option>
+                  <option value="senior">Senior</option>
+                  <option value="executive">Executive</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Work Mode</label>
+                <select className={inputClass} value={form.remoteType} onChange={(e) => set("remoteType", e.target.value)}>
+                  <option value="on-site">On-site</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="remote">Remote</option>
+                </select>
+              </div>
+            </div>
+
+            {fieldError && (
+              <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-2.5">
+                {fieldError}
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
+              <Button type="submit" disabled={submitting} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
+                {submitting ? (
+                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                ) : (
+                  <><Pencil className="w-4 h-4 mr-2" />Save Changes</>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 function PostJobModal({
   onClose,
   onSuccess,
@@ -572,7 +796,17 @@ function PostJobModal({
   );
 }
 
-function JobCard({ job, onViewApplicants }: { job: MyJob; onViewApplicants: (job: MyJob) => void }) {
+function JobCard({
+  job,
+  onViewApplicants,
+  onEdit,
+  onClose,
+}: {
+  job: MyJob;
+  onViewApplicants: (job: MyJob) => void;
+  onEdit: (job: MyJob) => void;
+  onClose: (job: MyJob) => void;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -656,6 +890,25 @@ function JobCard({ job, onViewApplicants }: { job: MyJob; onViewApplicants: (job
         <p className="mt-3 text-xs text-red-300/80 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
           This listing was not approved. Please review our guidelines and resubmit.
         </p>
+      )}
+
+      {job.isActive && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+          <button
+            onClick={() => onEdit(job)}
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-border hover:border-primary/40 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit
+          </button>
+          <button
+            onClick={() => onClose(job)}
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-destructive border border-border hover:border-destructive/40 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+            Close listing
+          </button>
+        </div>
       )}
     </motion.div>
   );
@@ -769,6 +1022,10 @@ function EmployerDashboardContent() {
   const [userType, setUserType] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<MyJob | null>(null);
+  const [editingJob, setEditingJob] = useState<MyJob | null>(null);
+  const [closingJob, setClosingJob] = useState<MyJob | null>(null);
+  const [closing, setClosing] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     async function loadProfile() {
@@ -804,6 +1061,24 @@ function EmployerDashboardContent() {
       fetchJobs();
     }
   }, [userType]);
+
+  async function handleCloseJob(job: MyJob) {
+    setClosing(true);
+    try {
+      const res = await fetch(`${BASE}/api/jobs/${job.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to close listing");
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, isActive: false } : j));
+      toast({ title: "Listing closed", description: `"${job.title}" has been removed from the job board.` });
+    } catch (e: any) {
+      toast({ title: "Failed to close listing", description: e.message, variant: "destructive" });
+    } finally {
+      setClosing(false);
+      setClosingJob(null);
+    }
+  }
 
   if (profileLoading) {
     return (
@@ -951,7 +1226,13 @@ function EmployerDashboardContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence>
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} onViewApplicants={setSelectedJob} />
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onViewApplicants={setSelectedJob}
+                  onEdit={setEditingJob}
+                  onClose={setClosingJob}
+                />
               ))}
             </AnimatePresence>
           </div>
@@ -968,11 +1249,63 @@ function EmployerDashboardContent() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {editingJob && (
+          <EditJobModal
+            job={editingJob}
+            onClose={() => setEditingJob(null)}
+            onSuccess={fetchJobs}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {selectedJob && (
           <ApplicantsModal
             job={selectedJob}
             onClose={() => setSelectedJob(null)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {closingJob && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-card border border-border rounded-2xl w-full max-w-sm shadow-2xl p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-base">Close listing?</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">This will remove it from the job board.</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                <span className="font-medium text-foreground">"{closingJob.title}"</span> will no longer be visible to candidates. Application history is preserved.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setClosingJob(null)} className="flex-1" disabled={closing}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleCloseJob(closingJob)}
+                  disabled={closing}
+                  className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {closing ? (
+                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Closing…</>
+                  ) : (
+                    <><Trash2 className="w-4 h-4 mr-2" />Close listing</>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
