@@ -11,6 +11,12 @@ export const jobs = pgTable("jobs", {
   jobType: text("job_type").notNull().default("full-time"),
   level: text("level").notNull().default("mid"),
   isActive: boolean("is_active").notNull().default(true),
+  // Employer / source metadata
+  source: text("source"),               // "denarixx" | company slug | "external"
+  externalApplyUrl: text("external_apply_url"), // null = internal Denarixx flow
+  postedDate: timestamp("posted_date", { withTimezone: true }),
+  remoteType: text("remote_type"),      // "remote" | "hybrid" | "on-site"
+  country: text("country"),             // primary country (null for fully remote)
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

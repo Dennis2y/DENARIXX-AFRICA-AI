@@ -37,93 +37,348 @@ function inferLevel(roleStr: string | null | undefined): Level | null {
 }
 
 function computeMatch(
-  job: { requiredSkills: string[]; level: string; location: string; title: string },
+  job: { requiredSkills: string[]; level: string; location: string; title: string; remoteType?: string | null },
   userSkills: string[],
   userLocation?: string | null,
   userRole?: string | null,
+  targetJobTitle?: string | null,
+  cvSkills?: string[],
 ): { matchScore: number; matchedSkills: string[]; missingSkills: string[] } {
-  if (!userSkills.length) return { matchScore: 0, matchedSkills: [], missingSkills: job.requiredSkills };
+  // Merge profile skills with any additional CV-extracted skills
+  const allSkills = [...new Set([...userSkills, ...(cvSkills ?? [])])];
+  if (!allSkills.length) return { matchScore: 0, matchedSkills: [], missingSkills: job.requiredSkills };
 
   const required = job.requiredSkills.map(s => s.toLowerCase());
-  const userSkillsLower = userSkills.map(s => s.toLowerCase());
+  const allSkillsLower = allSkills.map(s => s.toLowerCase());
 
   // Skills: up to 60 points
-  const matchedLower = required.filter(r => userSkillsLower.some(u => u.includes(r) || r.includes(u)));
-  const missingLower = required.filter(r => !userSkillsLower.some(u => u.includes(r) || r.includes(u)));
+  const matchedLower = required.filter(r => allSkillsLower.some(u => u.includes(r) || r.includes(u)));
+  const missingLower = required.filter(r => !allSkillsLower.some(u => u.includes(r) || r.includes(u)));
   const skillScore = required.length > 0 ? (matchedLower.length / required.length) * 60 : 30;
 
   // Location: up to 15 points
   let locationScore = 0;
-  const jobLoc = job.location.toLowerCase();
-  if (jobLoc.includes("remote")) {
+  const jobIsRemote = job.remoteType === "remote" || job.location.toLowerCase().includes("remote");
+  if (jobIsRemote) {
     locationScore = 15;
   } else if (userLocation) {
     const userLoc = userLocation.toLowerCase();
+    const jobLoc = job.location.toLowerCase();
     const userCountry = userLoc.split(",").pop()?.trim() ?? userLoc;
     if (userCountry && jobLoc.includes(userCountry)) locationScore = 15;
-    else locationScore = 5;
+    else locationScore = 3;
   }
 
-  // Experience level: up to 15 points (inferred from user role string)
+  // Experience level: up to 15 points (inferred from user role or explicit target)
   let levelScore = 0;
-  const userLevel = inferLevel(userRole);
+  const effectiveRole = targetJobTitle ?? userRole;
+  const userLevel = inferLevel(effectiveRole);
   const jobLevel = job.level.toLowerCase() as Level;
   if (userLevel && LEVELS.includes(jobLevel)) {
     const diff = Math.abs(LEVELS.indexOf(userLevel) - LEVELS.indexOf(jobLevel));
     if (diff === 0) levelScore = 15;
     else if (diff === 1) levelScore = 8;
-    // diff >= 2: 0 pts
   }
 
-  // Target role title match: up to 10 points
+  // Target job title match: up to 10 points
   let roleScore = 0;
-  if (userRole) {
-    const userRoleLower = userRole.toLowerCase();
+  if (effectiveRole) {
+    const roleLower = effectiveRole.toLowerCase();
     const jobTitleLower = job.title.toLowerCase();
-    if (jobTitleLower.includes(userRoleLower) || userRoleLower.includes(jobTitleLower)) {
+    if (jobTitleLower.includes(roleLower) || roleLower.includes(jobTitleLower)) {
       roleScore = 10;
     } else {
-      const words = userRoleLower.split(/\s+/).filter(w => w.length > 3 && !["senior", "junior", "lead"].includes(w));
+      const words = roleLower.split(/\s+/).filter(w => w.length > 3 && !["senior", "junior", "lead", "staff"].includes(w));
       const hits = words.filter(w => jobTitleLower.includes(w));
       roleScore = Math.round((hits.length / Math.max(1, words.length)) * 10);
     }
   }
 
   const total = Math.min(100, Math.round(skillScore + locationScore + levelScore + roleScore));
-  const matchedSkills = job.requiredSkills.filter(s => matchedLower.includes(s.toLowerCase()));
-  const missingSkills = job.requiredSkills.filter(s => missingLower.includes(s.toLowerCase()));
+  // Use profile skills for matched/missing display (not CV extras — they're a bonus)
+  const profileSkillsLower = userSkills.map(s => s.toLowerCase());
+  const matchedSkills = job.requiredSkills.filter(s => allSkillsLower.some(u => u.includes(s.toLowerCase()) || s.toLowerCase().includes(u)));
+  const missingSkills = job.requiredSkills.filter(s => !allSkillsLower.some(u => u.includes(s.toLowerCase()) || s.toLowerCase().includes(u)));
   return { matchScore: total, matchedSkills, missingSkills };
 }
 
-// ── Seed ─────────────────────────────────────────────────────────────────────
+// ── Seed data ─────────────────────────────────────────────────────────────────
 
 const SEED_JOBS = [
-  { title: "Senior Frontend Engineer", company: "Andela", location: "Remote, Africa", description: "Join Africa's largest talent accelerator building world-class engineering teams. You'll work with US and European companies on cutting-edge products.", requiredSkills: ["React", "TypeScript", "CSS", "JavaScript"], salary: "$4,000–6,000/month", jobType: "full-time", level: "senior" },
-  { title: "Data Scientist", company: "Flutterwave", location: "Lagos, Nigeria", description: "Help Africa's leading fintech company make sense of millions of payment transactions through machine learning and advanced analytics.", requiredSkills: ["Python", "Machine Learning", "SQL", "Data Analysis"], salary: "₦600,000–900,000/month", jobType: "full-time", level: "mid" },
-  { title: "Product Designer (UI/UX)", company: "M-Pesa Africa", location: "Nairobi, Kenya", description: "Shape the digital financial experiences of 50+ million mobile money users across Africa. Own end-to-end design for mobile and web products.", requiredSkills: ["UI/UX Design", "Figma", "User Research", "Prototyping"], salary: "KES 250,000–400,000/month", jobType: "full-time", level: "mid" },
-  { title: "Backend Engineer (Node.js)", company: "Paystack", location: "Lagos, Nigeria (Hybrid)", description: "Build and scale the payments infrastructure that powers thousands of African businesses. Work on high-throughput systems handling billions in transactions.", requiredSkills: ["Node.js", "JavaScript", "PostgreSQL", "System Design"], salary: "₦500,000–800,000/month", jobType: "full-time", level: "mid" },
-  { title: "AI/ML Engineer", company: "InstaDeep", location: "Tunis, Tunisia (Remote-friendly)", description: "Work on cutting-edge AI research and deployment for industrial applications. InstaDeep is a global AI company headquartered in Africa.", requiredSkills: ["Python", "Machine Learning", "Deep Learning", "PyTorch"], salary: "$3,500–5,500/month", jobType: "full-time", level: "mid" },
-  { title: "Digital Marketing Manager", company: "Jumia", location: "Cairo, Egypt", description: "Lead performance marketing campaigns for Africa's largest e-commerce platform. Drive user acquisition, retention and revenue across multiple African markets.", requiredSkills: ["Digital Marketing", "SEO", "Data Analysis", "Social Media"], salary: "$2,000–3,500/month", jobType: "full-time", level: "senior" },
-  { title: "Mobile Developer (React Native)", company: "Chipper Cash", location: "Remote, Africa", description: "Build mobile payment experiences for Chipper Cash users across 7 African countries. Handle real-money flows and ensure a seamless cross-border transfer experience.", requiredSkills: ["React Native", "JavaScript", "TypeScript", "Mobile Development"], salary: "$3,000–5,000/month", jobType: "full-time", level: "mid" },
-  { title: "DevOps / Cloud Engineer", company: "Safaricom PLC", location: "Nairobi, Kenya", description: "Build and maintain the cloud infrastructure powering Kenya's leading telco and digital services platform, including M-Pesa.", requiredSkills: ["AWS", "Kubernetes", "Docker", "CI/CD", "Linux"], salary: "KES 300,000–500,000/month", jobType: "full-time", level: "mid" },
-  { title: "Product Manager", company: "Wave Mobile Money", location: "Dakar, Senegal", description: "Lead product strategy for Wave's fastest-growing African markets. Wave is disrupting mobile money with zero fees and an exceptional UX.", requiredSkills: ["Product Management", "Agile", "User Research", "Data Analysis"], salary: "$4,000–7,000/month", jobType: "full-time", level: "senior" },
-  { title: "Junior Software Developer", company: "Turing", location: "Remote", description: "Entry-level opportunity to work with top US companies via Turing's talent platform. Comprehensive onboarding and mentorship included.", requiredSkills: ["JavaScript", "Python", "SQL"], salary: "$1,500–2,500/month", jobType: "full-time", level: "junior" },
-  { title: "Cybersecurity Analyst", company: "Standard Bank Group", location: "Johannesburg, South Africa", description: "Protect one of Africa's largest banking groups from cyber threats. Work on threat detection, incident response, and security architecture.", requiredSkills: ["Cybersecurity", "Network Security", "SIEM", "Linux"], salary: "R 45,000–70,000/month", jobType: "full-time", level: "mid" },
-  { title: "Full-Stack Developer (Contract)", company: "Remoteli.io", location: "Remote", description: "Contract roles connecting African tech talent with remote-first companies globally. Flexible 3–12 month engagements with top clients.", requiredSkills: ["JavaScript", "React", "Node.js", "PostgreSQL"], salary: "$30–60/hour", jobType: "contract", level: "mid" },
+  // ── External listings (apply on company's site) ──────────────────────────
+  {
+    title: "Senior Frontend Engineer",
+    company: "Andela",
+    location: "Remote, Africa",
+    description: "Join Africa's largest talent accelerator building world-class engineering teams. You'll work with US and European companies on cutting-edge products. Andela vets and places top African developers with global tech companies.",
+    requiredSkills: ["React", "TypeScript", "CSS", "JavaScript"],
+    salary: "$4,000–6,000/month",
+    jobType: "full-time",
+    level: "senior",
+    source: "andela",
+    externalApplyUrl: "https://www.andela.com/talent/",
+    postedDate: new Date("2026-06-05"),
+    remoteType: "remote",
+    country: null,
+  },
+  {
+    title: "Data Scientist",
+    company: "Flutterwave",
+    location: "Lagos, Nigeria",
+    description: "Help Africa's leading fintech company make sense of millions of payment transactions through machine learning and advanced analytics. You'll build models that directly impact fraud detection and risk scoring.",
+    requiredSkills: ["Python", "Machine Learning", "SQL", "Data Analysis"],
+    salary: "₦600,000–900,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "flutterwave",
+    externalApplyUrl: "https://flutterwave.com/us/careers",
+    postedDate: new Date("2026-06-03"),
+    remoteType: "on-site",
+    country: "Nigeria",
+  },
+  {
+    title: "Product Designer (UI/UX)",
+    company: "M-Pesa Africa",
+    location: "Nairobi, Kenya",
+    description: "Shape the digital financial experiences of 50+ million mobile money users across Africa. Own end-to-end design for mobile and web products — from discovery and wireframes to high-fidelity prototypes.",
+    requiredSkills: ["UI/UX Design", "Figma", "User Research", "Prototyping"],
+    salary: "KES 250,000–400,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "safaricom",
+    externalApplyUrl: "https://www.safaricom.co.ke/careers",
+    postedDate: new Date("2026-06-08"),
+    remoteType: "on-site",
+    country: "Kenya",
+  },
+  {
+    title: "Backend Engineer (Node.js)",
+    company: "Paystack",
+    location: "Lagos, Nigeria (Hybrid)",
+    description: "Build and scale the payments infrastructure that powers thousands of African businesses. Work on high-throughput systems handling billions in transactions. Paystack is a Stripe company.",
+    requiredSkills: ["Node.js", "JavaScript", "PostgreSQL", "System Design"],
+    salary: "₦500,000–800,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "paystack",
+    externalApplyUrl: "https://paystack.com/careers",
+    postedDate: new Date("2026-06-01"),
+    remoteType: "hybrid",
+    country: "Nigeria",
+  },
+  {
+    title: "AI/ML Engineer",
+    company: "InstaDeep",
+    location: "Tunis, Tunisia (Remote-friendly)",
+    description: "Work on cutting-edge AI research and deployment for industrial applications. InstaDeep is a global AI company headquartered in Africa, with offices in London, Paris, and Cape Town.",
+    requiredSkills: ["Python", "Machine Learning", "Deep Learning", "PyTorch"],
+    salary: "$3,500–5,500/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "instadeep",
+    externalApplyUrl: "https://www.instadeep.com/careers/",
+    postedDate: new Date("2026-06-10"),
+    remoteType: "hybrid",
+    country: "Tunisia",
+  },
+  {
+    title: "Digital Marketing Manager",
+    company: "Jumia",
+    location: "Cairo, Egypt",
+    description: "Lead performance marketing campaigns for Africa's largest e-commerce platform. Drive user acquisition, retention, and revenue across multiple African markets using data-driven strategies.",
+    requiredSkills: ["Digital Marketing", "SEO", "Data Analysis", "Social Media"],
+    salary: "$2,000–3,500/month",
+    jobType: "full-time",
+    level: "senior",
+    source: "jumia",
+    externalApplyUrl: "https://group.jumia.com/careers",
+    postedDate: new Date("2026-06-04"),
+    remoteType: "on-site",
+    country: "Egypt",
+  },
+  {
+    title: "Mobile Developer (React Native)",
+    company: "Chipper Cash",
+    location: "Remote, Africa",
+    description: "Build mobile payment experiences for Chipper Cash users across 7 African countries. Handle real-money flows and ensure a seamless cross-border transfer experience on iOS and Android.",
+    requiredSkills: ["React Native", "JavaScript", "TypeScript", "Mobile Development"],
+    salary: "$3,000–5,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "chippercash",
+    externalApplyUrl: "https://chippercash.com/careers",
+    postedDate: new Date("2026-06-07"),
+    remoteType: "remote",
+    country: null,
+  },
+  {
+    title: "DevOps / Cloud Engineer",
+    company: "Safaricom PLC",
+    location: "Nairobi, Kenya",
+    description: "Build and maintain the cloud infrastructure powering Kenya's leading telco and digital services platform, including M-Pesa. Own reliability, automation, and cost optimisation for production systems.",
+    requiredSkills: ["AWS", "Kubernetes", "Docker", "CI/CD", "Linux"],
+    salary: "KES 300,000–500,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "safaricom",
+    externalApplyUrl: "https://www.safaricom.co.ke/careers",
+    postedDate: new Date("2026-06-02"),
+    remoteType: "on-site",
+    country: "Kenya",
+  },
+  {
+    title: "Product Manager",
+    company: "Wave Mobile Money",
+    location: "Dakar, Senegal",
+    description: "Lead product strategy for Wave's fastest-growing African markets. Wave is disrupting mobile money with zero fees and an exceptional UX across Senegal, Côte d'Ivoire, Uganda, and Tanzania.",
+    requiredSkills: ["Product Management", "Agile", "User Research", "Data Analysis"],
+    salary: "$4,000–7,000/month",
+    jobType: "full-time",
+    level: "senior",
+    source: "wave",
+    externalApplyUrl: "https://www.wave.com/en/careers/",
+    postedDate: new Date("2026-06-06"),
+    remoteType: "on-site",
+    country: "Senegal",
+  },
+  {
+    title: "Junior Software Developer",
+    company: "Turing",
+    location: "Remote",
+    description: "Entry-level opportunity to work with top US companies via Turing's talent platform. Comprehensive onboarding and mentorship included. Turing matches African developers with Silicon Valley companies.",
+    requiredSkills: ["JavaScript", "Python", "SQL"],
+    salary: "$1,500–2,500/month",
+    jobType: "full-time",
+    level: "junior",
+    source: "turing",
+    externalApplyUrl: "https://www.turing.com/jobs/",
+    postedDate: new Date("2026-06-09"),
+    remoteType: "remote",
+    country: null,
+  },
+  {
+    title: "Cybersecurity Analyst",
+    company: "Standard Bank Group",
+    location: "Johannesburg, South Africa",
+    description: "Protect one of Africa's largest banking groups from cyber threats. Work on threat detection, incident response, and security architecture across 20 African countries.",
+    requiredSkills: ["Cybersecurity", "Network Security", "SIEM", "Linux"],
+    salary: "R 45,000–70,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "standardbank",
+    externalApplyUrl: "https://careers.standardbank.com/",
+    postedDate: new Date("2026-06-03"),
+    remoteType: "on-site",
+    country: "South Africa",
+  },
+  {
+    title: "Full-Stack Developer (Contract)",
+    company: "Remoteli.io",
+    location: "Remote",
+    description: "Contract roles connecting African tech talent with remote-first companies globally. Flexible 3–12 month engagements with top clients. Remoteli specialises in placing African developers in international contract roles.",
+    requiredSkills: ["JavaScript", "React", "Node.js", "PostgreSQL"],
+    salary: "$30–60/hour",
+    jobType: "contract",
+    level: "mid",
+    source: "remoteli",
+    externalApplyUrl: "https://remoteli.io/jobs",
+    postedDate: new Date("2026-06-11"),
+    remoteType: "remote",
+    country: null,
+  },
+  // ── DENARIXX-internal listings (apply via Denarixx) ──────────────────────
+  {
+    title: "Full-Stack Engineer",
+    company: "DENARIXX",
+    location: "Remote, Africa",
+    description: "Help build Africa's AI Operating System. You'll work across the entire stack — React frontend, Express/Node backend, PostgreSQL database — shipping features that empower African professionals with AI tools.",
+    requiredSkills: ["React", "TypeScript", "Node.js", "PostgreSQL", "REST APIs"],
+    salary: "$2,500–4,000/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "denarixx",
+    externalApplyUrl: null,
+    postedDate: new Date("2026-06-12"),
+    remoteType: "remote",
+    country: null,
+  },
+  {
+    title: "AI Prompt Engineer",
+    company: "DENARIXX",
+    location: "Remote, Africa",
+    description: "Design and optimise the prompts powering DENARIXX's AI features — CV generation, job matching, interview coaching, and more. You'll work closely with product and engineering to craft prompts that deliver reliable, high-quality results.",
+    requiredSkills: ["Prompt Engineering", "Python", "OpenAI API", "Data Analysis"],
+    salary: "$2,000–3,500/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "denarixx",
+    externalApplyUrl: null,
+    postedDate: new Date("2026-06-12"),
+    remoteType: "remote",
+    country: null,
+  },
+  {
+    title: "Growth & Partnerships Lead",
+    company: "DENARIXX",
+    location: "Remote, Africa",
+    description: "Drive user growth and build partnerships with African universities, bootcamps, and tech communities. Own our go-to-market strategy across key African markets including Nigeria, Kenya, Ghana, South Africa, and Egypt.",
+    requiredSkills: ["Growth Marketing", "Partnerships", "Digital Marketing", "Data Analysis"],
+    salary: "$2,000–3,500/month",
+    jobType: "full-time",
+    level: "mid",
+    source: "denarixx",
+    externalApplyUrl: null,
+    postedDate: new Date("2026-06-12"),
+    remoteType: "remote",
+    country: null,
+  },
 ];
 
 async function ensureJobsSeeded() {
   try {
-    const existing = await db.select({ id: jobs.id }).from(jobs).limit(1);
-    if (existing.length === 0) await db.insert(jobs).values(SEED_JOBS);
+    const existing = await db.select({ id: jobs.id, title: jobs.title, company: jobs.company, source: jobs.source }).from(jobs);
+
+    if (existing.length === 0) {
+      await db.insert(jobs).values(SEED_JOBS);
+      return;
+    }
+
+    const existingKeys = new Set(existing.map(j => `${j.title}||${j.company}`));
+    const needsMigration = existing.some(j => j.source === null);
+
+    // Insert any new seed jobs not yet in DB
+    const newSeeds = SEED_JOBS.filter(s => !existingKeys.has(`${s.title}||${s.company}`));
+    if (newSeeds.length > 0) await db.insert(jobs).values(newSeeds);
+
+    // Backfill metadata fields for existing rows missing `source`
+    if (needsMigration) {
+      for (const seed of SEED_JOBS) {
+        if (existingKeys.has(`${seed.title}||${seed.company}`)) {
+          await db.update(jobs)
+            .set({
+              source: seed.source ?? null,
+              externalApplyUrl: seed.externalApplyUrl ?? null,
+              postedDate: seed.postedDate ?? null,
+              remoteType: seed.remoteType ?? null,
+              country: seed.country ?? null,
+            })
+            .where(and(eq(jobs.title, seed.title), eq(jobs.company, seed.company)));
+        }
+      }
+    }
   } catch {}
 }
 ensureJobsSeeded();
 
 // ── GET /api/jobs ─────────────────────────────────────────────────────────────
+// Query params: ?targetTitle=<string> ?cvSkills=<comma-separated>
 
 router.get("/", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
+  const targetTitle = (req.query.targetTitle as string | undefined) || null;
+  const cvSkillsRaw = (req.query.cvSkills as string | undefined) || "";
+  const cvSkills = cvSkillsRaw ? cvSkillsRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
+
   try {
     const allJobs = await db.select().from(jobs).where(eq(jobs.isActive, true));
     let userSkills: string[] = [];
@@ -147,12 +402,14 @@ router.get("/", async (req, res) => {
       }
     }
 
+    const hasMatchContext = userSkills.length > 0 || cvSkills.length > 0;
+
     const jobsWithMatch = allJobs.map(job => {
       let matchScore: number | null = null;
       let matchedSkills: string[] = [];
       let missingSkills: string[] = job.requiredSkills;
-      if (userSkills.length > 0) {
-        const result = computeMatch(job, userSkills, userLocation, userRole);
+      if (hasMatchContext) {
+        const result = computeMatch(job, userSkills, userLocation, userRole, targetTitle, cvSkills);
         matchScore = result.matchScore;
         matchedSkills = result.matchedSkills;
         missingSkills = result.missingSkills;
@@ -185,6 +442,7 @@ router.get("/my-applications", requireAuth, async (req, res) => {
       coverLetter: jobApplications.coverLetter, appliedAt: jobApplications.appliedAt,
       title: jobs.title, company: jobs.company, location: jobs.location,
       jobType: jobs.jobType, level: jobs.level, salary: jobs.salary,
+      externalApplyUrl: jobs.externalApplyUrl,
     })
       .from(jobApplications)
       .innerJoin(jobs, eq(jobApplications.jobId, jobs.id))
@@ -207,14 +465,12 @@ router.get("/saved", requireAuth, async (req, res) => {
       .from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.json({ jobs: [] }); return; }
 
-    const saved = await db.select({ jobId: savedJobs.jobId })
-      .from(savedJobs).where(eq(savedJobs.userId, user.id));
+    const saved = await db.select({ jobId: savedJobs.jobId }).from(savedJobs).where(eq(savedJobs.userId, user.id));
     const savedIds = saved.map(s => s.jobId);
     if (!savedIds.length) { res.json({ jobs: [] }); return; }
 
     const skillRows = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
     const userSkills = skillRows.map(s => s.skill);
-
     const apps = await db.select({ jobId: jobApplications.jobId }).from(jobApplications).where(eq(jobApplications.userId, user.id));
     const appliedIds = new Set(apps.map(a => a.jobId));
 
@@ -264,22 +520,13 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
     const [updated] = await db.update(jobApplications).set({ status }).where(eq(jobApplications.id, appId)).returning();
     res.json({ application: updated });
 
-    // Fire-and-forget email notification — fetch job details then send
     db.select({ title: jobs.title, company: jobs.company })
       .from(jobs).where(eq(jobs.id, app.jobId)).limit(1)
       .then(([job]) => {
         if (!job) return;
-        return sendApplicationStatusEmail({
-          name: user.name,
-          email: user.email,
-          jobTitle: job.title,
-          company: job.company,
-          status,
-        });
+        return sendApplicationStatusEmail({ name: user.name, email: user.email, jobTitle: job.title, company: job.company, status });
       })
-      .catch((emailErr) => {
-        req.log.error({ err: emailErr }, "Failed to send application status email");
-      });
+      .catch((emailErr) => { req.log.error({ err: emailErr }, "Failed to send application status email"); });
   } catch (err) {
     req.log.error({ err }, "Failed to update application status");
     res.status(500).json({ error: "Failed to update status" });
@@ -299,8 +546,13 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
     const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    const [job] = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    const [job] = await db.select({ id: jobs.id, externalApplyUrl: jobs.externalApplyUrl }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
     if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+
+    if (job.externalApplyUrl) {
+      res.status(400).json({ error: "This job uses an external application process.", externalApplyUrl: job.externalApplyUrl });
+      return;
+    }
 
     const [existing] = await db.select({ id: jobApplications.id })
       .from(jobApplications).where(and(eq(jobApplications.userId, user.id), eq(jobApplications.jobId, jobId))).limit(1);
@@ -327,7 +579,6 @@ router.post("/:id/save", requireAuth, async (req, res) => {
   try {
     const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
-
     await db.insert(savedJobs).values({ userId: user.id, jobId }).onConflictDoNothing();
     res.json({ saved: true });
   } catch (err) {
@@ -346,7 +597,6 @@ router.delete("/:id/save", requireAuth, async (req, res) => {
   try {
     const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
-
     await db.delete(savedJobs).where(and(eq(savedJobs.userId, user.id), eq(savedJobs.jobId, jobId)));
     res.json({ saved: false });
   } catch (err) {
@@ -356,10 +606,12 @@ router.delete("/:id/save", requireAuth, async (req, res) => {
 });
 
 // ── POST /api/jobs/:id/match-explain ─────────────────────────────────────────
+// Body: { cvText?: string; targetTitle?: string }
 
 router.post("/:id/match-explain", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const jobId = Number(req.params.id);
+  const { cvText, targetTitle } = req.body as { cvText?: string; targetTitle?: string };
   if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
 
   try {
@@ -372,19 +624,27 @@ router.post("/:id/match-explain", requireAuth, async (req, res) => {
 
     const skillRows = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
     const userSkills = skillRows.map(s => s.skill);
-    const { matchedSkills, missingSkills } = computeMatch(job, userSkills, user.location, user.role);
+
+    // Extract additional skills from CV text (keyword intersection with job skills)
+    const cvSkills: string[] = cvText
+      ? job.requiredSkills.filter(s => cvText.toLowerCase().includes(s.toLowerCase()))
+      : [];
+
+    const effectiveRole = targetTitle ?? user.role;
+    const { matchedSkills, missingSkills } = computeMatch(job, userSkills, user.location, user.role, effectiveRole, cvSkills);
 
     const openai = getOpenAISafe(res);
     if (!openai) return;
 
+    const cvNote = cvText ? `\nCV excerpt: ${cvText.slice(0, 600)}` : "";
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [{
         role: "system",
-        content: "You are a career coach. Analyze the job match and return ONLY a valid JSON object (no markdown):\n{\n  \"summary\": \"<2-sentence explanation of why this is a good or partial match>\",\n  \"suggestions\": [\"<3 specific, actionable steps to improve the match>\"]\n}",
+        content: "You are a career coach for African tech professionals. Analyze the job match and return ONLY a valid JSON object (no markdown):\n{\n  \"summary\": \"<2-sentence explanation of why this is a good or partial match>\",\n  \"suggestions\": [\"<3 specific, actionable steps to improve the match>\"]\n}",
       }, {
         role: "user",
-        content: `Job: ${job.title} at ${job.company}\nRequired skills: ${job.requiredSkills.join(", ")}\nUser skills: ${userSkills.join(", ")}\nMatched skills: ${matchedSkills.join(", ")}\nMissing skills: ${missingSkills.join(", ")}\nUser current role: ${user.role ?? "unknown"}`,
+        content: `Job: ${job.title} at ${job.company} (${job.level} level, ${job.location})\nRequired skills: ${job.requiredSkills.join(", ")}\nUser profile skills: ${userSkills.join(", ")}\nTarget role: ${effectiveRole ?? "not specified"}\nMatched skills: ${matchedSkills.join(", ") || "none"}\nMissing skills: ${missingSkills.join(", ") || "none"}${cvNote}`,
       }],
       temperature: 0.4,
       max_tokens: 400,
@@ -398,7 +658,7 @@ router.post("/:id/match-explain", requireAuth, async (req, res) => {
     res.json({ summary: parsed.summary ?? "", matchedSkills, missingSkills, suggestions: parsed.suggestions ?? [] });
   } catch (err: any) {
     req.log.error({ err }, "match-explain failed");
-    const msg = err?.status === 429 ? "Rate limit. Try again shortly." : "AI unavailable.";
+    const msg = err?.status === 429 ? "Rate limit — try again shortly." : "AI unavailable.";
     res.status(500).json({ error: msg });
   }
 });
@@ -408,6 +668,7 @@ router.post("/:id/match-explain", requireAuth, async (req, res) => {
 router.post("/:id/cover-letter", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const jobId = Number(req.params.id);
+  const { cvText } = req.body as { cvText?: string };
   if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
 
   try {
@@ -421,17 +682,19 @@ router.post("/:id/cover-letter", requireAuth, async (req, res) => {
     const skillRows = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
     const userSkills = skillRows.map(s => s.skill);
 
+    const cvNote = cvText ? `\nRelevant CV background:\n${cvText.slice(0, 800)}` : "";
+
     const openai = getOpenAISafe(res);
     if (!openai) return;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [{
         role: "system",
-        content: "You are an expert job application coach. Write a compelling, personalised 3-paragraph cover letter. Be specific about the company and role. Use a professional but warm tone. Return ONLY the cover letter text — no subject line, no date, no address block.",
+        content: "You are an expert job application coach specialising in African tech careers. Write a compelling, personalised 3-paragraph cover letter. Be specific about the company and role. Use a professional but warm tone. Return ONLY the cover letter text — no subject line, no date, no address block.",
       }, {
         role: "user",
-        content: `Candidate name: ${user.name ?? "Candidate"}\nCurrent role: ${user.role ?? "Professional"}\nSkills: ${userSkills.join(", ")}\n\nApplying for: ${job.title} at ${job.company} (${job.location})\nJob description: ${job.description}\nRequired skills: ${job.requiredSkills.join(", ")}`,
+        content: `Candidate name: ${user.name ?? "Candidate"}\nCurrent role: ${user.role ?? "Professional"}\nSkills: ${userSkills.join(", ")}${cvNote}\n\nApplying for: ${job.title} at ${job.company} (${job.location})\nJob description: ${job.description}\nRequired skills: ${job.requiredSkills.join(", ")}`,
       }],
       temperature: 0.7,
       max_tokens: 600,
@@ -441,7 +704,7 @@ router.post("/:id/cover-letter", requireAuth, async (req, res) => {
     res.json({ coverLetter });
   } catch (err: any) {
     req.log.error({ err }, "cover-letter generation failed");
-    const msg = err?.status === 429 ? "Rate limit. Try again shortly." : "AI unavailable.";
+    const msg = err?.status === 429 ? "Rate limit — try again shortly." : "AI unavailable.";
     res.status(500).json({ error: msg });
   }
 });
@@ -475,11 +738,11 @@ router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
     const openai = getOpenAISafe(res);
     if (!openai) return;
 
-    const systemPrompt = `You are an expert ATS and recruitment consultant. Analyse this CV against the job description for the target role.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords already present>],\n  "suggestions": [<3-5 actionable steps to improve the CV for this specific role>],\n  "tailoredSummary": "<2-3 sentence professional summary, tailored to this JD and target role>"\n}`;
+    const systemPrompt = `You are an expert ATS and recruitment consultant specialising in African tech careers. Analyse this CV against the job description for the target role.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords already present>],\n  "suggestions": [<3-5 actionable steps to improve the CV for this specific role>],\n  "tailoredSummary": "<2-3 sentence professional summary, tailored to this JD and target role>"\n}`;
     const userPrompt = `Target role: ${resolvedRole}\n\nCV:\n${cvContent.slice(0, 2500)}\n\n---\n\nJob: ${job.title} at ${job.company}\nJob Description: ${job.description}\nRequired Skills: ${job.requiredSkills.join(", ")}`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       temperature: 0.3,
       max_tokens: 900,
@@ -491,12 +754,10 @@ router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
     catch { const m = raw.match(/\{[\s\S]*\}/); if (m) try { parsed = JSON.parse(m[0]); } catch {} }
 
     if (!parsed) { res.status(500).json({ error: "Failed to parse AI response." }); return; }
-
-    // Return both tailoredSummary and tailoredCv (aliases) for forward compat
     res.json({ ...parsed, tailoredCv: parsed.tailoredSummary });
   } catch (err: any) {
     req.log.error({ err }, "tailor-cv failed");
-    const msg = err?.status === 429 ? "Rate limit. Try again shortly." : "AI unavailable.";
+    const msg = err?.status === 429 ? "Rate limit — try again shortly." : "AI unavailable.";
     res.status(500).json({ error: msg });
   }
 });
