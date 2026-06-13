@@ -147,15 +147,15 @@ function DashboardContent() {
           className="grid grid-cols-3 gap-4 mb-10"
         >
           {[
-            { label: "Skills", value: skillCount, icon: BookOpen },
-            { label: "Connections", value: acceptedConnections, icon: Users },
-            { label: "Applications", value: applicationCount, icon: Briefcase },
-          ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-xl border border-border bg-card p-4 text-center">
-              <Icon className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+            { label: "Skills", value: skillCount, icon: BookOpen, href: `${basePath}/profile` },
+            { label: "Connections", value: acceptedConnections, icon: Users, href: `${basePath}/skillswap` },
+            { label: "Applications", value: applicationCount, icon: Briefcase, href: `${basePath}/jobs?tab=applications` },
+          ].map(({ label, value, icon: Icon, href }) => (
+            <a key={label} href={href} className="rounded-xl border border-border bg-card p-4 text-center block hover:border-primary/40 transition-colors group">
+              <Icon className="w-5 h-5 text-muted-foreground mx-auto mb-1 group-hover:text-primary transition-colors" />
               <div className="text-2xl font-bold">{value}</div>
               <div className="text-xs text-muted-foreground">{label}</div>
-            </div>
+            </a>
           ))}
         </motion.div>
 

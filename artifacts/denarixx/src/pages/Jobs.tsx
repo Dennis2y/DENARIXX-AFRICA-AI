@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Show } from "@clerk/react";
-import { Redirect, Link } from "wouter";
+import { Redirect, Link, useSearch } from "wouter";
 import {
   Briefcase, MapPin, Clock, ChevronLeft, Search,
   Sparkles, CheckCircle, Send, Loader2, X, Star, TrendingUp,
@@ -619,7 +619,11 @@ function JobCard({
 function JobsContent() {
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<Tab>("browse");
+  const urlSearch = useSearch();
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = new URLSearchParams(urlSearch).get("tab");
+    return (["browse", "applications", "saved"].includes(t ?? "") ? t as Tab : "browse");
+  });
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [savedJobsList, setSavedJobsList] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -936,6 +940,16 @@ function JobsContent() {
                       </details>
                     )}
                     <StatusPipeline appId={app.id} currentStatus={app.status} onUpdate={handleStatusUpdate} />
+                    <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-4 flex-wrap">
+                      <a href={`${basePath}/dena`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
+                        <Sparkles className="w-3 h-3 text-primary" />Ask DENA for coaching
+                      </a>
+                      {app.externalApplyUrl && (
+                        <a href={app.externalApplyUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-400 transition-colors">
+                          <ExternalLink className="w-3 h-3" />View job posting
+                        </a>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

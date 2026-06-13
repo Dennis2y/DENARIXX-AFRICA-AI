@@ -1716,6 +1716,29 @@ function CvBuilderContent() {
                 </div>
               </div>
 
+              {/* Next steps CTA */}
+              <div className="mb-5 rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <Briefcase className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">CV saved — ready to find your next role?</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Your CV is used to boost AI match scores in Jobs AI.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Link to="/jobs">
+                    <Button size="sm" className="rounded-xl gap-1.5 bg-yellow-400/90 text-background hover:bg-yellow-400">
+                      <Briefcase className="w-3.5 h-3.5" />Search Jobs AI →
+                    </Button>
+                  </Link>
+                  <Link to="/interview-coach">
+                    <Button size="sm" variant="outline" className="rounded-xl gap-1.5 text-xs">
+                      <Zap className="w-3.5 h-3.5" />Practice Interview
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
               <div className="mb-5">
                 <h2 className="text-sm font-semibold mb-3 flex items-center gap-2"><Layout className="w-4 h-4 text-primary" />Choose Template</h2>
                 <div className="grid grid-cols-4 gap-3">

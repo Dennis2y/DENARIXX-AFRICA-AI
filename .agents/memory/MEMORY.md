@@ -1,5 +1,6 @@
 - [JIT User Provisioning](jit-user-provisioning.md) — GET /api/users/me must upsert on email, not plain INSERT — avoids duplicate key 500 on re-login.
 - [CV Builder wizard architecture](cv-builder-wizard.md) — 6-step wizard with import review modal, live preview panel, data cleanup pipeline; utilities are module-level before CvBuilderContent
-- [OpenAI model constraint](openai-model.md) — only gpt-3.5-turbo works; project blocks GPT-4 family models
+- [OpenAI model constraint](openai-model.md) — use gpt-4o-mini for all endpoints; gpt-4 family may be blocked
+- [Jobs.tsx naming conflict](jobs-naming-conflict.md) — `useSearch()` result must be named `urlSearch`, not `search` — conflicts with existing `const [search, setSearch]` job-filter state
 - [Jobs AI architecture](jobs-ai-architecture.md) — match scoring weights, saved_jobs table, localStorage CV key, Express route ordering for static-before-param
 - [Expo workflow health check](expo-workflow-health-check.md) — restart_workflow always fails for Expo mobile artifact; health check likely checks Expo dev domain, not localhost:24951; start workflow from Replit UI instead

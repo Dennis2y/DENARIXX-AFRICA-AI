@@ -400,10 +400,16 @@ function ProfileContent() {
               </Button>
 
               {saved && (
-                <p className="text-center text-sm text-muted-foreground">
-                  Profile saved.{" "}
-                  <Link to="/dashboard" className="text-primary hover:underline">Back to Dashboard →</Link>
-                </p>
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-green-400 font-medium flex items-center justify-center gap-1.5">
+                    <Check className="w-4 h-4" />Profile saved!
+                  </p>
+                  <div className="flex items-center justify-center gap-4 text-sm">
+                    <Link to="/dashboard" className="text-muted-foreground hover:text-foreground underline">Dashboard</Link>
+                    <span className="text-border">·</span>
+                    <Link to="/jobs" className="text-primary hover:underline font-medium">Find matching jobs →</Link>
+                  </div>
+                </div>
               )}
             </motion.div>
           </>
