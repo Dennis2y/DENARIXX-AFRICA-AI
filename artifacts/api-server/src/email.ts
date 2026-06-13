@@ -415,6 +415,163 @@ export async function sendApplicationStatusEmail(params: {
   });
 }
 
+function buildJobMatchEmail(params: {
+  name: string | null;
+  email: string;
+  jobTitle: string;
+  company: string;
+  location: string;
+  matchScore: number;
+  jobId: number;
+}): { subject: string; html: string } {
+  const { name, jobTitle, company, location, matchScore, jobId } = params;
+  const firstName = name ? name.trim().split(" ")[0] : "there";
+  const domain = getAppDomain();
+  const jobUrl = `${domain}/jobs?highlight=${jobId}`;
+
+  const subject = `🎯 New job match: ${jobTitle} at ${company} (${matchScore}% match)`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${subject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0B1020;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0B1020;padding:32px 16px;">
+  <tr>
+    <td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+              <tr>
+                <td style="background-color:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.3);border-radius:10px;padding:8px 16px;display:inline-block;">
+                  <span style="color:#00E5FF;font-size:20px;font-weight:900;letter-spacing:-0.5px;">DENARIXX<span style="color:#7B61FF;">.AI</span></span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Main card -->
+        <tr>
+          <td style="background-color:#111827;border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;">
+
+            <!-- Top accent bar -->
+            <tr>
+              <td style="background:linear-gradient(90deg,#00E5FF,#7B61FF);height:3px;display:block;"></td>
+            </tr>
+
+            <!-- Hero content -->
+            <tr>
+              <td style="padding:48px 40px 40px;">
+                <p style="margin:0 0 8px;font-size:40px;text-align:center;">🎯</p>
+                <h1 style="margin:0 0 12px;font-size:26px;font-weight:900;color:#FFFFFF;text-align:center;line-height:1.2;">
+                  New job match, ${firstName}!
+                </h1>
+                <p style="margin:0 0 32px;font-size:15px;color:#94A3B8;text-align:center;line-height:1.6;">
+                  A new opportunity just posted that matches your profile.
+                </p>
+
+                <!-- Match score badge -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                  <tr>
+                    <td style="text-align:center;">
+                      <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                        <tr>
+                          <td style="background:linear-gradient(135deg,rgba(0,229,255,0.15),rgba(123,97,255,0.15));border:1px solid rgba(0,229,255,0.3);border-radius:50px;padding:10px 28px;">
+                            <span style="color:#00E5FF;font-size:22px;font-weight:900;">${matchScore}% match</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Job info -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                  <tr>
+                    <td style="background-color:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px;">
+                      <p style="margin:0 0 4px;font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Position</p>
+                      <p style="margin:0 0 16px;font-size:20px;font-weight:900;color:#FFFFFF;">${jobTitle}</p>
+                      <p style="margin:0 0 4px;font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Company</p>
+                      <p style="margin:0 0 16px;font-size:15px;font-weight:600;color:#CBD5E1;">${company}</p>
+                      <p style="margin:0 0 4px;font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Location</p>
+                      <p style="margin:0;font-size:14px;color:#94A3B8;">${location}</p>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- CTA -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+                  <tr>
+                    <td align="center">
+                      <a href="${jobUrl}" style="display:inline-block;background:linear-gradient(135deg,#00E5FF,#7B61FF);color:#000000;font-weight:900;font-size:15px;padding:14px 36px;border-radius:50px;text-decoration:none;letter-spacing:0.3px;">
+                        View Job &amp; Apply →
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background-color:#0B1020;border-top:1px solid rgba(255,255,255,0.06);padding:24px 40px;text-align:center;">
+                <p style="margin:0 0 6px;font-size:12px;color:#475569;">
+                  <strong style="color:#00E5FF;">DENARIXX AFRICA AI</strong> · Headquartered in Ghana, building for 54 nations
+                </p>
+                <p style="margin:0;font-size:11px;color:#334155;">
+                  You're receiving this because your profile matches new job listings at ${domain}
+                </p>
+              </td>
+            </tr>
+
+          </td>
+        </tr>
+
+        <!-- Bottom spacer -->
+        <tr><td style="padding-top:24px;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#334155;">© ${new Date().getFullYear()} DENARIXX AFRICA AI. All rights reserved.</p>
+        </td></tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`;
+
+  return { subject, html };
+}
+
+export async function sendJobMatchEmail(params: {
+  name: string | null;
+  email: string;
+  jobTitle: string;
+  company: string;
+  location: string;
+  matchScore: number;
+  jobId: number;
+}): Promise<void> {
+  const client = getResend();
+  if (!client) return;
+
+  const { subject, html } = buildJobMatchEmail(params);
+
+  await client.emails.send({
+    from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+    to: [params.email],
+    subject,
+    html,
+  });
+}
+
 export async function sendWelcomeEmail(params: {
   name: string | null;
   email: string;

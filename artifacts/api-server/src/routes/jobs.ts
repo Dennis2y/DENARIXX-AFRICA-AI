@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { sendApplicationStatusEmail } from "../email";
+import { sendApplicationStatusEmail, sendJobMatchEmail } from "../email";
 
 const router: IRouter = Router();
 
@@ -100,6 +100,64 @@ function computeMatch(
   const matchedSkills = job.requiredSkills.filter(s => allSkillsLower.some(u => u.includes(s.toLowerCase()) || s.toLowerCase().includes(u)));
   const missingSkills = job.requiredSkills.filter(s => !allSkillsLower.some(u => u.includes(s.toLowerCase()) || s.toLowerCase().includes(u)));
   return { matchScore: total, matchedSkills, missingSkills };
+}
+
+// ── Job-match notifications ───────────────────────────────────────────────────
+
+const MATCH_THRESHOLD = 70;
+
+async function notifyMatchingCandidates(
+  job: { id: number; title: string; company: string; location: string; requiredSkills: string[]; level: string; remoteType: string | null },
+  logger: { error: (obj: Record<string, unknown>, msg: string) => void },
+): Promise<void> {
+  try {
+    const candidates = await db
+      .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name, location: usersTable.location, role: usersTable.role })
+      .from(usersTable)
+      .where(and(eq(usersTable.userType, "candidate"), eq(usersTable.emailNotifications, true)));
+
+    if (!candidates.length) return;
+
+    const userIds = candidates.map(c => c.id);
+    const skillRows = await db
+      .select({ userId: userSkillsTable.userId, skill: userSkillsTable.skill })
+      .from(userSkillsTable)
+      .where(inArray(userSkillsTable.userId, userIds));
+
+    const skillsByUser = new Map<number, string[]>();
+    for (const row of skillRows) {
+      const arr = skillsByUser.get(row.userId) ?? [];
+      arr.push(row.skill);
+      skillsByUser.set(row.userId, arr);
+    }
+
+    const sends: Promise<void>[] = [];
+    for (const candidate of candidates) {
+      const userSkills = skillsByUser.get(candidate.id) ?? [];
+      if (!userSkills.length) continue;
+
+      const { matchScore } = computeMatch(job, userSkills, candidate.location, candidate.role);
+      if (matchScore < MATCH_THRESHOLD) continue;
+
+      sends.push(
+        sendJobMatchEmail({
+          name: candidate.name,
+          email: candidate.email,
+          jobTitle: job.title,
+          company: job.company,
+          location: job.location,
+          matchScore,
+          jobId: job.id,
+        }).catch(err => {
+          logger.error({ err, candidateId: candidate.id }, "Failed to send job-match email");
+        }),
+      );
+    }
+
+    await Promise.all(sends);
+  } catch (err) {
+    logger.error({ err }, "notifyMatchingCandidates failed");
+  }
 }
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
@@ -544,6 +602,10 @@ router.patch("/:id/moderate", requireAuth, async (req, res) => {
 
     if (!updated) { res.status(404).json({ error: "Job not found" }); return; }
     res.json({ job: updated });
+
+    if (status === "approved") {
+      notifyMatchingCandidates(updated, req.log).catch(() => {});
+    }
   } catch (err) {
     req.log.error({ err }, "Failed to moderate job listing");
     res.status(500).json({ error: "Failed to moderate listing" });
