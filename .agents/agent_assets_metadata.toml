@@ -12,3 +12,9 @@ id = "xJI4qiNN4JjbVfAIsJxFt"
 uri = "file://artifacts/denarixx/src/assets/professionals.png"
 type = "image"
 title = "Professionals with holograms"
+
+[[generated]]
+id = "rDC3wyrJcZ9OIABn9MCnf"
+uri = "file://artifacts/denarixx-mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"

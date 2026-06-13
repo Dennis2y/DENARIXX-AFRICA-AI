@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "DENARIXX",
+    "slug": "denarixx-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "denarixx-mobile",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1020"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.denarixx.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0B1020"
+      },
+      "package": "com.denarixx.mobile"
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png",
+      "backgroundColor": "#0B1020"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
