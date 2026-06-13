@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Show } from "@clerk/react";
 import { Redirect, useLocation, useSearch } from "wouter";
 import {
-  ArrowLeft, Send, MessageCircle, User, Search, RefreshCw, ChevronLeft
+  ArrowLeft, Send, MessageCircle, User, Search, RefreshCw, ChevronLeft, Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -59,6 +59,7 @@ type Message = {
   toUserId: number;
   content: string;
   isRead: boolean;
+  jobApplicationId: number | null;
   createdAt: string;
 };
 
@@ -87,15 +88,17 @@ function useThread(partnerId: number | null) {
   });
 }
 
-function useSendMessage(partnerId: number | null) {
+function useSendMessage(partnerId: number | null, jobApplicationId?: number | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (content: string) => {
+      const body: Record<string, unknown> = { content };
+      if (jobApplicationId) body.jobApplicationId = jobApplicationId;
       const r = await fetch(`${basePath}/api/messages/${partnerId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error("Failed to send");
       return r.json();
@@ -103,13 +106,24 @@ function useSendMessage(partnerId: number | null) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
       qc.invalidateQueries({ queryKey: ["messages-inbox"] });
+      qc.invalidateQueries({ queryKey: ["messages-unread-count"] });
     },
   });
 }
 
-function ThreadView({ partnerId, onBack }: { partnerId: number; onBack: () => void }) {
+function ThreadView({
+  partnerId,
+  onBack,
+  jobTitle,
+  jobApplicationId,
+}: {
+  partnerId: number;
+  onBack: () => void;
+  jobTitle?: string | null;
+  jobApplicationId?: number | null;
+}) {
   const { data, isLoading } = useThread(partnerId);
-  const { mutateAsync: send, isPending } = useSendMessage(partnerId);
+  const { mutateAsync: send, isPending } = useSendMessage(partnerId, jobApplicationId);
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -137,11 +151,19 @@ function ThreadView({ partnerId, onBack }: { partnerId: number; onBack: () => vo
           <ChevronLeft className="w-5 h-5" />
         </button>
         <Avatar name={partner?.name} url={partner?.avatarUrl} size={36} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm truncate">{partner?.name ?? "User"}</p>
           {partner?.role && <p className="text-xs text-muted-foreground truncate">{partner.role}</p>}
         </div>
       </div>
+
+      {/* Job context banner */}
+      {jobTitle && (
+        <div className="mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
+          <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">Re: <span className="font-semibold">{jobTitle}</span> application</span>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -240,7 +262,7 @@ function InboxList({
             <MessageCircle className="w-10 h-10 mb-3 opacity-30" />
             <p className="font-medium text-sm">No conversations yet</p>
             <p className="text-xs mt-1 text-center px-6">
-              Accept a SkillSwap connection, then use "Message" to start a chat.
+              Messages from employers about your applications will appear here.
             </p>
           </div>
         ) : (
@@ -285,6 +307,9 @@ function MessagesContent() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const partnerParam = params.get("partner");
+  const jobParam = params.get("job");
+  const appIdParam = params.get("appId");
+
   const [selectedId, setSelectedId] = useState<number | null>(
     partnerParam ? parseInt(partnerParam, 10) : null
   );
@@ -292,6 +317,9 @@ function MessagesContent() {
   const conversations = data?.conversations ?? [];
 
   const showThread = selectedId !== null && !isNaN(selectedId);
+
+  const jobTitle = jobParam ? decodeURIComponent(jobParam) : null;
+  const jobApplicationId = appIdParam ? parseInt(appIdParam, 10) : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -322,7 +350,13 @@ function MessagesContent() {
         {/* Thread panel */}
         <div className={`${showThread ? "flex" : "hidden lg:flex"} flex-col flex-1 overflow-hidden`}>
           {selectedId !== null ? (
-            <ThreadView key={selectedId} partnerId={selectedId} onBack={() => setSelectedId(null)} />
+            <ThreadView
+              key={selectedId}
+              partnerId={selectedId}
+              onBack={() => setSelectedId(null)}
+              jobTitle={jobTitle}
+              jobApplicationId={jobApplicationId}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <MessageCircle className="w-16 h-16 mb-4 opacity-20" />

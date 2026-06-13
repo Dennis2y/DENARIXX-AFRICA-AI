@@ -677,6 +677,7 @@ router.get("/saved", requireAuth, async (req, res) => {
 });
 
 // ── PATCH /api/jobs/applications/:appId/status ───────────────────────────────
+// Employer (job owner) or admin can update; email is sent to the applicant.
 
 router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
@@ -690,31 +691,101 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
   }
 
   try {
-    const [user] = await db
-      .select({ id: usersTable.id, email: usersTable.email, name: usersTable.name, emailNotifications: usersTable.emailNotifications })
+    const [caller] = await db
+      .select({ id: usersTable.id, userType: usersTable.userType })
       .from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
-    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!caller) { res.status(404).json({ error: "User not found" }); return; }
 
-    const [app] = await db
-      .select({ id: jobApplications.id, userId: jobApplications.userId, jobId: jobApplications.jobId })
-      .from(jobApplications).where(eq(jobApplications.id, appId)).limit(1);
-    if (!app || app.userId !== user.id) { res.status(404).json({ error: "Application not found" }); return; }
+    // Join application with its job to get postedByUserId and applicant userId
+    const [appRow] = await db
+      .select({
+        id: jobApplications.id,
+        applicantUserId: jobApplications.userId,
+        jobId: jobApplications.jobId,
+        postedByUserId: jobs.postedByUserId,
+      })
+      .from(jobApplications)
+      .innerJoin(jobs, eq(jobApplications.jobId, jobs.id))
+      .where(eq(jobApplications.id, appId))
+      .limit(1);
+
+    if (!appRow) { res.status(404).json({ error: "Application not found" }); return; }
+
+    const isEmployer = appRow.postedByUserId === caller.id;
+    const isAdmin = caller.userType === "admin";
+
+    if (!isEmployer && !isAdmin) {
+      res.status(403).json({ error: "Only the job's employer or an admin can update application status" });
+      return;
+    }
 
     const [updated] = await db.update(jobApplications).set({ status }).where(eq(jobApplications.id, appId)).returning();
     res.json({ application: updated });
 
-    if (user.emailNotifications !== false) {
-      db.select({ title: jobs.title, company: jobs.company })
-        .from(jobs).where(eq(jobs.id, app.jobId)).limit(1)
-        .then(([job]) => {
-          if (!job) return;
-          return sendApplicationStatusEmail({ name: user.name, email: user.email, jobTitle: job.title, company: job.company, status });
-        })
-        .catch((emailErr) => { req.log.error({ err: emailErr }, "Failed to send application status email"); });
-    }
+    // Fire-and-forget: email goes to the APPLICANT
+    db.select({ id: usersTable.id, email: usersTable.email, name: usersTable.name, emailNotifications: usersTable.emailNotifications })
+      .from(usersTable).where(eq(usersTable.id, appRow.applicantUserId)).limit(1)
+      .then(([applicant]) => {
+        if (!applicant || applicant.emailNotifications === false) return;
+        return db.select({ title: jobs.title, company: jobs.company })
+          .from(jobs).where(eq(jobs.id, appRow.jobId)).limit(1)
+          .then(([job]) => {
+            if (!job) return;
+            return sendApplicationStatusEmail({ name: applicant.name, email: applicant.email, jobTitle: job.title, company: job.company, status });
+          });
+      })
+      .catch(emailErr => req.log.error({ err: emailErr }, "Failed to send application status email"));
   } catch (err) {
     req.log.error({ err }, "Failed to update application status");
     res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+// ── GET /api/jobs/:id/applicants ──────────────────────────────────────────────
+// Employer sees all applicants for their job listing with candidate details.
+
+router.get("/:id/applicants", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const jobId = Number(String(req.params.id));
+  if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
+
+  try {
+    const [caller] = await db
+      .select({ id: usersTable.id, userType: usersTable.userType })
+      .from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    if (!caller) { res.status(404).json({ error: "User not found" }); return; }
+
+    const [job] = await db
+      .select({ id: jobs.id, postedByUserId: jobs.postedByUserId })
+      .from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+
+    if (job.postedByUserId !== caller.id && caller.userType !== "admin") {
+      res.status(403).json({ error: "You can only view applicants for your own listings" }); return;
+    }
+
+    const applicants = await db
+      .select({
+        id: jobApplications.id,
+        userId: jobApplications.userId,
+        jobId: jobApplications.jobId,
+        status: jobApplications.status,
+        coverLetter: jobApplications.coverLetter,
+        appliedAt: jobApplications.appliedAt,
+        candidateName: usersTable.name,
+        candidateEmail: usersTable.email,
+        candidateRole: usersTable.role,
+        candidateAvatarUrl: usersTable.avatarUrl,
+      })
+      .from(jobApplications)
+      .innerJoin(usersTable, eq(jobApplications.userId, usersTable.id))
+      .where(eq(jobApplications.jobId, jobId))
+      .orderBy(desc(jobApplications.appliedAt));
+
+    res.json({ applicants, total: applicants.length });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch applicants");
+    res.status(500).json({ error: "Failed to load applicants" });
   }
 });
 

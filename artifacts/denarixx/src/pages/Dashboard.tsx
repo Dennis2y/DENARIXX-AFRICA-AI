@@ -68,12 +68,27 @@ function useApplications() {
   });
 }
 
+function useUnreadCount() {
+  return useQuery<{ count: number }>({
+    queryKey: ["messages-unread-count"],
+    queryFn: async () => {
+      const res = await fetch(`${basePath}/api/messages/unread-count`, { credentials: "include" });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+}
+
 function DashboardContent() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { data: profile } = useProfile();
   const { data: connData } = useConnections();
   const { data: appData } = useApplications();
+  const { data: unreadData } = useUnreadCount();
+  const unreadCount = unreadData?.count ?? 0;
 
   const firstName = user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Explorer";
   const skillCount = profile?.skills?.length ?? 0;
@@ -171,28 +186,45 @@ function DashboardContent() {
             Your Modules
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {modules.map(({ icon: Icon, label, desc, color, bg, href, live }) => (
-              <a key={label} href={live ? href : undefined} onClick={!live ? e => e.preventDefault() : undefined}>
-                <motion.div
-                  whileHover={live ? { scale: 1.02, y: -2 } : {}}
-                  className={`rounded-xl border p-5 transition-colors relative ${bg} ${live ? "cursor-pointer hover:border-opacity-60" : "cursor-default opacity-60"}`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <Icon className={`w-6 h-6 ${color}`} />
-                    {live ? (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-full px-2 py-0.5 border border-border">
-                        <Lock className="w-2.5 h-2.5" />
-                        Coming soon
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-semibold">{label}</div>
-                  <div className="text-sm text-muted-foreground mt-1">{desc}</div>
-                </motion.div>
-              </a>
-            ))}
+            {modules.map(({ icon: Icon, label, desc, color, bg, href, live }) => {
+              const isMessages = label === "Messages";
+              return (
+                <a key={label} href={live ? href : undefined} onClick={!live ? e => e.preventDefault() : undefined}>
+                  <motion.div
+                    whileHover={live ? { scale: 1.02, y: -2 } : {}}
+                    className={`rounded-xl border p-5 transition-colors relative ${bg} ${live ? "cursor-pointer hover:border-opacity-60" : "cursor-default opacity-60"}`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="relative">
+                        <Icon className={`w-6 h-6 ${color}`} />
+                        {isMessages && unreadCount > 0 && (
+                          <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] bg-primary text-primary-foreground rounded-full text-[10px] font-bold flex items-center justify-center px-1">
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      {live ? (
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-full px-2 py-0.5 border border-border">
+                          <Lock className="w-2.5 h-2.5" />
+                          Coming soon
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {label}
+                      {isMessages && unreadCount > 0 && (
+                        <span className="text-xs font-normal text-primary">
+                          {unreadCount} unread
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">{desc}</div>
+                  </motion.div>
+                </a>
+              );
+            })}
           </div>
         </motion.div>
 

@@ -129,7 +129,7 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
     const partnerId = parseInt(req.params.partnerId as string, 10);
     if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
 
-    const { content } = req.body as { content?: string };
+    const { content, jobApplicationId } = req.body as { content?: string; jobApplicationId?: number };
     if (!content || typeof content !== "string" || content.trim().length === 0 || content.length > 2000) {
       res.status(400).json({ error: "Message content required (1-2000 chars)" }); return;
     }
@@ -142,6 +142,7 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
       fromUserId: me.id,
       toUserId: partnerId,
       content: content.trim(),
+      jobApplicationId: typeof jobApplicationId === "number" ? jobApplicationId : null,
     }).returning();
 
     res.status(201).json({ message: msg });

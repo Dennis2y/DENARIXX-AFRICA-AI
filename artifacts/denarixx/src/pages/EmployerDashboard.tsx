@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Show } from "@clerk/react";
-import { Redirect, Link } from "wouter";
+import { Redirect, Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Briefcase,
@@ -22,6 +22,11 @@ import {
   Wifi,
   X,
   ShieldCheck,
+  MessageSquare,
+  ChevronDown,
+  FileText,
+  User,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type ModerationStatus = "pending" | "approved" | "rejected";
+type ApplicationStatus = "applied" | "reviewing" | "interview" | "offered" | "rejected";
 
 interface MyJob {
   id: number;
@@ -43,6 +49,19 @@ interface MyJob {
   isActive: boolean;
   createdAt: string;
   applicationCount: number;
+}
+
+interface Applicant {
+  id: number;
+  userId: number;
+  jobId: number;
+  status: ApplicationStatus;
+  coverLetter: string | null;
+  appliedAt: string;
+  candidateName: string | null;
+  candidateEmail: string;
+  candidateRole: string | null;
+  candidateAvatarUrl: string | null;
 }
 
 interface PostJobPayload {
@@ -77,6 +96,14 @@ const STATUS_CONFIG: Record<ModerationStatus, { label: string; icon: typeof Cloc
   rejected: { label: "Rejected", icon: XCircle, classes: "bg-red-500/15 text-red-300 border-red-500/30" },
 };
 
+const APP_STATUS_CONFIG: Record<ApplicationStatus, { label: string; classes: string }> = {
+  applied:    { label: "Applied",    classes: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+  reviewing:  { label: "Reviewing",  classes: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+  interview:  { label: "Interview",  classes: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+  offered:    { label: "Offered",    classes: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+  rejected:   { label: "Rejected",   classes: "bg-red-500/15 text-red-300 border-red-500/30" },
+};
+
 function StatusBadge({ status }: { status: ModerationStatus }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const Icon = cfg.icon;
@@ -85,6 +112,236 @@ function StatusBadge({ status }: { status: ModerationStatus }) {
       <Icon className="w-3 h-3" />
       {cfg.label}
     </span>
+  );
+}
+
+function AppStatusBadge({ status }: { status: ApplicationStatus }) {
+  const cfg = APP_STATUS_CONFIG[status] ?? APP_STATUS_CONFIG.applied;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${cfg.classes}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function CandidateAvatar({ name, url, size = 36 }: { name?: string | null; url?: string | null; size?: number }) {
+  const initials = (name ?? "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+  if (url) return <img src={url} alt={name ?? "Candidate"} className="rounded-full object-cover flex-shrink-0" style={{ width: size, height: size }} />;
+  return (
+    <div className="rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0 font-bold text-primary" style={{ width: size, height: size, fontSize: size * 0.35 }}>
+      {initials}
+    </div>
+  );
+}
+
+function ApplicantRow({
+  applicant,
+  jobTitle,
+  onStatusChange,
+}: {
+  applicant: Applicant;
+  jobTitle: string;
+  onStatusChange: (appId: number, status: ApplicationStatus) => void;
+}) {
+  const [, setLocation] = useLocation();
+  const [expanded, setExpanded] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const { toast } = useToast();
+
+  const STATUS_OPTIONS: ApplicationStatus[] = ["applied", "reviewing", "interview", "offered", "rejected"];
+
+  async function handleStatusChange(newStatus: ApplicationStatus) {
+    if (newStatus === applicant.status) return;
+    setUpdating(true);
+    try {
+      const res = await fetch(`${BASE}/api/jobs/applications/${applicant.id}/status`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to update");
+      onStatusChange(applicant.id, newStatus);
+      toast({ title: "Status updated", description: `${applicant.candidateName ?? "Candidate"} marked as ${APP_STATUS_CONFIG[newStatus].label}` });
+    } catch (e: any) {
+      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  function handleMessage() {
+    const params = new URLSearchParams({
+      partner: String(applicant.userId),
+      appId: String(applicant.id),
+      job: encodeURIComponent(jobTitle),
+    });
+    setLocation(`/messages?${params.toString()}`);
+  }
+
+  return (
+    <div className="border border-border rounded-xl bg-card/40 overflow-hidden">
+      <div className="flex items-start gap-3 p-4">
+        <CandidateAvatar name={applicant.candidateName} url={applicant.candidateAvatarUrl} size={40} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div className="min-w-0">
+              <p className="font-semibold text-sm truncate">{applicant.candidateName ?? "Anonymous"}</p>
+              {applicant.candidateRole && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <User className="w-3 h-3" />
+                  {applicant.candidateRole}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Mail className="w-3 h-3" />
+                {applicant.candidateEmail}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <AppStatusBadge status={applicant.status} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {/* Status dropdown */}
+            <div className="relative">
+              <select
+                value={applicant.status}
+                disabled={updating}
+                onChange={e => handleStatusChange(e.target.value as ApplicationStatus)}
+                className="text-xs bg-background border border-border rounded-lg px-2.5 py-1.5 text-foreground focus:outline-none focus:border-primary/50 disabled:opacity-50 appearance-none pr-7 cursor-pointer"
+              >
+                {STATUS_OPTIONS.map(s => (
+                  <option key={s} value={s}>{APP_STATUS_CONFIG[s].label}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleMessage}
+              className="h-7 text-xs gap-1.5 px-2.5"
+            >
+              <MessageSquare className="w-3 h-3" />
+              Message
+            </Button>
+
+            {applicant.coverLetter && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <FileText className="w-3 h-3" />
+                {expanded ? "Hide" : "Cover letter"}
+              </button>
+            )}
+
+            <span className="text-xs text-muted-foreground ml-auto">
+              {new Date(applicant.appliedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {expanded && applicant.coverLetter && (
+        <div className="px-4 pb-4 border-t border-border mt-0">
+          <p className="text-xs text-muted-foreground font-medium mt-3 mb-2">Cover letter</p>
+          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{applicant.coverLetter}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ApplicantsModal({
+  job,
+  onClose,
+}: {
+  job: MyJob;
+  onClose: () => void;
+}) {
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${BASE}/api/jobs/${job.id}/applicants`, { credentials: "include" });
+        if (!res.ok) throw new Error((await res.json()).error ?? "Failed to load");
+        const data = await res.json();
+        setApplicants(data.applicants ?? []);
+      } catch (e: any) {
+        setError(e.message ?? "Failed to load applicants");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [job.id]);
+
+  function handleStatusChange(appId: number, newStatus: ApplicationStatus) {
+    setApplicants(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.97 }}
+        className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[88vh] flex flex-col shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b border-border flex-shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold truncate">{job.title}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              {loading ? "Loading…" : `${applicants.length} ${applicants.length === 1 ? "applicant" : "applicants"}`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition flex-shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+              <span>Loading applicants…</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 text-destructive text-sm">{error}</div>
+          ) : applicants.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-center">
+              <Users className="w-12 h-12 mb-3 opacity-25" />
+              <p className="font-semibold">No applicants yet</p>
+              <p className="text-sm mt-1">When candidates apply, they'll show up here.</p>
+            </div>
+          ) : (
+            applicants.map(applicant => (
+              <ApplicantRow
+                key={applicant.id}
+                applicant={applicant}
+                jobTitle={job.title}
+                onStatusChange={handleStatusChange}
+              />
+            ))
+          )}
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
@@ -315,12 +572,12 @@ function PostJobModal({
   );
 }
 
-function JobCard({ job }: { job: MyJob }) {
+function JobCard({ job, onViewApplicants }: { job: MyJob; onViewApplicants: (job: MyJob) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-card/60 backdrop-blur border border-border rounded-2xl p-5 hover:border-primary/30 transition-colors"
+      className="bg-card/60 backdrop-blur border border-border rounded-2xl p-5 hover:border-primary/30 transition-colors flex flex-col"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
@@ -360,14 +617,20 @@ function JobCard({ job }: { job: MyJob }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-sm font-medium">
-          <Users className="w-4 h-4 text-primary" />
-          <span className="text-foreground">{job.applicationCount}</span>
-          <span className="text-muted-foreground">
+      <div className="flex items-center justify-between mt-auto">
+        <button
+          onClick={() => onViewApplicants(job)}
+          className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors group"
+        >
+          <Users className="w-4 h-4" />
+          <span className="text-foreground group-hover:text-primary transition-colors">{job.applicationCount}</span>
+          <span className="text-muted-foreground group-hover:text-primary/70 transition-colors">
             {job.applicationCount === 1 ? "applicant" : "applicants"}
           </span>
-        </div>
+          {job.applicationCount > 0 && (
+            <span className="text-xs text-primary/60 font-normal ml-0.5">→ view</span>
+          )}
+        </button>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           {job.isActive ? (
             <Eye className="w-3.5 h-3.5 text-emerald-400" />
@@ -505,6 +768,7 @@ function EmployerDashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [userType, setUserType] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState<MyJob | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -585,6 +849,12 @@ function EmployerDashboardContent() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/messages">
+              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Messages</span>
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="sm"
@@ -681,7 +951,7 @@ function EmployerDashboardContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence>
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
+                <JobCard key={job.id} job={job} onViewApplicants={setSelectedJob} />
               ))}
             </AnimatePresence>
           </div>
@@ -696,6 +966,15 @@ function EmployerDashboardContent() {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedJob && (
+          <ApplicantsModal
+            job={selectedJob}
+            onClose={() => setSelectedJob(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -703,11 +982,11 @@ function EmployerDashboardContent() {
 export default function EmployerDashboard() {
   return (
     <>
-      <Show when="signed-out">
-        <Redirect to="/sign-in" />
-      </Show>
       <Show when="signed-in">
         <EmployerDashboardContent />
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/sign-in" />
       </Show>
     </>
   );
