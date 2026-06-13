@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, userSkillsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -140,6 +140,76 @@ router.put("/me/skills", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to update skills");
     res.status(500).json({ error: "Failed to update skills" });
+  }
+});
+
+// POST /api/users/push-token — register or refresh a device push token
+router.post("/push-token", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const { token, platform } = req.body as { token?: string; platform?: string };
+
+  if (!token || typeof token !== "string") {
+    res.status(400).json({ error: "token is required" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    await db
+      .insert(pushTokens)
+      .values({ userId: user.id, token, platform: platform ?? null })
+      .onConflictDoUpdate({
+        target: pushTokens.token,
+        set: { userId: user.id, platform: platform ?? null },
+      });
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to register push token");
+    res.status(500).json({ error: "Failed to register push token" });
+  }
+});
+
+// DELETE /api/users/push-token — remove a device push token on logout
+router.delete("/push-token", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const { token } = req.body as { token?: string };
+
+  if (!token || typeof token !== "string") {
+    res.status(400).json({ error: "token is required" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    await db
+      .delete(pushTokens)
+      .where(and(eq(pushTokens.token, token), eq(pushTokens.userId, user.id)));
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to remove push token");
+    res.status(500).json({ error: "Failed to remove push token" });
   }
 });
 

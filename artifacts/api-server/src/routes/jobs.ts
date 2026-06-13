@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable } from "@workspace/db";
+import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { sendApplicationStatusEmail, sendJobMatchEmail } from "../email";
@@ -100,6 +100,74 @@ function computeMatch(
   const matchedSkills = job.requiredSkills.filter(s => allSkillsLower.some(u => u.includes(s.toLowerCase()) || s.toLowerCase().includes(u)));
   const missingSkills = job.requiredSkills.filter(s => !allSkillsLower.some(u => u.includes(s.toLowerCase()) || s.toLowerCase().includes(u)));
   return { matchScore: total, matchedSkills, missingSkills };
+}
+
+// ── Push notifications ────────────────────────────────────────────────────────
+
+const STATUS_PUSH_MESSAGES: Record<string, { title: string; body: (jobTitle: string, company: string) => string }> = {
+  reviewing: {
+    title: "Application Under Review",
+    body: (jobTitle, company) => `${company} is reviewing your application for ${jobTitle}.`,
+  },
+  interview: {
+    title: "Interview Invitation! 🎉",
+    body: (jobTitle, company) => `${company} wants to interview you for ${jobTitle}. Check the app for next steps.`,
+  },
+  offered: {
+    title: "You Got an Offer! 🎊",
+    body: (jobTitle, company) => `Congratulations! ${company} has sent you an offer for ${jobTitle}.`,
+  },
+  rejected: {
+    title: "Application Update",
+    body: (jobTitle, company) => `${company} has updated your application for ${jobTitle}.`,
+  },
+};
+
+async function sendApplicationPushNotification(
+  applicantUserId: number,
+  applicationId: number,
+  jobId: number,
+  jobTitle: string,
+  company: string,
+  status: string,
+  logger: { error: (obj: Record<string, unknown>, msg: string) => void },
+): Promise<void> {
+  const msg = STATUS_PUSH_MESSAGES[status];
+  if (!msg) return;
+
+  try {
+    const tokens = await db
+      .select({ token: pushTokens.token })
+      .from(pushTokens)
+      .where(eq(pushTokens.userId, applicantUserId));
+
+    if (!tokens.length) return;
+
+    const messages = tokens.map(({ token }) => ({
+      to: token,
+      sound: "default" as const,
+      title: msg.title,
+      body: msg.body(jobTitle, company),
+      data: { applicationId, jobId, status },
+      channelId: "application-updates",
+    }));
+
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "Accept-Encoding": "gzip, deflate",
+      },
+      body: JSON.stringify(messages),
+    });
+
+    if (!response.ok) {
+      logger.error({ status: response.status }, "Expo push API returned non-2xx");
+    }
+  } catch (err) {
+    logger.error({ err }, "Failed to send application push notification");
+  }
 }
 
 // ── Job-match notifications ───────────────────────────────────────────────────
@@ -723,19 +791,31 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
     const [updated] = await db.update(jobApplications).set({ status }).where(eq(jobApplications.id, appId)).returning();
     res.json({ application: updated });
 
-    // Fire-and-forget: email goes to the APPLICANT
+    // Fire-and-forget: fetch applicant + job details for notifications
     db.select({ id: usersTable.id, email: usersTable.email, name: usersTable.name, emailNotifications: usersTable.emailNotifications })
       .from(usersTable).where(eq(usersTable.id, appRow.applicantUserId)).limit(1)
       .then(([applicant]) => {
-        if (!applicant || applicant.emailNotifications === false) return;
+        if (!applicant) return;
         return db.select({ title: jobs.title, company: jobs.company })
           .from(jobs).where(eq(jobs.id, appRow.jobId)).limit(1)
           .then(([job]) => {
             if (!job) return;
-            return sendApplicationStatusEmail({ name: applicant.name, email: applicant.email, jobTitle: job.title, company: job.company, status, userId: applicant.id });
+            const notifyPromises: Promise<void>[] = [];
+            // Email notification (respects emailNotifications preference)
+            if (applicant.emailNotifications !== false) {
+              notifyPromises.push(
+                sendApplicationStatusEmail({ name: applicant.name, email: applicant.email, jobTitle: job.title, company: job.company, status, userId: applicant.id })
+                  .catch(emailErr => req.log.error({ err: emailErr }, "Failed to send application status email")),
+              );
+            }
+            // Push notification (always send if device token exists)
+            notifyPromises.push(
+              sendApplicationPushNotification(appRow.applicantUserId, appId, appRow.jobId, job.title, job.company, status, req.log),
+            );
+            return Promise.all(notifyPromises);
           });
       })
-      .catch(emailErr => req.log.error({ err: emailErr }, "Failed to send application status email"));
+      .catch(err => req.log.error({ err }, "Failed to send application notifications"));
   } catch (err) {
     req.log.error({ err }, "Failed to update application status");
     res.status(500).json({ error: "Failed to update status" });

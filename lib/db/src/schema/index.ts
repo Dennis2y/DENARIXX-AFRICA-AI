@@ -12,3 +12,4 @@ export * from "./directMessages";
 export * from "./savedJobs";
 export * from "./resumes";
 export * from "./emailLogs";
+export * from "./pushTokens";
