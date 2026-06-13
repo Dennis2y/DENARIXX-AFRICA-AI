@@ -76,6 +76,7 @@
   },
   "dependencies": {
     "@clerk/react": "^6.9.0",
+    "@clerk/shared": "4.17.0",
     "@clerk/themes": "^1.7.20"
   }
 }
