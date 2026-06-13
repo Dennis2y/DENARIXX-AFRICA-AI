@@ -263,12 +263,12 @@ function ImportReviewModal({
 export default function CvBuilderScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile } = useUser();
+  const { profile, updateProfile, cvResult, saveCvResult } = useUser();
   const generateCv = useGenerateCv();
   const importCv = useImportCv();
 
   const [tab, setTab] = useState<Tab>("form");
-  const [result, setResult] = useState<CvGenerateResponse | null>(null);
+  const result = cvResult;
   const [parsedCv, setParsedCv] = useState<ParsedCvData | null>(null);
   const [reviewVisible, setReviewVisible] = useState(false);
   const [highlightedFields, setHighlightedFields] = useState(false);
@@ -298,7 +298,7 @@ export default function CvBuilderScreen() {
         experience: profile.experience,
       });
 
-      setResult(res);
+      await saveCvResult(res);
       setTab("cv");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
@@ -643,7 +643,7 @@ export default function CvBuilderScreen() {
 
           <Pressable
             onPress={() => {
-              setResult(null);
+              saveCvResult(null);
               setTab("form");
             }}
             style={[

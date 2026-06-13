@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { JobCard } from "@/components/JobCard";
 import { useColors } from "@/hooks/useColors";
 import { useJobs, useSaveJob } from "@/hooks/useJobs";
+import { useUser } from "@/context/UserContext";
 
 const FILTERS = ["All", "Full Time", "Contract", "Remote"];
 
@@ -25,7 +26,8 @@ export default function JobsScreen() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
-  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
+
+  const { savedJobIds, toggleSavedJob } = useUser();
 
   const { data: jobs, isLoading, error, refetch, isRefetching } = useJobs();
   const saveJob = useSaveJob();
@@ -50,12 +52,7 @@ export default function JobsScreen() {
   }, [jobs, query, activeFilter]);
 
   const handleSave = (jobId: number, saved: boolean) => {
-    setSavedIds((prev) => {
-      const next = new Set(prev);
-      if (saved) next.add(jobId);
-      else next.delete(jobId);
-      return next;
-    });
+    toggleSavedJob(jobId, saved);
     saveJob.mutate({ jobId, save: saved });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
@@ -189,7 +186,7 @@ export default function JobsScreen() {
             <JobCard
               job={item}
               onSave={handleSave}
-              isSaved={savedIds.has(item.id)}
+              isSaved={savedJobIds.includes(item.id)}
             />
           )}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: bottomPad + 80 }}

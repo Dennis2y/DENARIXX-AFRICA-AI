@@ -1,4 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 export interface Job {
   id: number;
@@ -23,6 +25,8 @@ export interface Application {
   appliedAt: string;
   job?: Job;
 }
+
+const APPLICATIONS_CACHE_KEY = "cached_applications";
 
 const getBaseUrl = () => {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
@@ -62,14 +66,44 @@ export function useJob(id: number) {
 }
 
 export function useApplications() {
-  return useQuery<Application[]>({
+  const [cachedData, setCachedData] = useState<Application[] | undefined>(
+    undefined
+  );
+  const [cacheLoaded, setCacheLoaded] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(APPLICATIONS_CACHE_KEY).then((raw) => {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setCachedData(parsed);
+        } catch {}
+      }
+      setCacheLoaded(true);
+    });
+  }, []);
+
+  const query = useQuery<Application[]>({
     queryKey: ["applications"],
     queryFn: async () => {
       const data = await apiFetch("/api/jobs/my-applications");
       return Array.isArray(data) ? data : data.applications ?? [];
     },
+    placeholderData: cachedData,
+    enabled: cacheLoaded,
     retry: 1,
   });
+
+  useEffect(() => {
+    if (query.data) {
+      AsyncStorage.setItem(
+        APPLICATIONS_CACHE_KEY,
+        JSON.stringify(query.data)
+      ).catch(() => {});
+    }
+  }, [query.data]);
+
+  return query;
 }
 
 export function useApplyToJob() {

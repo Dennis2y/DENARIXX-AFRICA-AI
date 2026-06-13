@@ -24,6 +24,7 @@ import {
   useMatchExplain,
   useSaveJob,
 } from "@/hooks/useJobs";
+import { useUser } from "@/context/UserContext";
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,13 +33,15 @@ export default function JobDetailScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
+  const { savedJobIds, toggleSavedJob } = useUser();
+
   const { data: job, isLoading } = useJob(jobId);
   const applyMutation = useApplyToJob();
   const saveJob = useSaveJob();
   const genCoverLetter = useGenerateCoverLetter();
   const matchExplain = useMatchExplain();
 
-  const [isSaved, setIsSaved] = useState(false);
+  const isSaved = savedJobIds.includes(jobId);
   const [hasApplied, setHasApplied] = useState(false);
   const [coverLetter, setCoverLetter] = useState<string | null>(null);
   const [matchExplanation, setMatchExplanation] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export default function JobDetailScreen() {
 
   const handleSave = () => {
     const next = !isSaved;
-    setIsSaved(next);
+    toggleSavedJob(jobId, next);
     saveJob.mutate({ jobId, save: next });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
