@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { sendApplicationStatusEmail } from "../email";
 
@@ -380,7 +380,7 @@ router.get("/", async (req, res) => {
   const cvSkills = cvSkillsRaw ? cvSkillsRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
 
   try {
-    const allJobs = await db.select().from(jobs).where(eq(jobs.isActive, true));
+    const allJobs = await db.select().from(jobs).where(and(eq(jobs.isActive, true), eq(jobs.moderationStatus, "approved")));
     let userSkills: string[] = [];
     let userLocation: string | null = null;
     let userRole: string | null = null;
@@ -426,6 +426,127 @@ router.get("/", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to list jobs");
     res.status(500).json({ error: "Failed to load jobs" });
+  }
+});
+
+// ── POST /api/jobs ─────────────────────────────────────────────────────────────
+// Employer posts a new job listing. New listings start with moderationStatus="pending".
+
+router.post("/", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const { title, company, location, description, requiredSkills, salary, jobType, level, remoteType, country } =
+    req.body as {
+      title?: string;
+      company?: string;
+      location?: string;
+      description?: string;
+      requiredSkills?: string[];
+      salary?: string | null;
+      jobType?: string;
+      level?: string;
+      remoteType?: string;
+      country?: string | null;
+    };
+
+  if (!title?.trim() || !company?.trim() || !location?.trim() || !description?.trim()) {
+    res.status(400).json({ error: "title, company, location, and description are required" });
+    return;
+  }
+
+  try {
+    const [user] = await db.select({ id: usersTable.id, userType: usersTable.userType }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.userType !== "employer" && user.userType !== "admin") {
+      res.status(403).json({ error: "Employer account required. Activate your employer account to post jobs." });
+      return;
+    }
+
+    const [job] = await db.insert(jobs).values({
+      title: title.trim(),
+      company: company.trim(),
+      location: location.trim(),
+      description: description.trim(),
+      requiredSkills: Array.isArray(requiredSkills) ? requiredSkills.filter(Boolean) : [],
+      salary: salary ?? null,
+      jobType: jobType ?? "full-time",
+      level: level ?? "mid",
+      remoteType: remoteType ?? null,
+      country: country ?? null,
+      source: "employer",
+      externalApplyUrl: null,
+      postedDate: new Date(),
+      postedByUserId: user.id,
+      moderationStatus: "pending",
+      isActive: true,
+    }).returning();
+
+    res.status(201).json({ job });
+  } catch (err) {
+    req.log.error({ err }, "Failed to create job listing");
+    res.status(500).json({ error: "Failed to create job listing" });
+  }
+});
+
+// ── GET /api/jobs/mine ─────────────────────────────────────────────────────────
+// Returns all jobs posted by the authenticated employer with application counts.
+
+router.get("/mine", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  try {
+    const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    if (!user) { res.json({ jobs: [] }); return; }
+
+    const myJobs = await db.select().from(jobs).where(eq(jobs.postedByUserId, user.id)).orderBy(desc(jobs.createdAt));
+
+    if (!myJobs.length) { res.json({ jobs: [], total: 0 }); return; }
+
+    const jobIds = myJobs.map(j => j.id);
+    const appCounts = await db
+      .select({ jobId: jobApplications.jobId, count: sql<number>`cast(count(*) as int)` })
+      .from(jobApplications)
+      .where(inArray(jobApplications.jobId, jobIds))
+      .groupBy(jobApplications.jobId);
+
+    const countMap = Object.fromEntries(appCounts.map(r => [r.jobId, r.count]));
+
+    const result = myJobs.map(j => ({ ...j, applicationCount: countMap[j.id] ?? 0 }));
+    res.json({ jobs: result, total: result.length });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch employer listings");
+    res.status(500).json({ error: "Failed to load your listings" });
+  }
+});
+
+// ── PATCH /api/jobs/:id/moderate ──────────────────────────────────────────────
+// Admin-only: approve or reject a pending job listing.
+
+router.patch("/:id/moderate", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const jobId = Number(req.params.id);
+  const { status } = req.body as { status?: string };
+
+  if (!jobId || isNaN(jobId)) { res.status(400).json({ error: "Invalid job ID" }); return; }
+  if (!status || !["approved", "rejected"].includes(status)) {
+    res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+    return;
+  }
+
+  try {
+    const [user] = await db.select({ id: usersTable.id, userType: usersTable.userType }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.userType !== "admin") { res.status(403).json({ error: "Admin access required" }); return; }
+
+    const [updated] = await db
+      .update(jobs)
+      .set({ moderationStatus: status })
+      .where(eq(jobs.id, jobId))
+      .returning();
+
+    if (!updated) { res.status(404).json({ error: "Job not found" }); return; }
+    res.json({ job: updated });
+  } catch (err) {
+    req.log.error({ err }, "Failed to moderate job listing");
+    res.status(500).json({ error: "Failed to moderate listing" });
   }
 });
 
@@ -546,8 +667,13 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
     const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    const [job] = await db.select({ id: jobs.id, externalApplyUrl: jobs.externalApplyUrl }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    const [job] = await db.select({ id: jobs.id, externalApplyUrl: jobs.externalApplyUrl, moderationStatus: jobs.moderationStatus }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
     if (!job) { res.status(404).json({ error: "Job not found" }); return; }
+
+    if (job.moderationStatus !== "approved") {
+      res.status(403).json({ error: "This job listing is not available for applications." });
+      return;
+    }
 
     if (job.externalApplyUrl) {
       res.status(400).json({ error: "This job uses an external application process.", externalApplyUrl: job.externalApplyUrl });

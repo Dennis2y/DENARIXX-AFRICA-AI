@@ -1,4 +1,5 @@
-import { boolean, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 export const jobs = pgTable("jobs", {
   id: serial("id").primaryKey(),
@@ -17,6 +18,9 @@ export const jobs = pgTable("jobs", {
   postedDate: timestamp("posted_date", { withTimezone: true }),
   remoteType: text("remote_type"),      // "remote" | "hybrid" | "on-site"
   country: text("country"),             // primary country (null for fully remote)
+  // Employer-posted fields
+  postedByUserId: integer("posted_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
+  moderationStatus: text("moderation_status").notNull().default("approved"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

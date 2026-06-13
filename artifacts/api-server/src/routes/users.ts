@@ -49,9 +49,26 @@ router.get("/me", requireAuth, async (req, res) => {
 // PATCH /api/users/me — update current user profile
 router.patch("/me", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
-  const { name, bio, location, website, twitterHandle, linkedinUrl, githubHandle, role, country, avatarUrl } = req.body;
+  const { name, bio, location, website, twitterHandle, linkedinUrl, githubHandle, role, country, avatarUrl, userType } = req.body;
+
+  // userType can be set to "employer" by the user themselves;
+  // "admin" can only be set by someone already with userType="admin"
+  const SELF_ALLOWED_TYPES = ["candidate", "employer"];
 
   try {
+    let resolvedUserType: string | undefined = undefined;
+    if (userType !== undefined) {
+      if (!SELF_ALLOWED_TYPES.includes(userType)) {
+        // Check if the requesting user is already an admin
+        const [existing] = await db.select({ userType: usersTable.userType }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+        if (!existing || existing.userType !== "admin") {
+          res.status(403).json({ error: "Cannot set this userType" });
+          return;
+        }
+      }
+      resolvedUserType = userType;
+    }
+
     const [updated] = await db
       .update(usersTable)
       .set({
@@ -65,6 +82,7 @@ router.patch("/me", requireAuth, async (req, res) => {
         ...(role !== undefined && { role }),
         ...(country !== undefined && { country }),
         ...(avatarUrl !== undefined && { avatarUrl }),
+        ...(resolvedUserType !== undefined && { userType: resolvedUserType }),
         updatedAt: new Date(),
       })
       .where(eq(usersTable.clerkUserId, clerkUserId))

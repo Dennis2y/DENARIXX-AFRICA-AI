@@ -17,6 +17,7 @@ export const usersTable = pgTable("users", {
   role: text("role"),
   country: text("country"),
   reputationScore: integer("reputation_score").default(0).notNull(),
+  userType: text("user_type").notNull().default("candidate"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

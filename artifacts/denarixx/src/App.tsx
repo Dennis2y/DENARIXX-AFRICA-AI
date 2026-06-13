@@ -18,6 +18,7 @@ import SkillSwap from "@/pages/SkillSwap";
 import DenaPage from "@/pages/Dena";
 import CvBuilder from "@/pages/CvBuilder";
 import Jobs from "@/pages/Jobs";
+import EmployerDashboard from "@/pages/EmployerDashboard";
 import InterviewCoach from "@/pages/InterviewCoach";
 import Community from "@/pages/Community";
 import Messages from "@/pages/Messages";
@@ -158,6 +159,7 @@ function Router() {
       <Route path="/dena" component={DenaPage} />
       <Route path="/cv-builder" component={CvBuilder} />
       <Route path="/jobs" component={Jobs} />
+      <Route path="/employer" component={EmployerDashboard} />
       <Route path="/interview-coach" component={InterviewCoach} />
       <Route path="/community" component={Community} />
       <Route path="/messages" component={Messages} />

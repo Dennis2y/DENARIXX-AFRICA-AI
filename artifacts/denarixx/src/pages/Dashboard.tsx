@@ -29,6 +29,7 @@ const modules: Module[] = [
   { icon: Users, label: "Community", desc: "Connect with African talent", color: "text-pink-400", bg: "bg-pink-400/10 border-pink-400/20", href: `${basePath}/community`, live: true },
   { icon: MessageCircle, label: "Messages", desc: "Chat with your connections", color: "text-teal-400", bg: "bg-teal-400/10 border-teal-400/20", href: `${basePath}/messages`, live: true },
   { icon: Trophy, label: "Leaderboard", desc: "Your referral rank", color: "text-orange-400", bg: "bg-orange-400/10 border-orange-400/20", href: `${basePath}/leaderboard`, live: true },
+  { icon: BarChart3, label: "Post a Job", desc: "Hire African talent — employer dashboard", color: "text-rose-400", bg: "bg-rose-400/10 border-rose-400/20", href: `${basePath}/employer`, live: true },
 ];
 
 function useProfile() {
