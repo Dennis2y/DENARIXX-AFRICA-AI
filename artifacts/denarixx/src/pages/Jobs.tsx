@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useTypewriterText } from "@/hooks/useTypewriterText";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -153,6 +154,7 @@ function ApplicationModal({
   const [coverLetter, setCoverLetter] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const typedCoverLetter = useTypewriterText(coverLetter, generating ? 0 : 8);
 
   const generateCoverLetter = async () => {
     setGenerating(true);
@@ -215,7 +217,7 @@ function ApplicationModal({
             </button>
           </div>
           <textarea
-            value={coverLetter} onChange={e => setCoverLetter(e.target.value)}
+            value={typedCoverLetter} onChange={e => setCoverLetter(e.target.value)}
             placeholder="Write a cover letter or use AI to generate one…"
             rows={6}
             className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors resize-none"
@@ -242,6 +244,7 @@ function TailorCVModal({ job, onClose }: { job: Job; onClose: () => void }) {
   const [result, setResult] = useState<TailorResult | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const typedTailoredSummary = useTypewriterText(result?.tailoredSummary ?? "", loading ? 0 : 8);
 
   const cvText = (() => { try { return localStorage.getItem("denarixx_last_cv") ?? ""; } catch { return ""; } })();
   const hasCV = !!cvText;
@@ -268,7 +271,7 @@ function TailorCVModal({ job, onClose }: { job: Job; onClose: () => void }) {
 
   const copySummary = () => {
     if (result?.tailoredSummary) {
-      navigator.clipboard.writeText(result.tailoredSummary).then(() => {
+      navigator.clipboard.writeText(typedTailoredSummary).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
         toast({ title: "Copied to clipboard!" });
@@ -343,7 +346,7 @@ function TailorCVModal({ job, onClose }: { job: Job; onClose: () => void }) {
               </div>
             )}
 
-            {result.tailoredSummary && (
+            {typedTailoredSummary && (
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tailored Summary</p>
@@ -351,7 +354,7 @@ function TailorCVModal({ job, onClose }: { job: Job; onClose: () => void }) {
                     {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}{copied ? "Copied!" : "Copy"}
                   </button>
                 </div>
-                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-foreground leading-relaxed">{result.tailoredSummary}</div>
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-foreground leading-relaxed">{typedTailoredSummary}</div>
               </div>
             )}
           </div>
