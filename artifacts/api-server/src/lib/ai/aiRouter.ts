@@ -27,6 +27,31 @@ Short greeting language rules:
 - Do not answer partly in English after a non-English greeting.
 - Only use English when the user writes in English or explicitly asks for English.`;
 
+function detectForcedLanguage(messages: AIRequest["messages"]): string | null {
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content?.trim().toLowerCase();
+  if (!lastUser) return null;
+
+  if (/^(hallo|guten tag|guten morgen|guten abend|wie geht|servus|moin)\b/.test(lastUser)) return "German";
+  if (/^(hola|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal)\b/.test(lastUser)) return "Spanish";
+  if (/^(bonjour|bonsoir|salut|ça va|ca va)\b/.test(lastUser)) return "French";
+  if (/^(ciao|buongiorno|buonasera|come stai)\b/.test(lastUser)) return "Italian";
+  if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)\b/.test(lastUser)) return "Portuguese";
+
+  return null;
+}
+
+function languageOverrideRule(messages: AIRequest["messages"]) {
+  const language = detectForcedLanguage(messages);
+  if (!language) return "";
+
+  return `\n\nCRITICAL LANGUAGE OVERRIDE:
+The user's latest message is in ${language}.
+You MUST respond fully in ${language}.
+Do NOT use English.
+Do NOT mix English with ${language}.
+Even if the message is only a short greeting, continue fully in ${language}.`;
+}
+
 function normalizeMessages(messages: AIRequest["messages"]) {
   const hasSystem = messages.some((m) => m.role === "system");
 
@@ -34,13 +59,13 @@ function normalizeMessages(messages: AIRequest["messages"]) {
     role: m.role,
     content:
       m.role === "system"
-        ? `${MULTILINGUAL_SYSTEM_RULE}\n\n${m.content}`
+        ? `${MULTILINGUAL_SYSTEM_RULE}${languageOverrideRule(messages)}\n\n${m.content}`
         : m.content,
   }));
 
   if (!hasSystem) {
     return [
-      { role: "system" as const, content: MULTILINGUAL_SYSTEM_RULE },
+      { role: "system" as const, content: `${MULTILINGUAL_SYSTEM_RULE}${languageOverrideRule(messages)}` },
       ...normalized,
     ];
   }

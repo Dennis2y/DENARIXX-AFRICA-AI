@@ -36,6 +36,32 @@ function buildSystemPrompt(userContext?: { name?: string | null; role?: string |
   return parts.join("\n");
 }
 
+
+function detectChatLanguage(message: string): string | null {
+  const text = message.trim().toLowerCase();
+
+  if (/^(hallo|guten tag|guten morgen|guten abend|wie geht|servus|moin)\b/.test(text)) return "German";
+  if (/^(hola|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal)\b/.test(text)) return "Spanish";
+  if (/^(bonjour|bonsoir|salut|ça va|ca va)\b/.test(text)) return "French";
+  if (/^(ciao|buongiorno|buonasera|come stai)\b/.test(text)) return "Italian";
+  if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)\b/.test(text)) return "Portuguese";
+
+  return null;
+}
+
+function strictLanguageSystemMessage(message: string) {
+  const language = detectChatLanguage(message);
+  if (!language) return null;
+
+  return {
+    role: "system" as const,
+    content:
+      `CRITICAL: The user's latest message is in ${language}. ` +
+      `Reply ONLY in ${language}. Do not use English. Do not mix languages. ` +
+      `Even if the message is only a greeting, continue fully in ${language}.`,
+  };
+}
+
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
@@ -146,6 +172,7 @@ router.post("/chat", async (req, res) => {
       {
         messages: [
           { role: "system", content: systemPrompt },
+          ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
           ...history.slice(-20),
           { role: "user", content: message },
         ],
