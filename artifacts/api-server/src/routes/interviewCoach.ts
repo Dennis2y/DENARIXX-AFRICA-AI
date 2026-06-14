@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, interviewSessions, usersTable, userSkillsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { generateAI } from "../lib/ai/aiRouter";
 
 const router: IRouter = Router();
 
@@ -9,14 +10,13 @@ const INTERVIEW_SYSTEM = `You are an expert interview coach specialising in Afri
 You give honest, direct, constructive feedback. Be specific — reference what was said, what was missing, and how to improve.
 Always be encouraging but never vague. Score answers 1–10.`;
 
-async function callOpenAI(messages: { role: string; content: string }[]): Promise<string> {
-  const { openai } = require("@workspace/integrations-openai-ai-server");
-  const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
+async function callAI(messages: { role: "system" | "user" | "assistant"; content: string }[]): Promise<string> {
+  const completion = await generateAI({
     messages,
-    max_tokens: 800,
+    temperature: 0.7,
   });
-  return completion.choices[0]?.message?.content ?? "";
+
+  return completion.content ?? "";
 }
 
 // POST /api/interview-coach/sessions — start a new session (generate questions)
@@ -51,7 +51,7 @@ ${skillList ? `The candidate has skills in: ${skillList}.` : ""}
 Return ONLY a JSON array of 5 question strings, no other text. Example:
 ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"]`;
 
-    const raw = await callOpenAI([
+    const raw = await callAI([
       { role: "system", content: INTERVIEW_SYSTEM },
       { role: "user", content: prompt },
     ]);
@@ -134,7 +134,7 @@ Evaluate this answer. Return a JSON object with exactly these fields:
 }
 Return ONLY the JSON, no other text.`;
 
-    const raw = await callOpenAI([
+    const raw = await callAI([
       { role: "system", content: INTERVIEW_SYSTEM },
       { role: "user", content: feedbackPrompt },
     ]);
@@ -184,7 +184,7 @@ Average score: ${avgScore}/10.
 
 Write a concise 2-3 sentence overall performance summary. Be direct, motivating, and actionable. Focus on their biggest strength and one clear area to improve.`;
 
-    const overallFeedback = await callOpenAI([
+    const overallFeedback = await callAI([
       { role: "system", content: INTERVIEW_SYSTEM },
       { role: "user", content: summaryPrompt },
     ]);
