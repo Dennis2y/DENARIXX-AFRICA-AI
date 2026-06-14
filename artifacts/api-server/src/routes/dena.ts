@@ -41,15 +41,15 @@ function buildSystemPrompt(userContext?: { name?: string | null; role?: string |
 function detectChatLanguage(message: string): string | null {
   const text = message.trim().toLowerCase();
 
-  if (/^(hallo|guten tag|guten morgen|guten abend|wie geht|servus|moin)\b/.test(text)) return "German";
-  if (/^(hola|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal)\b/.test(text)) return "Spanish";
-  if (/^(bonjour|bonsoir|salut|ça va|ca va)\b/.test(text)) return "French";
-  if (/^(ciao|buongiorno|buonasera|come stai)\b/.test(text)) return "Italian";
-  if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)\b/.test(text)) return "Portuguese";
+  if (/^(hallo|guten tag|guten morgen|guten abend|wie geht|servus|moin)/.test(text)) return "German";
+  if (/^(hola|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal)/.test(text)) return "Spanish";
+  if (/^(bonjour|bonsoir|salut|ça va|ca va)/.test(text)) return "French";
+  if (/^(ciao|buongiorno|buonasera|come stai)/.test(text)) return "Italian";
+  if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)/.test(text)) return "Portuguese";
 
-  const englishSignals = /\b(what|which|who|where|when|why|how|explain|summarize|compare|tell|show|give|is|are|was|were|does|did|can|should|would|could|experience|skills|backend|frontend|strongest|document|uploaded|question|answer)\b/g;
-  const matches = text.match(englishSignals)?.length ?? 0;
-  if (matches >= 2) return "English";
+  const englishSignals = /(what|which|who|where|when|why|how|explain|summarize|compare|tell|show|give|is|are|was|were|does|did|can|should|would|could|experience|skills|backend|frontend|strongest|document|uploaded|question|answer)/g;
+  const englishMatches = text.match(englishSignals)?.length ?? 0;
+  if (englishMatches >= 2) return "English";
 
   return null;
 }
@@ -396,8 +396,8 @@ router.post("/chat", async (req, res) => {
       {
         messages: [
           { role: "system", content: systemPrompt },
-          ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
           ...history.slice(-20),
+          ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
           { role: "user", content: message },
         ],
         temperature: 0.7,
