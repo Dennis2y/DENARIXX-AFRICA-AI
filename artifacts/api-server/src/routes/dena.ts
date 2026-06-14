@@ -54,6 +54,19 @@ function detectChatLanguage(message: string): string | null {
   return null;
 }
 
+
+function detectReplyLanguage(message: string): string | null {
+  const text = message.trim().toLowerCase();
+
+  // Strong English question detection
+  if (/\b(what|which|who|where|when|why|how)\b/.test(text)) return "English";
+  if (/\b(is|are|was|were|does|did|can|could|should|would)\b/.test(text) && /\b(experience|skills|backend|frontend|career|job|document|cv|resume|strongest)\b/.test(text)) return "English";
+  if (/\bi('|’)m asking in english\b/.test(text)) return "English";
+
+  return detectChatLanguage(message);
+}
+
+
 function strictLanguageSystemMessage(message: string) {
   const language = detectChatLanguage(message);
   if (!language) return null;
@@ -405,7 +418,7 @@ router.post("/chat", async (req, res) => {
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
 
-  const detectedReplyLanguage = detectChatLanguage(message);
+  const detectedReplyLanguage = detectReplyLanguage(message);
   if (detectedReplyLanguage) {
     systemPrompt += `\n\n--- Reply Language Rule ---\nThe latest user message is in ${detectedReplyLanguage}. Reply only in ${detectedReplyLanguage}, even if uploaded documents are in another language. Use document facts but translate the answer into ${detectedReplyLanguage}.`;
   }
@@ -425,7 +438,8 @@ router.post("/chat", async (req, res) => {
       return;
     }
 
-    const finalReplyLanguage = detectChatLanguage(message);
+    const finalReplyLanguage = detectReplyLanguage(message);
+    console.log("DENA_REPLY_LANGUAGE_DEBUG", { message, finalReplyLanguage });
     const finalUserMessage = finalReplyLanguage
       ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
