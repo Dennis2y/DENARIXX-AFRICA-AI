@@ -395,17 +395,18 @@ router.post("/chat", async (req, res) => {
       return;
     }
 
+    const finalReplyLanguage = detectChatLanguage(message);
+    const finalUserMessage = finalReplyLanguage
+      ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
+      : message;
+
     const aiResponse = await streamAI(
       {
         messages: [
           { role: "system", content: systemPrompt },
           ...history.slice(-20),
           ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
-          {
-            role: "user",
-            content:
-              `${message}\n\nIMPORTANT: Answer in the same language as this latest user message. Do not use the uploaded document language unless it is the same as this message language.`,
-          },
+          { role: "user", content: finalUserMessage },
         ],
         temperature: 0.7,
       },
