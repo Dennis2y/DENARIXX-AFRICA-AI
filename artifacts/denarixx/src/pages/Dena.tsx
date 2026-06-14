@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Role = "user" | "assistant";
-type Message = { role: Role; content: string; id?: number };
+type MessageAttachment = { id: number; filename: string; type: "document" };
+type Message = { role: Role; content: string; id?: number; attachments?: MessageAttachment[] };
+type PendingDocument = { id: number; filename: string; summary?: string | null; chunkCount?: number };
 type Conversation = { id: number; title: string; updatedAt: string };
 
 const WELCOME: Message = {
@@ -72,6 +74,7 @@ function DenaPageContent() {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [pendingDocument, setPendingDocument] = useState<PendingDocument | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -129,15 +132,14 @@ function DenaPageContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed");
 
-      const summary = data.document?.summary || "Document uploaded successfully.";
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            `📎 I uploaded **${file.name}** and saved it to your document library.\n\n${summary}\n\nYou can now ask me questions about this document.`,
-        },
-      ]);
+      setPendingDocument({
+        id: data.document.id,
+        filename: data.document.filename,
+        summary: data.document.summary,
+        chunkCount: data.document.chunkCount,
+      });
+
+      setInput((prev) => prev || "");
     } catch (err: any) {
       setMessages((prev) => [
         ...prev,
@@ -305,7 +307,13 @@ function DenaPageContent() {
     if (!text || streaming) return;
     setInput("");
 
-    const userMsg: Message = { role: "user", content: text };
+    const userMsg: Message = {
+      role: "user",
+      content: text,
+      attachments: pendingDocument
+        ? [{ id: pendingDocument.id, filename: pendingDocument.filename, type: "document" }]
+        : undefined,
+    };
     setMessages(prev => [...prev, userMsg]);
     setStreaming(true);
 
@@ -324,7 +332,11 @@ function DenaPageContent() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({ message: text, conversationId: activeConvId ?? undefined }),
+        body: JSON.stringify({
+          message: text,
+          conversationId: activeConvId ?? undefined,
+          documentId: pendingDocument?.id,
+        }),
       });
 
       if (!res.ok || !res.body) throw new Error("Failed");
@@ -369,6 +381,8 @@ function DenaPageContent() {
           } catch {}
         }
       }
+
+      if (pendingDocument) setPendingDocument(null);
 
       // Refresh conversation list to show new/updated entry
       await fetchConversations();
@@ -536,8 +550,22 @@ function DenaPageContent() {
                         : "bg-card border border-border text-foreground rounded-bl-sm"
                     }`}
                   >
+                    {msg.attachments?.length ? (
+                      <div className="mb-2 space-y-1">
+                        {msg.attachments.map((attachment) => (
+                          <div
+                            key={`${attachment.type}-${attachment.id}`}
+                            className="inline-flex max-w-full items-center gap-2 rounded-lg border border-white/25 bg-white/15 px-2.5 py-1.5 text-xs"
+                          >
+                            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{attachment.filename}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
                     {msg.role === "user" ? (
-                      msg.content
+                      <span>{msg.content}</span>
                     ) : (
                       <TypewriterText
                         text={msg.content}
@@ -593,6 +621,26 @@ function DenaPageContent() {
 
         {/* Input area */}
         <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm flex-shrink-0">
+          {pendingDocument && (
+            <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium truncate">{pendingDocument.filename}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Attached to next message{pendingDocument.chunkCount ? ` • ${pendingDocument.chunkCount} chunks` : ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPendingDocument(null)}
+                className="text-muted-foreground hover:text-red-400 transition-colors"
+                title="Remove attachment"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2 max-w-3xl mx-auto">
             <input
               ref={inputRef}
