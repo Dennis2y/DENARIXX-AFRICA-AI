@@ -315,9 +315,14 @@ function DenaPageContent() {
     let resolvedConvId = activeConvId;
 
     try {
+      const token = await getToken();
+
       const res = await fetch(`${basePath}/api/dena/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ message: text, conversationId: activeConvId ?? undefined }),
       });

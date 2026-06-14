@@ -3,6 +3,7 @@ import { db, conversations, messages, usersTable, userSkillsTable, userMemories,
 import { eq, desc, asc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { streamAI } from "../lib/ai/aiRouter";
+import { getAuth } from "@clerk/express";
 
 const router: IRouter = Router();
 
@@ -249,7 +250,7 @@ async function saveUserMemories(userId: number, rawMemories: string[]) {
 
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
-  const clerkUserId: string | undefined = (req as any).clerkUserId;
+  const clerkUserId: string | undefined = (req as any).clerkUserId || getAuth(req)?.userId;
   const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt, activeWorkflow } = req.body as {
     message: string;
     conversationId?: number;
