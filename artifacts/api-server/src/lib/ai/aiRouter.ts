@@ -141,9 +141,17 @@ export async function streamAI(
 ): Promise<AIResponse> {
   const provider = request.provider || AI_CONFIG.defaultProvider;
 
+console.log("STREAM_AI_PROVIDER =", provider);
+
   if (provider !== "openai") {
     const response = await generateAI(request);
-    await onToken(response.content);
+
+    const parts = response.content.match(/\S+\s*/g) ?? [response.content];
+    for (const part of parts) {
+      await onToken(part);
+      await new Promise((resolve) => setTimeout(resolve, 18));
+    }
+
     return response;
   }
 
