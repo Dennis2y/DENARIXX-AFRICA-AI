@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useTypewriterText } from "@/hooks/useTypewriterText";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -842,6 +843,8 @@ function CvBuilderContent() {
   const [copied, setCopied] = useState<"resume" | "cover" | null>(null);
   const [activeTab, setActiveTab] = useState<"resume" | "cover">("resume");
   const [editedCoverLetter, setEditedCoverLetter] = useState("");
+  const typedResume = useTypewriterText(result?.resume ?? "", generateLoading ? 0 : 5);
+  const typedCoverLetter = useTypewriterText(editedCoverLetter, generateLoading ? 0 : 5);
   const [isDragging, setIsDragging] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ ach: false, jd: false, exp: true });
   const [savedResumes, setSavedResumes] = useState<SavedResume[]>([]);
@@ -1865,12 +1868,12 @@ function CvBuilderContent() {
                   <div className="h-1.5 w-full rounded-t-lg" style={{ backgroundColor: TEMPLATES.find(t => t.id === selectedTemplate)?.accent }} />
                   {activeTab === "resume" ? (
                     <div className="bg-white border border-border rounded-b-2xl p-6 leading-relaxed max-h-[600px] overflow-y-auto">
-                      <div className="prose prose-sm max-w-none" style={{ color: "#1e293b" }} dangerouslySetInnerHTML={{ __html: mdInline(result.resume) }} />
+                      <div className="prose prose-sm max-w-none" style={{ color: "#1e293b" }} dangerouslySetInnerHTML={{ __html: mdInline(typedResume) }} />
                     </div>
                   ) : (
                     <div className="relative">
                       <textarea
-                        value={editedCoverLetter}
+                        value={typedCoverLetter}
                         onChange={e => setEditedCoverLetter(e.target.value)}
                         className="w-full bg-white border border-border rounded-b-2xl p-6 text-sm text-gray-800 leading-relaxed resize-none outline-none focus:border-primary/40 transition-colors"
                         style={{ minHeight: 600, fontFamily: "Georgia, serif" }}
@@ -1883,9 +1886,9 @@ function CvBuilderContent() {
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2"><Eye className="w-3.5 h-3.5" />Print Preview</div>
                   <div className="rounded-2xl border border-border overflow-hidden" style={{ height: 600 }}>
                     <iframe
-                      key={`${selectedTemplate}-${activeTab}-${editedCoverLetter.length}`}
+                      key={`${selectedTemplate}-${activeTab}-${typedCoverLetter.length}-${typedResume.length}`}
                       title="CV Preview"
-                      srcDoc={activeTab === "resume" ? previewHtml : buildPrintHTML(editedCoverLetter, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0], form.photo || undefined, { email: form.email, phone: form.phone, location: form.location, linkedin: form.linkedin, skills: form.skills })}
+                      srcDoc={activeTab === "resume" ? buildPrintHTML(typedResume, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0], form.photo || undefined, { email: form.email, phone: form.phone, location: form.location, linkedin: form.linkedin, skills: form.skills }) : buildPrintHTML(typedCoverLetter, form.name, form.targetRole, TEMPLATES.find(t => t.id === selectedTemplate) ?? TEMPLATES[0], form.photo || undefined, { email: form.email, phone: form.phone, location: form.location, linkedin: form.linkedin, skills: form.skills })}
                       className="w-full h-full border-0 bg-white"
                       sandbox="allow-same-origin"
                     />
