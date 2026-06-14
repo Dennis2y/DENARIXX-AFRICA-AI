@@ -1,6 +1,14 @@
 import OpenAI from "openai";
 import { AIRequest, AIResponse, AIProvider } from "./types";
 import { AI_CONFIG } from "./config";
+import { callAnthropic } from "./providers/anthropic";
+import { callMistral } from "./providers/mistral";
+
+const VALID_PROVIDERS: AIProvider[] = ["openai", "gemini", "anthropic", "groq", "mistral"];
+
+function isAIProvider(value: unknown): value is AIProvider {
+  return typeof value === "string" && VALID_PROVIDERS.includes(value as AIProvider);
+}
 
 function normalizeMessages(messages: AIRequest["messages"]) {
   return messages.map((m) => ({
@@ -66,15 +74,8 @@ async function callGemini(request: AIRequest): Promise<AIResponse> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: request.temperature ?? 0.7,
-        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: request.temperature ?? 0.7 },
       }),
     },
   );
@@ -96,24 +97,36 @@ async function callGemini(request: AIRequest): Promise<AIResponse> {
   };
 }
 
-export async function generateAI(request: AIRequest): Promise<AIResponse> {
-  const order = [
-    request.provider,
-    ...AI_CONFIG.fallbackOrder,
-  ].filter(Boolean) as AIProvider[];
+async function callProvider(provider: AIProvider, request: AIRequest): Promise<AIResponse> {
+  if (!AI_CONFIG.providers[provider]) {
+    throw new Error(`${provider.toUpperCase()} is not configured`);
+  }
 
-  const uniqueOrder = [...new Set(order)];
+  if (provider === "openai") return callOpenAI(request);
+  if (provider === "gemini") return callGemini(request);
+  if (provider === "groq") return callGroq(request);
+  if (provider === "anthropic") return callAnthropic(request);
+  if (provider === "mistral") return callMistral(request);
+
+  throw new Error(`Unsupported provider: ${provider}`);
+}
+
+export async function generateAI(request: AIRequest): Promise<AIResponse> {
+  if (request.provider) {
+    if (!isAIProvider(request.provider)) {
+      throw new Error(`Invalid AI provider: ${request.provider}`);
+    }
+
+    // Explicit provider = no fallback. If OpenAI fails, say OpenAI failed.
+    return callProvider(request.provider, request);
+  }
+
+  const order = AI_CONFIG.fallbackOrder.filter(isAIProvider);
   let lastError: unknown;
 
-  for (const provider of uniqueOrder) {
+  for (const provider of order) {
     try {
-      if (!AI_CONFIG.providers[provider]) continue;
-
-      if (provider === "openai") return await callOpenAI(request);
-      if (provider === "groq") return await callGroq(request);
-      if (provider === "gemini") return await callGemini(request);
-
-      continue;
+      return await callProvider(provider, request);
     } catch (err) {
       lastError = err;
     }
