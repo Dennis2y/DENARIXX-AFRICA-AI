@@ -3,6 +3,8 @@ import { db, documentUploads, usersTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateAI } from "../lib/ai/aiRouter";
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import mammoth from "mammoth";
 
 const router: IRouter = Router();
 
@@ -17,6 +19,53 @@ async function getDbUser(clerkUserId: string) {
 
   return user;
 }
+
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const uint8 = new Uint8Array(buffer);
+  const pdf = await (pdfjs as any).getDocument({ data: uint8 }).promise;
+
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item: any) => item.str)
+      .filter(Boolean)
+      .join(" ");
+    pages.push(pageText);
+  }
+
+  return pages.join("\n\n");
+}
+
+async function extractDocxText(buffer: Buffer): Promise<string> {
+  const result = await mammoth.extractRawText({ buffer });
+  return result.value || "";
+}
+
+async function extractUploadedContent(filename: string, fileType: string, content: string, encoding?: string): Promise<string> {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+
+  if (encoding === "base64" || ["pdf", "docx", "doc"].includes(ext)) {
+    const buffer = Buffer.from(content, "base64");
+
+    if (ext === "pdf" || fileType.includes("pdf")) {
+      return extractPdfText(buffer);
+    }
+
+    if (ext === "docx" || fileType.includes("wordprocessingml")) {
+      return extractDocxText(buffer);
+    }
+
+    if (ext === "doc") {
+      throw new Error("Legacy .doc files are not supported yet. Please convert to .docx or PDF.");
+    }
+  }
+
+  return content;
+}
+
 
 function cleanContent(raw: string) {
   return raw
@@ -34,11 +83,18 @@ router.post("/upload", requireAuth, async (req, res) => {
     filename?: string;
     fileType?: string;
     content?: string;
+    encoding?: "text" | "base64";
   };
 
   const filename = body.filename?.trim();
   const fileType = body.fileType?.trim().toLowerCase() || "text/plain";
-  const content = cleanContent(body.content ?? "");
+  let content = "";
+  try {
+    content = cleanContent(await extractUploadedContent(filename ?? "", fileType, body.content ?? "", body.encoding));
+  } catch (err: any) {
+    res.status(415).json({ error: err.message ?? "Could not read this document" });
+    return;
+  }
 
   if (!filename || !content) {
     res.status(400).json({ error: "filename and content are required" });

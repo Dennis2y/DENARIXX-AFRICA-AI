@@ -80,23 +80,33 @@ function DenaPageContent() {
 
 
   const uploadDocument = useCallback(async (file: File) => {
-    const allowed = ["txt", "md", "json", "csv"];
+    const allowed = ["txt", "md", "json", "csv", "pdf", "docx", "doc"];
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
 
     if (!allowed.includes(ext)) {
-      alert("For now, DENA document chat supports TXT, MD, JSON, and CSV files. PDF/DOCX comes next.");
+      alert("DENA supports TXT, MD, JSON, CSV, PDF, DOCX, and DOC files.");
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert("Please upload a file under 2 MB for now.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Please upload a file under 10 MB.");
       return;
     }
 
     setUploadingDocument(true);
 
     try {
-      const content = await file.text();
+      let content = "";
+
+      if (["txt", "md", "json", "csv"].includes(ext)) {
+        content = await file.text();
+      } else {
+        const arrayBuffer = await file.arrayBuffer();
+        let binary = "";
+        const bytes = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        content = btoa(binary);
+      }
 
       const res = await fetch(`${basePath}/api/documents/upload`, {
         method: "POST",
@@ -106,6 +116,7 @@ function DenaPageContent() {
           filename: file.name,
           fileType: file.type || `text/${ext}`,
           content,
+          encoding: ["pdf", "docx", "doc"].includes(ext) ? "base64" : "text",
         }),
       });
 
@@ -585,7 +596,7 @@ function DenaPageContent() {
             <input
               ref={documentInputRef}
               type="file"
-              accept=".txt,.md,.json,.csv"
+              accept=".txt,.md,.json,.csv,.pdf,.docx,.doc"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
