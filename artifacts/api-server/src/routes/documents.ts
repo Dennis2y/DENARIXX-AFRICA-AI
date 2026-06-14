@@ -10,14 +10,27 @@ const router: IRouter = Router();
 
 const MAX_TEXT_CHARS = 80_000;
 
-async function getDbUser(clerkUserId: string) {
-  const [user] = await db
+async function getOrCreateDbUser(clerkUserId: string) {
+  const [existingUser] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.clerkUserId, clerkUserId))
     .limit(1);
 
-  return user;
+  if (existingUser) return existingUser;
+
+  const safeId = clerkUserId.replace(/[^a-zA-Z0-9_-]/g, "");
+  const [newUser] = await db
+    .insert(usersTable)
+    .values({
+      clerkUserId,
+      email: `${safeId}@denarixx.local`,
+      name: "Denarixx User",
+      userType: "candidate",
+    })
+    .returning();
+
+  return newUser;
 }
 
 
@@ -125,7 +138,7 @@ router.post("/upload", requireAuth, async (req, res) => {
   }
 
   try {
-    const user = await getDbUser(clerkUserId);
+    const user = await getOrCreateDbUser(clerkUserId);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -188,7 +201,7 @@ router.get("/", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
 
   try {
-    const user = await getDbUser(clerkUserId);
+    const user = await getOrCreateDbUser(clerkUserId);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -226,7 +239,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 
   try {
-    const user = await getDbUser(clerkUserId);
+    const user = await getOrCreateDbUser(clerkUserId);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
