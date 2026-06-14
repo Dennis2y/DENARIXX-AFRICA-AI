@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser, Show } from "@clerk/react";
+import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
@@ -62,6 +62,7 @@ function timeAgo(iso: string) {
 
 function DenaPageContent() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
@@ -108,9 +109,14 @@ function DenaPageContent() {
         content = btoa(binary);
       }
 
+      const token = await getToken();
+
       const res = await fetch(`${basePath}/api/documents/upload`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           filename: file.name,
@@ -144,7 +150,7 @@ function DenaPageContent() {
       setUploadingDocument(false);
       if (documentInputRef.current) documentInputRef.current.value = "";
     }
-  }, []);
+  }, [getToken]);
 
 
   const speechSupported =
