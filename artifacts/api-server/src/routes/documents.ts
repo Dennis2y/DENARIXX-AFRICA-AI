@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, documentUploads, usersTable } from "@workspace/db";
+import { db, documentUploads, documentChunks, usersTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateAI } from "../lib/ai/aiRouter";
@@ -64,6 +64,24 @@ async function extractUploadedContent(filename: string, fileType: string, conten
   }
 
   return content;
+}
+
+
+
+function chunkDocumentText(text: string, chunkSize = 1800, overlap = 250): string[] {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  const chunks: string[] = [];
+
+  let start = 0;
+  while (start < cleaned.length) {
+    const end = Math.min(start + chunkSize, cleaned.length);
+    const chunk = cleaned.slice(start, end).trim();
+    if (chunk.length > 80) chunks.push(chunk);
+    if (end >= cleaned.length) break;
+    start = Math.max(0, end - overlap);
+  }
+
+  return chunks.slice(0, 80);
 }
 
 
@@ -147,7 +165,18 @@ router.post("/upload", requireAuth, async (req, res) => {
       })
       .returning();
 
-    res.json({ document });
+    const chunks = chunkDocumentText(content);
+    if (chunks.length > 0) {
+      await db.insert(documentChunks).values(
+        chunks.map((chunk, index) => ({
+          documentId: document.id,
+          chunkIndex: index,
+          content: chunk,
+        })),
+      );
+    }
+
+    res.json({ document: { ...document, chunkCount: chunks.length } });
   } catch (err) {
     req.log.error({ err }, "Failed to upload document");
     res.status(500).json({ error: "Failed to upload document" });

@@ -15,3 +15,4 @@ export * from "./emailLogs";
 export * from "./pushTokens";
 export * from "./userMemories";
 export * from "./documentUploads";
+export * from "./documentChunks";
