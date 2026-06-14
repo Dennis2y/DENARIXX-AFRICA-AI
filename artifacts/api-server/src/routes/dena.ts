@@ -62,6 +62,41 @@ function strictLanguageSystemMessage(message: string) {
   };
 }
 
+
+function directGreetingResponse(message: string): string | null {
+  const text = message.trim().toLowerCase();
+
+  if (/^(hallo|guten tag|guten morgen|guten abend|servus|moin)[!.?\s]*$/.test(text)) {
+    return "Hallo! Willkommen bei Denarixx. Wie kann ich dir heute helfen? Möchtest du deine Karriere verbessern, einen Lebenslauf erstellen, neue Fähigkeiten lernen oder passende Jobs finden?";
+  }
+
+  if (/^(bonjour|bonsoir|salut)[!.?\s]*$/.test(text)) {
+    return "Bonjour ! Bienvenue sur Denarixx. Comment puis-je vous aider aujourd’hui ? Voulez-vous améliorer votre carrière, créer un CV, apprendre de nouvelles compétences ou trouver des offres d’emploi adaptées ?";
+  }
+
+  if (/^(hola|buenos días|buenos dias|buenas tardes|buenas noches)[!.?\s]*$/.test(text)) {
+    return "¡Hola! Bienvenido a Denarixx. ¿Cómo puedo ayudarte hoy? ¿Quieres mejorar tu carrera, crear un CV, aprender nuevas habilidades o encontrar empleos adecuados?";
+  }
+
+  if (/^(ciao|buongiorno|buonasera)[!.?\s]*$/.test(text)) {
+    return "Ciao! Benvenuto su Denarixx. Come posso aiutarti oggi? Vuoi migliorare la tua carriera, creare un CV, imparare nuove competenze o trovare lavori adatti?";
+  }
+
+  if (/^(olá|ola|bom dia|boa tarde|boa noite)[!.?\s]*$/.test(text)) {
+    return "Olá! Bem-vindo ao Denarixx. Como posso ajudar você hoje? Quer melhorar sua carreira, criar um CV, aprender novas habilidades ou encontrar empregos adequados?";
+  }
+
+  return null;
+}
+
+function writeSseText(res: any, text: string, conversationId?: number) {
+  const parts = text.match(/\S+\s*/g) ?? [text];
+  for (const part of parts) {
+    res.write(`data: ${JSON.stringify({ content: part, conversationId })}\n\n`);
+  }
+  res.write(`data: ${JSON.stringify({ done: true, conversationId })}\n\n`);
+  res.end();
+}
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
@@ -166,6 +201,12 @@ router.post("/chat", async (req, res) => {
     res.setHeader("Connection", "keep-alive");
     if (resolvedConvId) {
       res.setHeader("X-Conversation-Id", String(resolvedConvId));
+    }
+
+    const directGreeting = directGreetingResponse(message);
+    if (directGreeting) {
+      writeSseText(res, directGreeting, resolvedConvId);
+      return;
     }
 
     const aiResponse = await streamAI(
