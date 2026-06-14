@@ -10,11 +10,32 @@ function isAIProvider(value: unknown): value is AIProvider {
   return typeof value === "string" && VALID_PROVIDERS.includes(value as AIProvider);
 }
 
+const MULTILINGUAL_SYSTEM_RULE = `You are multilingual.
+Automatically detect the user's language from their latest message.
+Always respond in the same language the user used.
+If the user mixes languages, respond in the main language while preserving important names, brands, technical terms, and quoted text.
+You can understand, read, write, translate, rewrite, summarize, and explain in any language.
+Never force English unless the user explicitly asks for English.`;
+
 function normalizeMessages(messages: AIRequest["messages"]) {
-  return messages.map((m) => ({
+  const hasSystem = messages.some((m) => m.role === "system");
+
+  const normalized = messages.map((m) => ({
     role: m.role,
-    content: m.content,
+    content:
+      m.role === "system"
+        ? `${MULTILINGUAL_SYSTEM_RULE}\n\n${m.content}`
+        : m.content,
   }));
+
+  if (!hasSystem) {
+    return [
+      { role: "system" as const, content: MULTILINGUAL_SYSTEM_RULE },
+      ...normalized,
+    ];
+  }
+
+  return normalized;
 }
 
 async function callOpenAI(request: AIRequest): Promise<AIResponse> {
