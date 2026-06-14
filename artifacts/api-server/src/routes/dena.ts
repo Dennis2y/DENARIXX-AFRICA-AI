@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, conversations, messages, usersTable, userSkillsTable } from "@workspace/db";
-import { eq, desc, asc } from "drizzle-orm";
+import { db, conversations, messages, usersTable, userSkillsTable, userMemories } from "@workspace/db";
+import { eq, desc, asc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { streamAI } from "../lib/ai/aiRouter";
 
@@ -97,6 +97,74 @@ function writeSseText(res: any, text: string, conversationId?: number) {
   res.write(`data: ${JSON.stringify({ done: true, conversationId })}\n\n`);
   res.end();
 }
+
+async function loadUserMemories(userId: number): Promise<string[]> {
+  try {
+    const rows = await db
+      .select({ content: userMemories.content })
+      .from(userMemories)
+      .where(and(eq(userMemories.userId, userId), eq(userMemories.isActive, true)))
+      .orderBy(desc(userMemories.updatedAt))
+      .limit(12);
+
+    return rows.map((r) => r.content).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function extractSimpleMemories(message: string): string[] {
+  const text = message.trim();
+  const memories: string[] = [];
+
+  const patterns = [
+    /\bmy name is\s+(.+)/i,
+    /\bi am\s+(.+)/i,
+    /\bi'm\s+(.+)/i,
+    /\bi work as\s+(.+)/i,
+    /\bi want to\s+(.+)/i,
+    /\bmein name ist\s+(.+)/i,
+    /\bich bin\s+(.+)/i,
+    /\bje suis\s+(.+)/i,
+    /\bme llamo\s+(.+)/i,
+    /\bsoy\s+(.+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[0]) memories.push(match[0].trim());
+  }
+
+  return [...new Set(memories)].slice(0, 5);
+}
+
+async function saveUserMemories(userId: number, rawMemories: string[]) {
+  const memories = rawMemories
+    .map((m) => m.trim())
+    .filter((m) => m.length >= 6 && m.length <= 300);
+
+  for (const content of memories) {
+    try {
+      const existing = await db
+        .select({ id: userMemories.id })
+        .from(userMemories)
+        .where(and(eq(userMemories.userId, userId), eq(userMemories.content, content)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        await db.insert(userMemories).values({
+          userId,
+          category: "profile",
+          content,
+          source: "dena_chat",
+        });
+      }
+    } catch {
+      // Memory should never break chat
+    }
+  }
+}
+
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId;
@@ -116,13 +184,17 @@ router.post("/chat", async (req, res) => {
 
   // Load user context if authenticated
   let userContext: Parameters<typeof buildSystemPrompt>[0] | undefined;
+  let resolvedUserId: number | undefined;
+  let savedMemoryLines: string[] = [];
   let resolvedConvId: number | undefined = conversationId;
 
   if (clerkUserId) {
     try {
       const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
       if (user) {
+        resolvedUserId = user.id;
         const skills = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
+        savedMemoryLines = await loadUserMemories(user.id);
         userContext = { name: user.name, role: user.role, location: user.location, skills: skills.map(s => s.skill) };
       }
 
@@ -195,6 +267,10 @@ router.post("/chat", async (req, res) => {
     }
   }
 
+  if (savedMemoryLines.length) {
+    systemPrompt += `\n\n--- Long-term User Memory ---\n${savedMemoryLines.map((m) => `- ${m}`).join("\n")}\nUse these memories carefully to personalize help. Do not mention memory unless it is useful.`;
+  }
+
   try {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -225,6 +301,10 @@ router.post("/chat", async (req, res) => {
     );
 
     const fullResponse = aiResponse.content;
+
+    if (resolvedUserId) {
+      await saveUserMemories(resolvedUserId, extractSimpleMemories(message));
+    }
 
     // Save assistant response to DB
     if (resolvedConvId && fullResponse) {
