@@ -4,7 +4,7 @@ import { useUser, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
-  ChevronLeft, Menu, X
+  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -68,9 +68,98 @@ function DenaPageContent() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+
+  const speechSupported =
+    typeof window !== "undefined" &&
+    (("SpeechRecognition" in window) || ("webkitSpeechRecognition" in window));
+
+  const speakText = useCallback((text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
+
+    window.speechSynthesis.cancel();
+
+    const cleanText = text
+      .replace(/\*\*/g, "")
+      .replace(/[#_`>\-]/g, "")
+      .replace(/\n+/g, " ")
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    const lower = cleanText.toLowerCase();
+    if (/[äöüß]|\b(hallo|guten|danke|bitte|karriere|lebenslauf)\b/.test(lower)) utterance.lang = "de-DE";
+    else if (/[¿¡]|\b(hola|gracias|trabajo|habilidades)\b/.test(lower)) utterance.lang = "es-ES";
+    else if (/\b(bonjour|merci|carrière|compétences|emploi)\b/.test(lower)) utterance.lang = "fr-FR";
+    else utterance.lang = "en-US";
+
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+    }
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (!speechSupported) {
+      alert("Voice input is not supported in this browser. Try Chrome.");
+      return;
+    }
+
+    if (listening) {
+      recognitionRef.current?.stop?.();
+      setListening(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInput(transcript.trim());
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [listening, speechSupported]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop?.();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -374,6 +463,15 @@ function DenaPageContent() {
                       />
                     )}
                   </div>
+                  {msg.role === "assistant" && msg.content.trim() && (
+                    <button
+                      onClick={() => speaking ? stopSpeaking() : speakText(msg.content)}
+                      className="ml-2 mt-2 text-muted-foreground hover:text-primary transition-colors"
+                      title={speaking ? "Stop speaking" : "Read aloud"}
+                    >
+                      {speaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
+                  )}
                 </motion.div>
               ))}
               {streaming && messages[messages.length - 1]?.content === "" && (
@@ -425,6 +523,16 @@ function DenaPageContent() {
               className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 placeholder:text-muted-foreground disabled:opacity-50 transition-colors"
             />
             <Button
+              type="button"
+              onClick={toggleListening}
+              disabled={streaming || loadingConv}
+              variant="outline"
+              className={`rounded-xl h-11 w-11 p-0 flex-shrink-0 ${listening ? "border-red-400 text-red-400 animate-pulse" : ""}`}
+              title={listening ? "Stop listening" : "Speak to DENA"}
+            >
+              {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
+            <Button
               onClick={sendMessage}
               disabled={!input.trim() || streaming || loadingConv}
               className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-11 w-11 p-0 flex-shrink-0"
@@ -432,7 +540,9 @@ function DenaPageContent() {
               {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
           </div>
-          <p className="text-center text-[10px] text-muted-foreground mt-2">DENA can make mistakes. Verify important info.</p>
+          <p className="text-center text-[10px] text-muted-foreground mt-2">
+            {listening ? "Listening… speak now." : speaking ? "DENA is speaking…" : "DENA can make mistakes. Verify important info."}
+          </p>
         </div>
       </div>
     </div>
