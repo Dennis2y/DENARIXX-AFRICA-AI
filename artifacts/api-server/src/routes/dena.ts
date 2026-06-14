@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, conversations, messages, usersTable, userSkillsTable, userMemories } from "@workspace/db";
+import { db, conversations, messages, usersTable, userSkillsTable, userMemories, documentUploads } from "@workspace/db";
 import { eq, desc, asc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { streamAI } from "../lib/ai/aiRouter";
@@ -98,6 +98,24 @@ function writeSseText(res: any, text: string, conversationId?: number) {
   res.end();
 }
 
+
+async function loadRecentDocuments(userId: number): Promise<Array<{ filename: string; summary: string | null; content: string }>> {
+  try {
+    return await db
+      .select({
+        filename: documentUploads.filename,
+        summary: documentUploads.summary,
+        content: documentUploads.content,
+      })
+      .from(documentUploads)
+      .where(and(eq(documentUploads.userId, userId), eq(documentUploads.isActive, true)))
+      .orderBy(desc(documentUploads.updatedAt))
+      .limit(3);
+  } catch {
+    return [];
+  }
+}
+
 async function loadUserMemories(userId: number): Promise<string[]> {
   try {
     const rows = await db
@@ -186,6 +204,7 @@ router.post("/chat", async (req, res) => {
   let userContext: Parameters<typeof buildSystemPrompt>[0] | undefined;
   let resolvedUserId: number | undefined;
   let savedMemoryLines: string[] = [];
+  let recentDocuments: Array<{ filename: string; summary: string | null; content: string }> = [];
   let resolvedConvId: number | undefined = conversationId;
 
   if (clerkUserId) {
@@ -195,6 +214,7 @@ router.post("/chat", async (req, res) => {
         resolvedUserId = user.id;
         const skills = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
         savedMemoryLines = await loadUserMemories(user.id);
+        recentDocuments = await loadRecentDocuments(user.id);
         userContext = { name: user.name, role: user.role, location: user.location, skills: skills.map(s => s.skill) };
       }
 
@@ -269,6 +289,13 @@ router.post("/chat", async (req, res) => {
 
   if (savedMemoryLines.length) {
     systemPrompt += `\n\n--- Long-term User Memory ---\n${savedMemoryLines.map((m) => `- ${m}`).join("\n")}\nUse these memories carefully to personalize help. Do not mention memory unless it is useful.`;
+  }
+
+  if (recentDocuments.length) {
+    systemPrompt += `\n\n--- Recently Uploaded Documents ---\n${recentDocuments.map((doc) => {
+      const preview = (doc.summary || doc.content).slice(0, 4000);
+      return `Document: ${doc.filename}\n${preview}`;
+    }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
 
   try {
