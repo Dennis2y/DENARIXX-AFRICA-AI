@@ -47,6 +47,10 @@ function detectChatLanguage(message: string): string | null {
   if (/^(ciao|buongiorno|buonasera|come stai)\b/.test(text)) return "Italian";
   if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)\b/.test(text)) return "Portuguese";
 
+  const englishSignals = /\b(what|which|who|where|when|why|how|explain|summarize|compare|tell|show|give|is|are|was|were|does|did|can|should|would|could|experience|skills|backend|frontend|strongest|document|uploaded|question|answer)\b/g;
+  const matches = text.match(englishSignals)?.length ?? 0;
+  if (matches >= 2) return "English";
+
   return null;
 }
 
@@ -58,8 +62,8 @@ function strictLanguageSystemMessage(message: string) {
     role: "system" as const,
     content:
       `CRITICAL: The user's latest message is in ${language}. ` +
-      `Reply ONLY in ${language}. Do not use English. Do not mix languages. ` +
-      `Even if the message is only a greeting, continue fully in ${language}.`,
+      `Reply ONLY in ${language}. The uploaded document language must NOT control the reply language. ` +
+      `Use document facts, but translate/explain them in ${language}. Do not mix languages.`,
   };
 }
 
@@ -367,6 +371,11 @@ router.post("/chat", async (req, res) => {
       const preview = (doc.summary || doc.content).slice(0, 1800);
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
+  }
+
+  const detectedReplyLanguage = detectChatLanguage(message);
+  if (detectedReplyLanguage) {
+    systemPrompt += `\n\n--- Reply Language Rule ---\nThe latest user message is in ${detectedReplyLanguage}. Reply only in ${detectedReplyLanguage}, even if uploaded documents are in another language. Use document facts but translate the answer into ${detectedReplyLanguage}.`;
   }
 
   try {
