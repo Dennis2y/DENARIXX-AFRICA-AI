@@ -4,7 +4,7 @@ import { useUser, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
-  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX
+  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -70,10 +70,70 @@ function DenaPageContent() {
   const [loadingConv, setLoadingConv] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+
+
+
+  const uploadDocument = useCallback(async (file: File) => {
+    const allowed = ["txt", "md", "json", "csv"];
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+
+    if (!allowed.includes(ext)) {
+      alert("For now, DENA document chat supports TXT, MD, JSON, and CSV files. PDF/DOCX comes next.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Please upload a file under 2 MB for now.");
+      return;
+    }
+
+    setUploadingDocument(true);
+
+    try {
+      const content = await file.text();
+
+      const res = await fetch(`${basePath}/api/documents/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          filename: file.name,
+          fileType: file.type || `text/${ext}`,
+          content,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+
+      const summary = data.document?.summary || "Document uploaded successfully.";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            `📎 I uploaded **${file.name}** and saved it to your document library.\n\n${summary}\n\nYou can now ask me questions about this document.`,
+        },
+      ]);
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Sorry, I could not upload that document. ${err.message ?? "Please try again."}`,
+        },
+      ]);
+    } finally {
+      setUploadingDocument(false);
+      if (documentInputRef.current) documentInputRef.current.value = "";
+    }
+  }, []);
 
 
   const speechSupported =
@@ -522,6 +582,26 @@ function DenaPageContent() {
               disabled={streaming || loadingConv}
               className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 placeholder:text-muted-foreground disabled:opacity-50 transition-colors"
             />
+            <input
+              ref={documentInputRef}
+              type="file"
+              accept=".txt,.md,.json,.csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadDocument(file);
+              }}
+            />
+            <Button
+              type="button"
+              onClick={() => documentInputRef.current?.click()}
+              disabled={streaming || loadingConv || uploadingDocument}
+              variant="outline"
+              className="rounded-xl h-11 w-11 p-0 flex-shrink-0"
+              title="Upload document"
+            >
+              {uploadingDocument ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+            </Button>
             <Button
               type="button"
               onClick={toggleListening}
@@ -541,7 +621,7 @@ function DenaPageContent() {
             </Button>
           </div>
           <p className="text-center text-[10px] text-muted-foreground mt-2">
-            {listening ? "Listening… speak now." : speaking ? "DENA is speaking…" : "DENA can make mistakes. Verify important info."}
+            {uploadingDocument ? "Uploading document…" : listening ? "Listening… speak now." : speaking ? "DENA is speaking…" : "DENA can make mistakes. Verify important info."}
           </p>
         </div>
       </div>
