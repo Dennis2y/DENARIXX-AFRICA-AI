@@ -47,9 +47,9 @@ function detectChatLanguage(message: string): string | null {
   if (/^(ciao|buongiorno|buonasera|come stai)/.test(text)) return "Italian";
   if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)/.test(text)) return "Portuguese";
 
-  const englishSignals = /(what|which|who|where|when|why|how|explain|summarize|compare|tell|show|give|is|are|was|were|does|did|can|should|would|could|experience|skills|backend|frontend|strongest|document|uploaded|question|answer)/g;
+  const englishSignals = /(what|which|who|where|when|why|how|explain|summarize|compare|tell|show|give|is|are|was|were|does|did|can|should|would|could|experience|skills|backend|frontend|strongest|document|uploaded|question|answer|english|responding|german)/g;
   const englishMatches = text.match(englishSignals)?.length ?? 0;
-  if (englishMatches >= 2) return "English";
+  if (englishMatches >= 1 && /[a-z]/.test(text)) return "English";
 
   return null;
 }
@@ -61,9 +61,11 @@ function strictLanguageSystemMessage(message: string) {
   return {
     role: "system" as const,
     content:
-      `CRITICAL: The user's latest message is in ${language}. ` +
-      `Reply ONLY in ${language}. The uploaded document language must NOT control the reply language. ` +
-      `Use document facts, but translate/explain them in ${language}. Do not mix languages.`,
+      `NON-NEGOTIABLE LANGUAGE RULE: Reply ONLY in ${language}. ` +
+      `The user's latest message controls the reply language. ` +
+      `Uploaded documents, retrieved chunks, summaries, memories, and conversation history may be in another language, but they must NOT control the response language. ` +
+      `Use the facts from documents, but translate/explain them fully in ${language}. ` +
+      `Do not start in the document language. Do not mix languages.`,
   };
 }
 
@@ -378,6 +380,7 @@ router.post("/chat", async (req, res) => {
     systemPrompt += `\n\n--- Reply Language Rule ---\nThe latest user message is in ${detectedReplyLanguage}. Reply only in ${detectedReplyLanguage}, even if uploaded documents are in another language. Use document facts but translate the answer into ${detectedReplyLanguage}.`;
   }
 
+
   try {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -398,7 +401,11 @@ router.post("/chat", async (req, res) => {
           { role: "system", content: systemPrompt },
           ...history.slice(-20),
           ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
-          { role: "user", content: message },
+          {
+            role: "user",
+            content:
+              `${message}\n\nIMPORTANT: Answer in the same language as this latest user message. Do not use the uploaded document language unless it is the same as this message language.`,
+          },
         ],
         temperature: 0.7,
       },
