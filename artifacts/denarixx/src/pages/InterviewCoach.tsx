@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useTypewriterText } from "@/hooks/useTypewriterText";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -169,6 +170,7 @@ function InterviewStep({
   const [evaluating, setEvaluating] = useState(false);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [currentFeedback, setCurrentFeedback] = useState<Answer["feedback"] | null>(null);
+  const typedCurrentFeedback = useTypewriterText(currentFeedback?.betterAnswer ?? "", evaluating ? 0 : 8);
   const [completing, setCompleting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -392,6 +394,7 @@ function InterviewCoachContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [overallFeedback, setOverallFeedback] = useState("");
+  const typedOverallFeedback = useTypewriterText(overallFeedback, 8);
   const [score, setScore] = useState(0);
 
   const startSession = async (role: string, type: InterviewType) => {
