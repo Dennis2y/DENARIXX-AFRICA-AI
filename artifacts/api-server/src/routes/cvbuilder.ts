@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db, usersTable, userSkillsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { generateAI } from "../lib/ai/aiRouter";
 
 const router: IRouter = Router();
 
@@ -31,26 +32,6 @@ function checkImportRateLimit(req: Request, res: Response): boolean {
   }
   entry.count++;
   return true;
-}
-
-function getOpenAI() {
-  const { openai } = require("@workspace/integrations-openai-ai-server");
-  return openai;
-}
-
-type OpenAIClient = ReturnType<typeof getOpenAI>;
-
-function getOpenAISafe(res: { status: (c: number) => { json: (b: unknown) => void } }): OpenAIClient | null {
-  if (!process.env.OPENAI_API_KEY) {
-    res.status(503).json({ error: "AI service is not configured. Please add your OPENAI_API_KEY in environment settings." });
-    return null;
-  }
-  try {
-    return getOpenAI();
-  } catch {
-    res.status(503).json({ error: "AI service failed to initialize. Please verify your OPENAI_API_KEY is valid." });
-    return null;
-  }
 }
 
 // POST /api/cv-builder/generate
@@ -139,17 +120,13 @@ ${achievements ? `Achievements: ${achievements}` : ""}
 ${spokenLanguages ? `Languages (spoken/written): ${spokenLanguages}` : ""}
 Tone: ${tone}`;
 
-  const openai = getOpenAISafe(res);
-  if (!openai) return;
-
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const completion = await generateAI({
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       temperature: 0.7,
     });
 
-    const raw = completion.choices[0]?.message?.content ?? "";
+    const raw = completion.content ?? "";
     const splitIdx = raw.indexOf("---COVER LETTER---");
     const resume = splitIdx > -1 ? raw.slice(0, splitIdx).trim() : raw.trim();
     const coverLetter = splitIdx > -1 ? raw.slice(splitIdx + "---COVER LETTER---".length).trim() : "";
@@ -169,9 +146,6 @@ router.post("/assist", requireAuth, async (req, res) => {
   };
 
   if (!action) { res.status(400).json({ error: "action is required" }); return; }
-
-  const openai = getOpenAISafe(res);
-  if (!openai) return;
 
   const langSuffix = language && language !== "English" ? ` Respond entirely in ${language}.` : "";
 
@@ -202,14 +176,12 @@ router.post("/assist", requireAuth, async (req, res) => {
   if (!prompt) { res.status(400).json({ error: "Invalid action" }); return; }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const completion = await generateAI({
       messages: [{ role: "system", content: prompt.system }, { role: "user", content: prompt.user }],
       temperature: 0.7,
-      max_tokens: 500,
     });
 
-    const result = completion.choices[0]?.message?.content?.trim() ?? "";
+    const result = completion.content?.trim() ?? "";
 
     if (action === "suggestSkills") {
       try {
@@ -240,9 +212,6 @@ router.post("/tailor", requireAuth, async (req, res) => {
     return;
   }
 
-  const openai = getOpenAISafe(res);
-  if (!openai) return;
-
   const systemPrompt = `You are an expert ATS and recruitment consultant. Analyze this CV against the job description.
 
 Return ONLY a valid JSON object (no markdown, no code blocks):
@@ -257,14 +226,12 @@ Return ONLY a valid JSON object (no markdown, no code blocks):
   const userPrompt = `CV:\n${cvContent.slice(0, 2500)}\n\n---\n\nJob Description:\n${jobDescription.slice(0, 1500)}${targetRole ? `\n\nTarget Role: ${targetRole}` : ""}`;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const completion = await generateAI({
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       temperature: 0.3,
-      max_tokens: 900,
     });
 
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const raw = completion.content?.trim() ?? "";
     try {
       res.json(JSON.parse(raw));
     } catch {
@@ -487,9 +454,6 @@ async function runCvParse(
     return;
   }
 
-  const openai = getOpenAISafe(res as any);
-  if (!openai) return;
-
   const systemPrompt = `You are an expert CV/resume parser. Extract ALL structured information from the CV text — do not truncate, summarise, or skip any content.
 
 Return ONLY a valid JSON object (no markdown, no code blocks, no trailing text):
@@ -518,17 +482,15 @@ Rules:
   const MAX_CV_CHARS = 12000;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const completion = await generateAI({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Parse this CV:\n\n${cvText.slice(0, MAX_CV_CHARS)}` },
       ],
       temperature: 0.05,
-      max_tokens: 3000,
     });
 
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const raw = completion.content?.trim() ?? "";
     const photo = (diagnostics as any).photo as string | undefined;
 
     const tryParse = (s: string) => {
