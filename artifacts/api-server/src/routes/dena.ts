@@ -41,28 +41,26 @@ function buildSystemPrompt(userContext?: { name?: string | null; role?: string |
 function detectChatLanguage(message: string): string | null {
   const text = message.trim().toLowerCase();
 
-  if (/^(hallo|guten tag|guten morgen|guten abend|wie geht|servus|moin)/.test(text)) return "German";
-  if (/^(hola|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal)/.test(text)) return "Spanish";
-  if (/^(bonjour|bonsoir|salut|ça va|ca va)/.test(text)) return "French";
-  if (/^(ciao|buongiorno|buonasera|come stai)/.test(text)) return "Italian";
-  if (/^(olá|ola|bom dia|boa tarde|boa noite|tudo bem)/.test(text)) return "Portuguese";
+  // Explicit non-English detection first
+  if (/(hallo|guten tag|guten morgen|guten abend|wie geht|servus|moin|danke|bitte|lebenslauf|karriere)/.test(text)) return "German";
+  if (/(hola|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal|gracias|trabajo|habilidades)/.test(text)) return "Spanish";
+  if (/(bonjour|bonsoir|salut|ça va|ca va|merci|emploi|compétences|carrière)/.test(text)) return "French";
+  if (/(ciao|buongiorno|buonasera|come stai|grazie|lavoro)/.test(text)) return "Italian";
+  if (/(olá|ola|bom dia|boa tarde|boa noite|tudo bem|obrigado|trabalho)/.test(text)) return "Portuguese";
 
-  const englishSignals = /(what|which|who|where|when|why|how|explain|summarize|compare|tell|show|give|is|are|was|were|does|did|can|should|would|could|experience|skills|backend|frontend|strongest|document|uploaded|question|answer|english|responding|german)/g;
-  const englishMatches = text.match(englishSignals)?.length ?? 0;
-  if (englishMatches >= 1 && /[a-z]/.test(text)) return "English";
+  // Strong English detection
+  if (/(hi|hello|hey|thanks|thank you|you are welcome|code|coding|html|css|javascript|python|write|give|show|make|build|create|what|which|who|where|when|why|how|can|could|would|should|is|are|do|does|did|experience|skills|backend|frontend|career|job|document|cv|resume|strongest)/.test(text)) {
+    return "English";
+  }
+
+  // If the text uses normal Latin letters and no clear non-English signal, default to English.
+  if (/[a-z]/.test(text)) return "English";
 
   return null;
 }
 
 
 function detectReplyLanguage(message: string): string | null {
-  const text = message.trim().toLowerCase();
-
-  // Strong English question detection
-  if (/\b(what|which|who|where|when|why|how)\b/.test(text)) return "English";
-  if (/\b(is|are|was|were|does|did|can|could|should|would)\b/.test(text) && /\b(experience|skills|backend|frontend|career|job|document|cv|resume|strongest)\b/.test(text)) return "English";
-  if (/\bi('|’)m asking in english\b/.test(text)) return "English";
-
   return detectChatLanguage(message);
 }
 
