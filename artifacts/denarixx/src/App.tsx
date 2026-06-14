@@ -16,6 +16,7 @@ import Dashboard from "@/pages/Dashboard";
 import Profile from "@/pages/Profile";
 import SkillSwap from "@/pages/SkillSwap";
 import DenaPage from "@/pages/Dena";
+import Memories from "@/pages/Memories";
 import CvBuilder from "@/pages/CvBuilder";
 import Jobs from "@/pages/Jobs";
 import EmployerDashboard from "@/pages/EmployerDashboard";
@@ -157,6 +158,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/skillswap" component={SkillSwap} />
       <Route path="/dena" component={DenaPage} />
+      <Route path="/memories" component={Memories} />
       <Route path="/cv-builder" component={CvBuilder} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/employer" component={EmployerDashboard} />
