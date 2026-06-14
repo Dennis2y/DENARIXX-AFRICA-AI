@@ -474,7 +474,9 @@ router.post("/chat", async (req, res) => {
       }
     }
 
-    writeSseText(res, fullResponse, resolvedConvId);
+    res.write(`data: ${JSON.stringify({ content: fullResponse, conversationId: resolvedConvId })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, conversationId: resolvedConvId })}\n\n`);
+    res.end();
     return;
 
   } catch (err) {
