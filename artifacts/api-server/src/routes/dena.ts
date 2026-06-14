@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, conversations, messages, usersTable, userSkillsTable, userMemories, documentUploads, documentChunks } from "@workspace/db";
 import { eq, desc, asc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { streamAI } from "../lib/ai/aiRouter";
+import { streamAI, generateAI } from "../lib/ai/aiRouter";
 import { getAuth } from "@clerk/express";
 
 const router: IRouter = Router();
@@ -254,6 +254,36 @@ async function saveUserMemories(userId: number, rawMemories: string[]) {
   }
 }
 
+
+async function forceReplyLanguage(targetLanguage: string, answer: string): Promise<string> {
+  if (!targetLanguage || !answer.trim()) return answer;
+
+  try {
+    const fixed = await generateAI({
+      messages: [
+        {
+          role: "system",
+          content:
+            `You are a strict language normalizer. Rewrite the assistant answer ONLY in ${targetLanguage}. ` +
+            `Do not add an introduction. Do not say "here is the revised answer". ` +
+            `Preserve all facts, names, technologies, company names, and meaning. ` +
+            `If the answer is already in ${targetLanguage}, return it cleanly in ${targetLanguage}.`,
+        },
+        {
+          role: "user",
+          content: answer,
+        },
+      ],
+      temperature: 0.1,
+    });
+
+    return fixed.content?.trim() || answer;
+  } catch {
+    return answer;
+  }
+}
+
+
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId || getAuth(req)?.userId;
@@ -400,22 +430,21 @@ router.post("/chat", async (req, res) => {
       ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
 
-    const aiResponse = await streamAI(
-      {
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...history.slice(-20),
-          ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
-          { role: "user", content: finalUserMessage },
-        ],
-        temperature: 0.7,
-      },
-      async (content) => {
-        res.write(`data: ${JSON.stringify({ content, conversationId: resolvedConvId })}\n\n`);
-      },
-    );
+    const aiResponse = await generateAI({
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history.slice(-20),
+        ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
+        { role: "user", content: finalUserMessage },
+      ],
+      temperature: 0.4,
+    });
 
-    const fullResponse = aiResponse.content;
+    let fullResponse = aiResponse.content || "";
+
+    if (finalReplyLanguage) {
+      fullResponse = await forceReplyLanguage(finalReplyLanguage, fullResponse);
+    }
 
     if (resolvedUserId) {
       await saveUserMemories(resolvedUserId, extractSimpleMemories(message));
@@ -431,8 +460,9 @@ router.post("/chat", async (req, res) => {
       }
     }
 
-    res.write(`data: ${JSON.stringify({ done: true, conversationId: resolvedConvId })}\n\n`);
-    res.end();
+    writeSseText(res, fullResponse, resolvedConvId);
+    return;
+
   } catch (err) {
     req.log.error({ err }, "DENA chat failed");
     if (!res.headersSent) {
