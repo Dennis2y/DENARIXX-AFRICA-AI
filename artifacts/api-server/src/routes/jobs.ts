@@ -2,25 +2,12 @@ import { Router, type IRouter } from "express";
 import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { generateAI } from "../lib/ai/aiRouter";
 import { sendApplicationStatusEmail, sendJobMatchEmail } from "../email";
 
 const router: IRouter = Router();
 
 // ── OpenAI helper ────────────────────────────────────────────────────────────
-
-function getOpenAI() {
-  const { openai } = require("@workspace/integrations-openai-ai-server");
-  return openai;
-}
-type OpenAIClient = ReturnType<typeof getOpenAI>;
-function getOpenAISafe(res: any): OpenAIClient | null {
-  if (!process.env.OPENAI_API_KEY) {
-    res.status(503).json({ error: "AI service not configured." });
-    return null;
-  }
-  try { return getOpenAI(); }
-  catch { res.status(503).json({ error: "AI service failed to initialize." }); return null; }
-}
 
 // ── Match scoring ────────────────────────────────────────────────────────────
 
@@ -1064,12 +1051,9 @@ router.post("/:id/match-explain", requireAuth, async (req, res) => {
     const effectiveRole = targetTitle ?? user.role;
     const { matchedSkills, missingSkills } = computeMatch(job, userSkills, user.location, user.role, effectiveRole, cvSkills);
 
-    const openai = getOpenAISafe(res);
-    if (!openai) return;
 
     const cvNote = cvText ? `\nCV excerpt: ${cvText.slice(0, 600)}` : "";
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await generateAI({
       messages: [{
         role: "system",
         content: "You are a career coach for African tech professionals. Analyze the job match and return ONLY a valid JSON object (no markdown):\n{\n  \"summary\": \"<2-sentence explanation of why this is a good or partial match>\",\n  \"suggestions\": [\"<3 specific, actionable steps to improve the match>\"]\n}",
@@ -1078,10 +1062,9 @@ router.post("/:id/match-explain", requireAuth, async (req, res) => {
         content: `Job: ${job.title} at ${job.company} (${job.level} level, ${job.location})\nRequired skills: ${job.requiredSkills.join(", ")}\nUser profile skills: ${userSkills.join(", ")}\nTarget role: ${effectiveRole ?? "not specified"}\nMatched skills: ${matchedSkills.join(", ") || "none"}\nMissing skills: ${missingSkills.join(", ") || "none"}${cvNote}`,
       }],
       temperature: 0.4,
-      max_tokens: 400,
     });
 
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "{}";
+    const raw = completion.content?.trim() ?? "{}";
     let parsed: { summary?: string; suggestions?: string[] } = {};
     try { parsed = JSON.parse(raw); }
     catch { const m = raw.match(/\{[\s\S]*\}/); if (m) try { parsed = JSON.parse(m[0]); } catch {} }
@@ -1115,11 +1098,8 @@ router.post("/:id/cover-letter", requireAuth, async (req, res) => {
 
     const cvNote = cvText ? `\nRelevant CV background:\n${cvText.slice(0, 800)}` : "";
 
-    const openai = getOpenAISafe(res);
-    if (!openai) return;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await generateAI({
       messages: [{
         role: "system",
         content: "You are an expert job application coach specialising in African tech careers. Write a compelling, personalised 3-paragraph cover letter. Be specific about the company and role. Use a professional but warm tone. Return ONLY the cover letter text — no subject line, no date, no address block.",
@@ -1128,10 +1108,9 @@ router.post("/:id/cover-letter", requireAuth, async (req, res) => {
         content: `Candidate name: ${user.name ?? "Candidate"}\nCurrent role: ${user.role ?? "Professional"}\nSkills: ${userSkills.join(", ")}${cvNote}\n\nApplying for: ${job.title} at ${job.company} (${job.location})\nJob description: ${job.description}\nRequired skills: ${job.requiredSkills.join(", ")}`,
       }],
       temperature: 0.7,
-      max_tokens: 600,
     });
 
-    const coverLetter = completion.choices[0]?.message?.content?.trim() ?? "";
+    const coverLetter = completion.content?.trim() ?? "";
     res.json({ coverLetter });
   } catch (err: any) {
     req.log.error({ err }, "cover-letter generation failed");
@@ -1166,20 +1145,16 @@ router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
 
     const resolvedRole = targetRole ?? user.role ?? job.title;
 
-    const openai = getOpenAISafe(res);
-    if (!openai) return;
 
     const systemPrompt = `You are an expert ATS and recruitment consultant specialising in African tech careers. Analyse this CV against the job description for the target role.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords already present>],\n  "suggestions": [<3-5 actionable steps to improve the CV for this specific role>],\n  "tailoredSummary": "<2-3 sentence professional summary, tailored to this JD and target role>"\n}`;
     const userPrompt = `Target role: ${resolvedRole}\n\nCV:\n${cvContent.slice(0, 2500)}\n\n---\n\nJob: ${job.title} at ${job.company}\nJob Description: ${job.description}\nRequired Skills: ${job.requiredSkills.join(", ")}`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await generateAI({
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       temperature: 0.3,
-      max_tokens: 900,
     });
 
-    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    const raw = completion.content?.trim() ?? "";
     let parsed: Record<string, unknown> | null = null;
     try { parsed = JSON.parse(raw); }
     catch { const m = raw.match(/\{[\s\S]*\}/); if (m) try { parsed = JSON.parse(m[0]); } catch {} }

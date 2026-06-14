@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable, skillListingsTable, skillConnectionsTable, userSkillsTable } from "@workspace/db";
 import { eq, and, ne, desc, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { generateAI } from "../lib/ai/aiRouter";
 
 const router: IRouter = Router();
 
@@ -175,13 +176,10 @@ router.get("/matches", requireAuth, async (req, res) => {
     }
 
     // Use OpenAI to rank matches
-    const apiKey = process.env["OPENAI_API_KEY"];
-    if (!apiKey || otherListings.length === 0) {
+    if (otherListings.length === 0) {
       res.json({ matches: otherListings.slice(0, 6), reason: "Browse-based matches" });
       return;
     }
-
-    const { openai } = require("@workspace/integrations-openai-ai-server");
 
     const prompt = `You are a skill-matching AI for Denarixx Africa AI platform.
 
@@ -194,16 +192,14 @@ ${JSON.stringify(otherListings.map(l => ({ id: l.id, type: l.listingType, skill:
 Return a JSON array of the top 6 listing IDs in match order, most relevant first. Format: { "matches": [id1, id2, ...] }
 Only return valid JSON, no other text.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const completion = await generateAI({
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 200,
-      response_format: { type: "json_object" },
+      temperature: 0.2,
     });
 
     let rankedIds: number[] = [];
     try {
-      const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+      const parsed = JSON.parse(completion.content ?? "{}");
       rankedIds = (parsed.matches ?? []).map(Number).filter(Boolean);
     } catch {
       rankedIds = otherListings.slice(0, 6).map(l => l.id);
