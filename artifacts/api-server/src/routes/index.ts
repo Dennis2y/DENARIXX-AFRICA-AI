@@ -11,11 +11,13 @@ import communityRouter from "./community";
 import messagesRouter from "./messages";
 import storageRouter from "./storage";
 import resumesRouter from "./resumes";
+import aiGenerateRouter from "./aiGenerate";
 import aiStatusRouter from "./aiStatus";
 
 const router: IRouter = Router();
 
 router.use("/ai/status", aiStatusRouter);
+router.use("/ai/generate", aiGenerateRouter);
 
 router.use(healthRouter);
 router.use(waitlistRouter);
