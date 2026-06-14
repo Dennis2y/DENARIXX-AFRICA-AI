@@ -12,10 +12,20 @@ function isAIProvider(value: unknown): value is AIProvider {
 
 const MULTILINGUAL_SYSTEM_RULE = `You are multilingual.
 Automatically detect the user's language from their latest message.
-Always respond in the same language the user used.
+Always respond fully in the same language the user used.
 If the user mixes languages, respond in the main language while preserving important names, brands, technical terms, and quoted text.
 You can understand, read, write, translate, rewrite, summarize, and explain in any language.
-Never force English unless the user explicitly asks for English.`;
+Never force English unless the user explicitly asks for English.
+
+Short greeting language rules:
+- If the user writes "Hallo", "Guten Tag", "Guten Morgen", "Guten Abend", "Wie geht's", or similar German greetings, respond fully in German.
+- If the user writes "Hola", "Buenos días", "Buenas tardes", or similar Spanish greetings, respond fully in Spanish.
+- If the user writes "Bonjour", "Bonsoir", "Salut", or similar French greetings, respond fully in French.
+- If the user writes "Ciao", "Buongiorno", or similar Italian greetings, respond fully in Italian.
+- If the user writes "Olá", "Bom dia", or similar Portuguese greetings, respond fully in Portuguese.
+- For short greetings, treat the greeting language as the user's language.
+- Do not answer partly in English after a non-English greeting.
+- Only use English when the user writes in English or explicitly asks for English.`;
 
 function normalizeMessages(messages: AIRequest["messages"]) {
   const hasSystem = messages.some((m) => m.role === "system");
