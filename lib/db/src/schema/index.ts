@@ -14,3 +14,4 @@ export * from "./resumes";
 export * from "./emailLogs";
 export * from "./pushTokens";
 export * from "./userMemories";
+export * from "./documentUploads";

@@ -12,6 +12,7 @@ import messagesRouter from "./messages";
 import storageRouter from "./storage";
 import resumesRouter from "./resumes";
 import memoriesRouter from "./memories";
+import documentsRouter from "./documents";
 import aiGenerateRouter from "./aiGenerate";
 import aiStatusRouter from "./aiStatus";
 
@@ -25,6 +26,7 @@ router.use(waitlistRouter);
 router.use("/storage", storageRouter);
 router.use("/resumes", resumesRouter);
 router.use("/memories", memoriesRouter);
+router.use("/documents", documentsRouter);
 router.use("/users", usersRouter);
 router.use("/dena", denaRouter);
 router.use("/skillswap", skillswapRouter);

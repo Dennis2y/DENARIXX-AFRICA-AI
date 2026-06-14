@@ -163,7 +163,7 @@ function DashboardContent() {
           className="grid grid-cols-3 gap-4 mb-10"
         >
           {[
-            { label: "Skills", value: skillCount, icon: BookOpen, Brain, href: `${basePath}/profile` },
+            { label: "Skills", value: skillCount, icon: BookOpen, href: `${basePath}/profile` },
             { label: "Connections", value: acceptedConnections, icon: Users, href: `${basePath}/skillswap` },
             { label: "Applications", value: applicationCount, icon: Briefcase, href: `${basePath}/jobs?tab=applications` },
           ].map(({ label, value, icon: Icon, href }) => (
