@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, conversations, messages, usersTable, userSkillsTable } from "@workspace/db";
 import { eq, desc, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { streamAI } from "../lib/ai/aiRouter";
 
 const router: IRouter = Router();
 
@@ -23,11 +24,6 @@ Platform modules you know:
 - Ambassador Program: Refer friends, earn points, climb the leaderboard
 
 Always sign off as "— DENA 🌍" on longer responses.`;
-
-function getOpenAI() {
-  const { openai } = require("@workspace/integrations-openai-ai-server");
-  return openai;
-}
 
 function buildSystemPrompt(userContext?: { name?: string | null; role?: string | null; location?: string | null; skills?: string[] }) {
   if (!userContext) return BASE_SYSTEM_PROMPT;
@@ -108,7 +104,6 @@ router.post("/chat", async (req, res) => {
     }
   }
 
-  const openai = getOpenAI();
   let systemPrompt: string;
   if (overrideSystemPrompt && moduleContext) {
     // Module chat: use only the module's own system prompt — no DENA career base
@@ -140,16 +135,6 @@ router.post("/chat", async (req, res) => {
   }
 
   try {
-    const stream = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      stream: true,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history.slice(-20),
-        { role: "user", content: message },
-      ],
-    });
-
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -157,15 +142,21 @@ router.post("/chat", async (req, res) => {
       res.setHeader("X-Conversation-Id", String(resolvedConvId));
     }
 
-    let fullResponse = "";
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content ?? "";
-      if (content) {
-        fullResponse += content;
+    const aiResponse = await streamAI(
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...history.slice(-20),
+          { role: "user", content: message },
+        ],
+        temperature: 0.7,
+      },
+      async (content) => {
         res.write(`data: ${JSON.stringify({ content, conversationId: resolvedConvId })}\n\n`);
-      }
-    }
+      },
+    );
+
+    const fullResponse = aiResponse.content;
 
     // Save assistant response to DB
     if (resolvedConvId && fullResponse) {
