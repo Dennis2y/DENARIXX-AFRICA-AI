@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, conversations, messages, usersTable, userSkillsTable, userMemories, documentUploads } from "@workspace/db";
+import { db, conversations, messages, usersTable, userSkillsTable, userMemories, documentUploads, documentChunks } from "@workspace/db";
 import { eq, desc, asc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { streamAI } from "../lib/ai/aiRouter";
@@ -96,6 +96,70 @@ function writeSseText(res: any, text: string, conversationId?: number) {
   }
   res.write(`data: ${JSON.stringify({ done: true, conversationId })}\n\n`);
   res.end();
+}
+
+
+
+function tokenizeForSearch(text: string): string[] {
+  const stopwords = new Set([
+    "the", "and", "for", "with", "that", "this", "from", "your", "you", "are", "was", "were",
+    "what", "how", "why", "when", "where", "who", "does", "about", "into", "eine", "der",
+    "die", "das", "und", "ist", "mit", "pour", "les", "des", "que", "qui", "como", "para",
+  ]);
+
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3 && !stopwords.has(w))
+    .slice(0, 20);
+}
+
+async function loadRelevantDocumentChunks(
+  userId: number,
+  query: string,
+): Promise<Array<{ filename: string; content: string; score: number }>> {
+  try {
+    const terms = tokenizeForSearch(query);
+
+    const rows = await db
+      .select({
+        filename: documentUploads.filename,
+        content: documentChunks.content,
+      })
+      .from(documentChunks)
+      .innerJoin(documentUploads, eq(documentChunks.documentId, documentUploads.id))
+      .where(and(
+        eq(documentUploads.userId, userId),
+        eq(documentUploads.isActive, true),
+        eq(documentChunks.isActive, true),
+      ))
+      .orderBy(desc(documentChunks.createdAt))
+      .limit(120);
+
+    const scored = rows
+      .map((row) => {
+        const lower = row.content.toLowerCase();
+        const filenameLower = row.filename.toLowerCase();
+        const score = terms.reduce((sum, term) => {
+          const inContent = lower.includes(term) ? 2 : 0;
+          const inFile = filenameLower.includes(term) ? 1 : 0;
+          return sum + inContent + inFile;
+        }, 0);
+
+        return { ...row, score };
+      })
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    if (scored.length > 0) return scored;
+
+    return rows.slice(0, 3).map((row) => ({ ...row, score: 0 }));
+  } catch {
+    return [];
+  }
 }
 
 
@@ -205,6 +269,7 @@ router.post("/chat", async (req, res) => {
   let resolvedUserId: number | undefined;
   let savedMemoryLines: string[] = [];
   let recentDocuments: Array<{ filename: string; summary: string | null; content: string }> = [];
+  let relevantDocumentChunks: Array<{ filename: string; content: string; score: number }> = [];
   let resolvedConvId: number | undefined = conversationId;
 
   if (clerkUserId) {
@@ -215,6 +280,7 @@ router.post("/chat", async (req, res) => {
         const skills = await db.select({ skill: userSkillsTable.skill }).from(userSkillsTable).where(eq(userSkillsTable.userId, user.id));
         savedMemoryLines = await loadUserMemories(user.id);
         recentDocuments = await loadRecentDocuments(user.id);
+        relevantDocumentChunks = await loadRelevantDocumentChunks(user.id, message);
         userContext = { name: user.name, role: user.role, location: user.location, skills: skills.map(s => s.skill) };
       }
 
@@ -291,9 +357,13 @@ router.post("/chat", async (req, res) => {
     systemPrompt += `\n\n--- Long-term User Memory ---\n${savedMemoryLines.map((m) => `- ${m}`).join("\n")}\nUse these memories carefully to personalize help. Do not mention memory unless it is useful.`;
   }
 
-  if (recentDocuments.length) {
+  if (relevantDocumentChunks.length) {
+    systemPrompt += `\n\n--- Relevant Uploaded Document Chunks ---\n${relevantDocumentChunks.map((chunk, index) => {
+      return `Source ${index + 1}: ${chunk.filename}\n${chunk.content.slice(0, 2200)}`;
+    }).join("\n\n---\n\n")}\nUse these chunks when answering questions about uploaded files, CVs, notes, documents, or when the user says "this document". If the chunks do not contain the answer, say that clearly.`;
+  } else if (recentDocuments.length) {
     systemPrompt += `\n\n--- Recently Uploaded Documents ---\n${recentDocuments.map((doc) => {
-      const preview = (doc.summary || doc.content).slice(0, 4000);
+      const preview = (doc.summary || doc.content).slice(0, 1800);
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
