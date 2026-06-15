@@ -99,6 +99,7 @@ function DenaPageContent() {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const [input, setInput] = useState("");
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
   const [listening, setListening] = useState(false);
@@ -211,7 +212,7 @@ function DenaPageContent() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({ text: cleanText, voice: "alloy" }),
+        body: JSON.stringify({ text: cleanText, voice: "nova" }),
       });
 
       if (!response.ok) throw new Error("Neural voice unavailable");
@@ -414,6 +415,12 @@ function DenaPageContent() {
     const text = input.trim();
     if (!text || streaming) return;
     setInput("");
+
+    if (editingMessageIndex !== null) {
+      setMessages((prev) => prev.slice(0, editingMessageIndex));
+      setActiveConvId(null);
+      setEditingMessageIndex(null);
+    }
 
     const userMsg: Message = {
       role: "user",
@@ -791,7 +798,7 @@ function DenaPageContent() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
-              placeholder="Ask DENA anything about your career..."
+              placeholder={editingMessageIndex !== null ? "Edit your message and resend..." : "Ask DENA anything about your career..."}
               disabled={streaming || loadingConv}
               className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 placeholder:text-muted-foreground disabled:opacity-50 transition-colors"
             />
