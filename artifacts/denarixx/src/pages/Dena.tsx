@@ -7,7 +7,7 @@ import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
-  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText
+  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText, Copy, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -97,6 +97,7 @@ function DenaPageContent() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
@@ -328,6 +329,28 @@ function DenaPageContent() {
       setConversations(prev => prev.filter(c => c.id !== convId));
       if (activeConvId === convId) newConversation();
     } catch {}
+  };
+
+  const copyMessage = async (content: string, index: number) => {
+    const text = content.trim();
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageIndex(index);
+      window.setTimeout(() => setCopiedMessageIndex(null), 1600);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopiedMessageIndex(index);
+      window.setTimeout(() => setCopiedMessageIndex(null), 1600);
+    }
   };
 
   // Send a message
@@ -600,6 +623,33 @@ function DenaPageContent() {
                         text={msg.content}
                         isActive={streaming && i === messages.length - 1 && msg.content.length > 0}
                       />
+                    )}
+
+                    {msg.content.trim() && (
+                      <div className={`mt-2 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <button
+                          type="button"
+                          onClick={() => copyMessage(msg.content, i)}
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors ${
+                            msg.role === "user"
+                              ? "bg-white/15 text-primary-foreground hover:bg-white/25"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                          }`}
+                          title="Copy message"
+                        >
+                          {copiedMessageIndex === i ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                   {msg.role === "assistant" && msg.content.trim() && (
