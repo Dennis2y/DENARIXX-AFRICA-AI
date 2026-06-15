@@ -29,7 +29,6 @@ router.post("/", requireAuth, async (req: Request, res: Response): Promise<void>
       prompt: cleanPrompt,
       size: size || "1024x1024",
       n: 1,
-      ...(model === "gpt-image-1" ? {} : { response_format: "url" as const }),
     });
 
     const item = image.data?.[0];
