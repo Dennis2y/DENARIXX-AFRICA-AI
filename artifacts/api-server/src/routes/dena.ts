@@ -611,13 +611,14 @@ Return ONLY this structure:
 
 # Job Match Score
 Score: XX/100
-Verdict: Strong Match / Good Match / Medium Match / Weak Match / Not Recommended
+Verdict: choose exactly ONE of: Strong Match, Good Match, Medium Match, Weak Match, Not Recommended
 
 # ATS Match Score
 Score: XX/100
 Reason:
 
 # Evidence Found In CV
+List only skills/experience explicitly found in SOURCE A. Do not invent.
 - 
 
 # Job Requirements Found
@@ -630,6 +631,7 @@ Explain how well SOURCE A fits SOURCE B.
 - 
 
 # Missing Skills
+List only requirements from SOURCE B that are NOT found in SOURCE A.
 - 
 
 # Missing Keywords
@@ -712,6 +714,7 @@ Reason:
 - 
 
 # Missing Skills
+List only requirements from SOURCE B that are NOT found in SOURCE A.
 - 
 
 # Missing Keywords
@@ -746,19 +749,19 @@ CRITICAL OUTPUT RULES:
 
 === CAREER ROADMAP MODE ===
 
-You are ONLY a career roadmap strategist, skills gap analyst, and technical career coach.
-
-Your job is to create a practical roadmap from the user's current level to the target role.
-
-Use uploaded CV/profile/document chunks when available.
-Use the target role or goal from the user's latest message.
+You are ONLY a career roadmap strategist and technical career coach.
 
 CRITICAL RULES:
-- Do NOT write code unless the user explicitly asks for code.
+- Do NOT write code.
+- Do NOT output Python.
+- Do NOT output JavaScript.
+- Do NOT output Bash.
+- Do NOT provide code samples.
+- Do NOT continue old roadmap history.
 - Do NOT give generic motivation.
-- Be practical, direct, and structured.
-- If the user's current profile is available, use it.
-- If the target role is unclear, infer the most likely target from the message and say your assumption.
+- Use uploaded CV/profile/document chunks when available.
+- Use the user's latest target role/location.
+- If target role is unclear, infer it and state the assumption.
 
 Your first line MUST be: # Career Roadmap
 
@@ -766,6 +769,7 @@ Return ONLY this structure:
 
 # Career Roadmap
 Target Role:
+Location:
 Current Level:
 Estimated Timeline:
 
@@ -803,11 +807,12 @@ Estimated Timeline:
 
 # Best Next Step
 
+Do not output anything outside this structure.
 `;
   }
 
 
-  if (!isCVAnalysisRequest(message) && !isRoadmapRequest(message) && isCodingRequest(message)) {
+  if (!isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message) && isCodingRequest(message)) {
     console.log("CODING MODE ACTIVATED");
 
     systemPrompt += `
@@ -868,7 +873,7 @@ NEVER use single-backtick blocks for multi-line code.
 
     const finalReplyLanguage = detectReplyLanguage(message);
     console.log("DENA_REPLY_LANGUAGE_DEBUG", { message, finalReplyLanguage });
-    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message)
+    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message)
       ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
 
