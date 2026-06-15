@@ -104,6 +104,7 @@ function DenaPageContent() {
   const [aiProvider, setAiProvider] = useState("auto");
   const [aiMode, setAiMode] = useState("balanced");
   const [temporaryChat, setTemporaryChat] = useState(false);
+  const [providerStatus, setProviderStatus] = useState<Record<string, boolean>>({ auto: true });
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
@@ -358,6 +359,19 @@ function DenaPageContent() {
   }, [getToken]);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
+
+  useEffect(() => {
+    async function fetchProviderStatus() {
+      try {
+        const res = await fetch(`${basePath}/api/dena/ai-status`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setProviderStatus(data.providers ?? { auto: true });
+      } catch {}
+    }
+
+    fetchProviderStatus();
+  }, []);
 
   // Load a specific conversation
   const loadConversation = async (convId: number) => {
@@ -1148,14 +1162,20 @@ function DenaPageContent() {
                   {aiProviders.map((provider) => (
                     <button
                       key={provider.id}
-                      onClick={() => setAiProvider(provider.id)}
-                      className={`flex w-full items-start justify-between rounded-lg px-3 py-2 text-left ${
+                      onClick={() => {
+                        if (provider.id === "auto" || providerStatus[provider.id]) setAiProvider(provider.id);
+                      }}
+                      disabled={provider.id !== "auto" && !providerStatus[provider.id]}
+                      className={`flex w-full items-start justify-between rounded-lg px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${
                         aiProvider === provider.id ? "bg-primary/15 text-primary" : "hover:bg-muted"
                       }`}
                     >
                       <div>
                         <div className="text-sm font-medium">{provider.label}</div>
                         <div className="text-xs text-muted-foreground">{provider.description}</div>
+                        <div className={`mt-1 text-[11px] ${providerStatus[provider.id] ? "text-green-400" : "text-red-400"}`}>
+                          {providerStatus[provider.id] ? "Available" : "Not configured"}
+                        </div>
                       </div>
                       {aiProvider === provider.id && <span className="text-xs">✓</span>}
                     </button>

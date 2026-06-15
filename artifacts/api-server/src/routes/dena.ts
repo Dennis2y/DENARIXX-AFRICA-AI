@@ -1021,6 +1021,25 @@ NEVER use single-backtick blocks for multi-line code.
   }
 });
 
+
+// GET /api/dena/ai-status — show configured AI providers
+router.get("/ai-status", async (_req, res) => {
+  res.json({
+    providers: {
+      auto: true,
+      openai: !!process.env.OPENAI_API_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      anthropic: !!process.env.ANTHROPIC_API_KEY,
+      groq: !!process.env.GROQ_API_KEY,
+      mistral: !!process.env.MISTRAL_API_KEY,
+    },
+    fallbackOrder: (process.env.AI_FALLBACK_ORDER || "openai,gemini,groq,anthropic,mistral")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean),
+  });
+});
+
 // GET /api/dena/conversations — list user's saved conversations (auth required)
 router.get("/conversations", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
