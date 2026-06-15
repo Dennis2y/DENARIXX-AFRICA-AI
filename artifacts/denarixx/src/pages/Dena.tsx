@@ -478,6 +478,8 @@ function DenaPageContent() {
           message: text,
           conversationId: activeConvId ?? undefined,
           documentId: pendingDocument?.id,
+          preferredLanguage: localStorage.getItem("dena-language") || undefined,
+          customInstructions: localStorage.getItem("dena-custom-instructions") || undefined,
         }),
       });
 
@@ -751,23 +753,12 @@ function DenaPageContent() {
                     <>
                       <h3 className="text-lg font-semibold">Billing</h3>
                       <div className="rounded-xl border border-border p-4">
-                        <div className="font-medium">Current plan</div>
-                        <p className="text-sm text-muted-foreground">{billingPlan} plan</p>
+                        <div className="font-medium">Billing</div>
+                        <p className="text-sm text-muted-foreground">
+                          Billing is not connected yet. No fake plan switching is enabled.
+                        </p>
                       </div>
-                      <div className="flex gap-2">
-                        {["Free", "Pro", "Team"].map((plan) => (
-                          <Button
-                            key={plan}
-                            variant={billingPlan === plan ? "default" : "outline"}
-                            onClick={() => {
-                              setBillingPlan(plan);
-                              localStorage.setItem("dena-billing-plan", plan);
-                            }}
-                          >
-                            {plan}
-                          </Button>
-                        ))}
-                      </div>
+                      <Button disabled variant="outline">Stripe billing not configured</Button>
                     </>
                   )}
 

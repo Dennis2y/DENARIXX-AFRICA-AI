@@ -465,13 +465,15 @@ function isCodingRequest(message: string): boolean {
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId || getAuth(req)?.userId;
-  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt, activeWorkflow } = req.body as {
+  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt, activeWorkflow, preferredLanguage, customInstructions } = req.body as {
     message: string;
     conversationId?: number;
     moduleContext?: string;
     history?: Array<{ role: "user" | "assistant"; content: string }>;
     overrideSystemPrompt?: boolean;
     activeWorkflow?: string;
+    preferredLanguage?: string;
+    customInstructions?: string;
   };
 
   if (!message || typeof message !== "string") {
@@ -566,6 +568,14 @@ router.post("/chat", async (req, res) => {
     if (moduleContext) {
       systemPrompt += `\n\n--- Module Context ---\n${moduleContext}\nFocus your responses on this domain. Be specific, practical, and Africa-aware.`;
     }
+  }
+
+  if (preferredLanguage) {
+    systemPrompt += `\n\n--- User Preferred Language ---\nWhen possible, reply in ${preferredLanguage}, unless the user's latest message clearly asks for another language.`;
+  }
+
+  if (customInstructions?.trim()) {
+    systemPrompt += `\n\n--- User Custom Instructions ---\n${customInstructions.trim().slice(0, 1200)}`;
   }
 
   if (savedMemoryLines.length) {
