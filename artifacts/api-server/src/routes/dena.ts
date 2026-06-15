@@ -608,7 +608,7 @@ SOURCE A:
 Uploaded CV/resume/profile/document chunks.
 
 SOURCE B:
-The pasted job description from the user's latest message.
+The pasted job description from the user's latest message. Extract all requirements from SOURCE B and compare them against SOURCE A.
 
 CRITICAL RULES:
 - Never invent skills.
@@ -618,7 +618,9 @@ CRITICAL RULES:
 - Evidence must be copied or closely paraphrased only from SOURCE A.
 - Never invent quoted CV evidence.
 - If exact evidence is not available, write "Not found in CV".
-- Do not mark AWS, Docker, Kubernetes, TypeScript, FastAPI, RAG, LLMs, PostgreSQL, or CI/CD as Found unless they explicitly appear in SOURCE A.
+- Mark a skill as FOUND when it clearly appears in SOURCE A.
+- Mark a skill as PARTIAL when SOURCE A shows related experience, adjacent technology, or equivalent practical experience.
+- Mark a skill as MISSING only when SOURCE A has no evidence for it.
 - Do NOT write code.
 - Do NOT give generic career advice.
 - Do NOT write an email or cover letter.
@@ -904,6 +906,15 @@ NEVER use single-backtick blocks for multi-line code.
       !isRoadmapRequest(message)
         ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
+
+    const analysisDocumentContext = (recentDocuments.length ? recentDocuments : []).map((doc, index) => {
+      const text = (doc.content || doc.summary || "").slice(0, 12000);
+      return `SOURCE A DOCUMENT ${index + 1}: ${doc.filename}\n${text}`;
+    }).join("\n\n---\n\n");
+
+    if ((isCVAnalysisRequest(message) || isJobMatchRequest(message) || isRoadmapRequest(message)) && analysisDocumentContext) {
+      systemPrompt += `\n\n=== SOURCE A: UPLOADED CV / PROFILE DOCUMENT CONTEXT ===\n${analysisDocumentContext}\n\n=== END SOURCE A ===\nUse this SOURCE A content as the candidate CV/profile evidence. If a skill appears here, it is FOUND. If it does not appear here, it is MISSING or PARTIAL.`;
+    }
 
     console.log("FINAL_SYSTEM_PROMPT");
     console.log(systemPrompt);
