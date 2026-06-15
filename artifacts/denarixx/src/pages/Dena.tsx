@@ -18,6 +18,7 @@ type MessageAttachment = { id: number; filename: string; type: "document" };
 type Message = { role: Role; content: string; id?: number; attachments?: MessageAttachment[]; provider?: string; model?: string };
 type PendingDocument = { id: number; filename: string; summary?: string | null; chunkCount?: number };
 type Conversation = { id: number; title: string; updatedAt: string };
+type LibraryDocument = { id: number; filename: string; summary?: string | null; updatedAt?: string; createdAt?: string };
 
 const WELCOME: Message = {
   role: "assistant",
@@ -102,6 +103,10 @@ function DenaPageContent() {
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [careerToolsOpen, setCareerToolsOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryDocuments, setLibraryDocuments] = useState<LibraryDocument[]>([]);
+  const [pinnedConversationIds, setPinnedConversationIds] = useState<number[]>([]);
+  const [conversationMenuId, setConversationMenuId] = useState<number | null>(null);
   const [aiProvider, setAiProvider] = useState("auto");
   const [aiMode, setAiMode] = useState("balanced");
   const [temporaryChat, setTemporaryChat] = useState(false);
@@ -363,6 +368,13 @@ function DenaPageContent() {
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dena-pinned-conversations");
+      if (saved) setPinnedConversationIds(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     async function fetchProviderStatus() {
       try {
         const res = await fetch(`${basePath}/api/dena/ai-status`, { credentials: "include" });
@@ -596,9 +608,14 @@ function DenaPageContent() {
 
   const firstName = user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Explorer";
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? "";
-  const filteredConversations = conversations.filter((conv) =>
-    conv.title.toLowerCase().includes(sidebarSearch.toLowerCase())
-  );
+  const filteredConversations = conversations
+    .filter((conv) => conv.title.toLowerCase().includes(sidebarSearch.toLowerCase()))
+    .sort((a, b) => {
+      const aPinned = pinnedConversationIds.includes(a.id) ? 1 : 0;
+      const bPinned = pinnedConversationIds.includes(b.id) ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
 
   const aiProviders = [
     { id: "auto", label: "Auto", description: "Uses configured fallback order" },
@@ -705,6 +722,64 @@ function DenaPageContent() {
     }
 
     startSidebarPrompt("I want to upload or analyze a document in DENA.");
+  };
+
+  const loadLibrary = async () => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/dena/library`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setLibraryDocuments(data.documents ?? []);
+      setLibraryOpen(true);
+    } catch {}
+  };
+
+  const openLibraryPanel = async () => {
+    await loadLibrary();
+  };
+
+  const renameConversation = async (conv: Conversation) => {
+    const nextTitle = window.prompt("Rename conversation", conv.title);
+    if (!nextTitle || !nextTitle.trim()) return;
+
+    try {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/dena/conversations/${conv.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ title: nextTitle.trim() }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setConversations((prev) => prev.map((item) => item.id === conv.id ? data.conversation : item));
+      setConversationMenuId(null);
+    } catch {}
+  };
+
+  const togglePinConversation = (convId: number) => {
+    setPinnedConversationIds((prev) => {
+      const next = prev.includes(convId)
+        ? prev.filter((id) => id !== convId)
+        : [...prev, convId];
+
+      localStorage.setItem("dena-pinned-conversations", JSON.stringify(next));
+      return next;
+    });
+    setConversationMenuId(null);
   };
 
 
@@ -944,6 +1019,61 @@ function DenaPageContent() {
         )}
       </AnimatePresence>
 
+      {/* DENA Library Modal */}
+      <AnimatePresence>
+        {libraryOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLibraryOpen(false)}
+          >
+            <motion.div
+              className="w-full max-w-3xl rounded-2xl border border-border bg-card shadow-2xl"
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-border px-6 py-4">
+                <div>
+                  <h2 className="text-xl font-semibold">DENA Library</h2>
+                  <p className="text-sm text-muted-foreground">Uploaded documents and saved workspace items.</p>
+                </div>
+                <button onClick={() => setLibraryOpen(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="max-h-[60vh] overflow-y-auto p-6 space-y-3">
+                {libraryDocuments.length === 0 ? (
+                  <div className="rounded-xl border border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No documents in your library yet.</p>
+                    <Button className="mt-4" onClick={openLibrary}>Upload document</Button>
+                  </div>
+                ) : (
+                  libraryDocuments.map((doc) => (
+                    <div key={doc.id} className="rounded-xl border border-border p-4">
+                      <div className="font-medium">{doc.filename}</div>
+                      {doc.summary && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{doc.summary}</p>}
+                      <div className="mt-3 flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => startSettingsPrompt(`Analyze this document: ${doc.filename}`)}>
+                          Analyze
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => startSettingsPrompt(`Compare my CV document ${doc.filename} with this job description:`)}>
+                          Job Match
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <aside className="hidden lg:flex h-full w-72 flex-shrink-0 flex-col border-r border-border bg-card">
         <div className="h-full w-72 flex flex-col border-r border-border bg-card">
@@ -985,7 +1115,7 @@ function DenaPageContent() {
               <Plus className="w-4 h-4" />
               New chat
             </Button>
-            <Button onClick={openLibrary} className="w-full justify-start gap-2" variant="ghost">
+            <Button onClick={openLibraryPanel} className="w-full justify-start gap-2" variant="ghost">
               <Library className="w-4 h-4" />
               Library
             </Button>
@@ -1035,15 +1165,50 @@ function DenaPageContent() {
               >
                 <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-60" />
                 <div className="flex-1 min-w-0">
-                  <div className="truncate font-medium text-xs leading-tight">{conv.title}</div>
+                  <div className="truncate font-medium text-xs leading-tight">
+                    {pinnedConversationIds.includes(conv.id) ? "📌 " : ""}{conv.title}
+                  </div>
                   <div className="text-[10px] opacity-50 mt-0.5">{timeAgo(conv.updatedAt)}</div>
                 </div>
-                <button
-                  onClick={(e) => deleteConversation(conv.id, e)}
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConversationMenuId(conversationMenuId === conv.id ? null : conv.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity px-1"
+                  >
+                    ⋯
+                  </button>
+                  {conversationMenuId === conv.id && (
+                    <div className="absolute right-0 top-6 z-50 w-36 rounded-lg border border-border bg-card p-1 shadow-xl">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          renameConversation(conv);
+                        }}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePinConversation(conv.id);
+                        }}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+                      >
+                        {pinnedConversationIds.includes(conv.id) ? "Unpin" : "Pin"}
+                      </button>
+                      <button
+                        onClick={(e) => deleteConversation(conv.id, e)}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-xs text-destructive hover:bg-muted"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </button>
             ))}
           </div>

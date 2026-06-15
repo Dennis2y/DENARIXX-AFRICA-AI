@@ -1057,6 +1057,73 @@ router.get("/ai-status", async (_req, res) => {
   });
 });
 
+
+// GET /api/dena/library — list user's uploaded documents
+router.get("/library", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+
+    if (!user) {
+      res.json({ documents: [] });
+      return;
+    }
+
+    const docs = await db
+      .select({
+        id: documentUploads.id,
+        filename: documentUploads.filename,
+        summary: documentUploads.summary,
+        createdAt: documentUploads.createdAt,
+        updatedAt: documentUploads.updatedAt,
+      })
+      .from(documentUploads)
+      .where(and(eq(documentUploads.userId, user.id), eq(documentUploads.isActive, true)))
+      .orderBy(desc(documentUploads.updatedAt))
+      .limit(50);
+
+    res.json({ documents: docs });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load DENA library");
+    res.status(500).json({ error: "Failed to load library" });
+  }
+});
+
+// PATCH /api/dena/conversations/:id — rename a conversation
+router.patch("/conversations/:id", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const convId = Number(req.params.id);
+  const { title } = req.body as { title?: string };
+
+  const cleanTitle = (title || "").trim().slice(0, 80);
+
+  if (!cleanTitle) {
+    res.status(400).json({ error: "title is required" });
+    return;
+  }
+
+  try {
+    const [conv] = await db.select().from(conversations).where(eq(conversations.id, convId)).limit(1);
+
+    if (!conv || conv.clerkUserId !== clerkUserId) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(conversations)
+      .set({ title: cleanTitle, updatedAt: new Date() })
+      .where(eq(conversations.id, convId))
+      .returning();
+
+    res.json({ conversation: updated });
+  } catch (err) {
+    req.log.error({ err }, "Failed to rename conversation");
+    res.status(500).json({ error: "Failed to rename conversation" });
+  }
+});
+
 // GET /api/dena/conversations — list user's saved conversations (auth required)
 router.get("/conversations", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
