@@ -1141,7 +1141,7 @@ function DenaPageContent() {
             </button>
 
             {modelMenuOpen && (
-              <div className="absolute right-0 top-10 z-50 w-80 rounded-2xl border border-border bg-card p-3 shadow-2xl">
+              <div className="absolute right-0 top-10 z-50 max-h-[68vh] w-80 overflow-y-auto rounded-2xl border border-border bg-card p-3 shadow-2xl lg:max-h-[62vh]">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Response mode</div>
                 <div className="space-y-1">
                   {aiModes.map((mode) => {
