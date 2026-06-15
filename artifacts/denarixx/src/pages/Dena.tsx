@@ -287,10 +287,24 @@ function DenaPageContent() {
   }, [getToken]);
 
   const stopSpeaking = useCallback(() => {
+    const audio = audioRef.current;
+
+    if (audio) {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = "";
+        audio.load();
+      } catch {}
+
+      audioRef.current = null;
+    }
+
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
-      setSpeaking(false);
     }
+
+    setSpeaking(false);
   }, []);
 
   const toggleListening = useCallback(() => {
