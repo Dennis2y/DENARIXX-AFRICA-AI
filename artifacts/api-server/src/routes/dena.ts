@@ -415,12 +415,18 @@ function isRoadmapRequest(message: string): boolean {
 
   return (
     text.includes("roadmap") ||
+    text.includes("career roadmap") ||
     text.includes("career path") ||
     text.includes("learning path") ||
-    text.includes("become a") ||
+    text.includes("skills roadmap") ||
+    text.includes("become ai engineer") ||
+    text.includes("ai engineer roadmap") ||
+    text.includes("software engineer roadmap") ||
+    text.includes("data scientist roadmap") ||
+    text.includes("machine learning roadmap") ||
     text.includes("how do i become") ||
-    text.includes("career plan") ||
-    text.includes("skills roadmap")
+    text.includes("create an ai engineer roadmap") ||
+    text.includes("create a roadmap")
   );
 }
 
@@ -752,18 +758,18 @@ CRITICAL OUTPUT RULES:
 You are ONLY a career roadmap strategist and technical career coach.
 
 CRITICAL RULES:
+- Your first line MUST be: # Career Roadmap
 - Do NOT write code.
 - Do NOT output Python.
 - Do NOT output JavaScript.
 - Do NOT output Bash.
 - Do NOT provide code samples.
+- Do NOT translate your answer into another language unless the user asks.
 - Do NOT continue old roadmap history.
 - Do NOT give generic motivation.
 - Use uploaded CV/profile/document chunks when available.
 - Use the user's latest target role/location.
 - If target role is unclear, infer it and state the assumption.
-
-Your first line MUST be: # Career Roadmap
 
 Return ONLY this structure:
 
@@ -810,7 +816,6 @@ Estimated Timeline:
 Do not output anything outside this structure.
 `;
   }
-
 
   if (!isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message) && isCodingRequest(message)) {
     console.log("CODING MODE ACTIVATED");
@@ -873,8 +878,13 @@ NEVER use single-backtick blocks for multi-line code.
 
     const finalReplyLanguage = detectReplyLanguage(message);
     console.log("DENA_REPLY_LANGUAGE_DEBUG", { message, finalReplyLanguage });
-    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message)
-      ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
+    const finalUserMessage =
+      finalReplyLanguage &&
+      !isCodingRequest(message) &&
+      !isCVAnalysisRequest(message) &&
+      !isJobMatchRequest(message) &&
+      !isRoadmapRequest(message)
+        ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
 
     console.log("FINAL_SYSTEM_PROMPT");
@@ -885,6 +895,13 @@ NEVER use single-backtick blocks for multi-line code.
       recentDocuments: recentDocuments.length,
       relevantDocumentChunks: relevantDocumentChunks.length,
       isCV: isCVAnalysisRequest(message),
+    });
+
+    console.log("MODE_DEBUG", {
+      isCV: isCVAnalysisRequest(message),
+      isJobMatch: isJobMatchRequest(message),
+      isRoadmap: isRoadmapRequest(message),
+      isCoding: isCodingRequest(message),
     });
 
     const aiResponse = await generateAI({
@@ -906,8 +923,8 @@ NEVER use single-backtick blocks for multi-line code.
 
     const responseHasCode = /```[\s\S]*?```/.test(fullResponse) || /`(?:html|css|javascript|typescript|python|sql)[\s\S]*?`/i.test(fullResponse);
 
-    if (finalReplyLanguage && !isCodingRequest(message) && !responseHasCode) {
-      fullResponse = await forceReplyLanguage(finalReplyLanguage, fullResponse);
+    if (!isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message) && isCodingRequest(message)) {
+      fullResponse = await forceReplyLanguage(finalReplyLanguage!, fullResponse);
     }
 
     fullResponse = normalizeCodeFences(fullResponse);
