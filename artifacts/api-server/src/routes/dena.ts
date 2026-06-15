@@ -378,6 +378,23 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
 
 
 
+
+function isJobMatchRequest(message: string): boolean {
+  const text = message.toLowerCase();
+
+  return (
+    text.includes("match this job") ||
+    text.includes("job match") ||
+    text.includes("match my cv") ||
+    text.includes("compare my cv") ||
+    text.includes("compare this job") ||
+    text.includes("am i fit for this job") ||
+    text.includes("should i apply") ||
+    text.includes("job description") ||
+    text.includes("jd:")
+  );
+}
+
 function isCVAnalysisRequest(message: string): boolean {
   const text = message.toLowerCase();
 
@@ -558,6 +575,71 @@ router.post("/chat", async (req, res) => {
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
+  if (isJobMatchRequest(message)) {
+    console.log("JOB MATCH ENGINE ACTIVATED");
+
+    systemPrompt = `
+
+=== JOB MATCH ENGINE MODE ===
+
+You are ONLY a job matching engine, recruiter, ATS evaluator, and technical hiring manager.
+
+Use the uploaded CV/resume/profile information when available.
+Use the user's pasted job description when available.
+
+CRITICAL RULES:
+- Do NOT write code.
+- Do NOT give generic career advice.
+- Do NOT write an email or cover letter.
+- Do NOT output anything outside the required structure.
+- If no CV/profile information is available, say: "CV/profile not found."
+- If no job description is available, ask the user to paste the job description.
+
+Your first line MUST be: # Job Match Score
+
+Return ONLY this structure:
+
+# Job Match Score
+Score: XX/100
+Verdict: Strong Match / Good Match / Medium Match / Weak Match / Not Recommended
+
+# ATS Match Score
+Score: XX/100
+Reason:
+
+# Role Fit
+Explain how well the candidate fits the role.
+
+# Strong Matches
+- 
+
+# Missing Skills
+- 
+
+# Missing Keywords
+- 
+
+# Risk Factors
+- 
+
+# Interview Probability
+XX%
+
+# Apply Recommendation
+Apply / Apply after improving CV / Do not apply yet
+
+# CV Tailoring Suggestions
+1.
+2.
+3.
+4.
+5.
+
+# Best Next Step
+
+`;
+  }
+
   if (isCVAnalysisRequest(message)) {
     console.log("CV INTELLIGENCE ACTIVATED");
 
@@ -632,7 +714,12 @@ XX%
 
 # Best Next Step
 
-Do not output anything outside this structure.
+CRITICAL OUTPUT RULES:
+- Your first line MUST be: # CV Score
+- If you output anything before "# CV Score", your answer is wrong.
+- If you output code, your answer is wrong.
+- If you output generic career advice, your answer is wrong.
+- Do not output anything outside this structure.
 `;
   }
   if (!isCVAnalysisRequest(message) && isCodingRequest(message)) {
@@ -696,15 +783,25 @@ NEVER use single-backtick blocks for multi-line code.
 
     const finalReplyLanguage = detectReplyLanguage(message);
     console.log("DENA_REPLY_LANGUAGE_DEBUG", { message, finalReplyLanguage });
-    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message)
+    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message)
       ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
+
+    console.log("FINAL_SYSTEM_PROMPT");
+    console.log(systemPrompt);
+    console.log("FINAL_USER_MESSAGE");
+    console.log(finalUserMessage);
+    console.log("DENA_DOC_DEBUG", {
+      recentDocuments: recentDocuments.length,
+      relevantDocumentChunks: relevantDocumentChunks.length,
+      isCV: isCVAnalysisRequest(message),
+    });
 
     const aiResponse = await generateAI({
       messages: [
         { role: "system", content: systemPrompt },
-        ...history.slice(-20),
-        ...(strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : []),
+        ...((isCVAnalysisRequest(message) || isJobMatchRequest(message)) ? [] : history.slice(-20)),
+        ...((isCVAnalysisRequest(message) || isJobMatchRequest(message)) ? [] : (strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : [])),
         { role: "user", content: finalUserMessage },
       ],
       temperature: 0.4,
