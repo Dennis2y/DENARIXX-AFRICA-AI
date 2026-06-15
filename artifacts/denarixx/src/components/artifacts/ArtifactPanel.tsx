@@ -238,14 +238,8 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
     await navigator.clipboard.writeText(content);
   }
 
-  function downloadArtifact() {
-    const ext =
-      type === "code" ? "txt" :
-      type === "html" ? "html" :
-      type === "markdown" || type === "document" ? "md" :
-      "txt";
-
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  function downloadFile(ext: string, mime: string, fileContent: string) {
+    const blob = new Blob([fileContent], { type: mime });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
@@ -254,6 +248,70 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
     link.click();
 
     URL.revokeObjectURL(url);
+  }
+
+  function downloadTxt() {
+    downloadFile("txt", "text/plain;charset=utf-8", content);
+  }
+
+  function downloadMarkdown() {
+    downloadFile("md", "text/markdown;charset=utf-8", content);
+  }
+
+  function downloadHtml() {
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title || "DENA Artifact"}</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; padding: 40px; max-width: 900px; margin: auto; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <pre>${content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+</body>
+</html>`;
+
+    downloadFile("html", "text/html;charset=utf-8", html);
+  }
+
+  function downloadWordDoc() {
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title || "DENA Artifact"}</title>
+</head>
+<body>
+  <pre style="font-family: Arial, sans-serif; white-space: pre-wrap; line-height: 1.6;">${content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+</body>
+</html>`;
+
+    downloadFile("doc", "application/msword;charset=utf-8", html);
+  }
+
+  function printPdf() {
+    const win = window.open("", "_blank");
+    if (!win) return;
+
+    win.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title || "DENA Artifact"}</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; padding: 40px; max-width: 900px; margin: auto; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <pre>${content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`);
+    win.document.close();
   }
 
   if (!open) return null;
@@ -320,10 +378,24 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
                 Copy
               </Button>
 
-              <Button size="sm" variant="outline" onClick={downloadArtifact} disabled={!content.trim()}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="outline" onClick={downloadTxt} disabled={!content.trim()}>
+                  <Download className="mr-2 h-4 w-4" />
+                  TXT
+                </Button>
+                <Button size="sm" variant="outline" onClick={downloadMarkdown} disabled={!content.trim()}>
+                  MD
+                </Button>
+                <Button size="sm" variant="outline" onClick={downloadHtml} disabled={!content.trim()}>
+                  HTML
+                </Button>
+                <Button size="sm" variant="outline" onClick={downloadWordDoc} disabled={!content.trim()}>
+                  DOC
+                </Button>
+                <Button size="sm" variant="outline" onClick={printPdf} disabled={!content.trim()}>
+                  PDF
+                </Button>
+              </div>
 
               <Button size="sm" onClick={saveArtifact} disabled={!content.trim() || saving || !hasActiveChanges}>
                 <Save className="mr-2 h-4 w-4" />
