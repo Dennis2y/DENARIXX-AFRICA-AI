@@ -640,13 +640,10 @@ function DenaPageContent() {
                           {copiedMessageIndex === i ? (
                             <>
                               <Check className="w-3.5 h-3.5" />
-                              Copied
+                              <span>Copied</span>
                             </>
                           ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" />
-                              Copy
-                            </>
+                            <Copy className="w-3.5 h-3.5" />
                           )}
                         </button>
                       </div>
