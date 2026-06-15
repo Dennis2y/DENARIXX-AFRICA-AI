@@ -108,6 +108,7 @@ function DenaPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -189,33 +190,80 @@ function DenaPageContent() {
     typeof window !== "undefined" &&
     (("SpeechRecognition" in window) || ("webkitSpeechRecognition" in window));
 
-  const speakText = useCallback((text: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !text.trim()) return;
-
-    window.speechSynthesis.cancel();
-
+  const speakText = useCallback(async (text: string) => {
     const cleanText = text
+      .replace(/```[\s\S]*?```/g, "Code block omitted from voice.")
       .replace(/\*\*/g, "")
       .replace(/[#_`>\-]/g, "")
       .replace(/\n+/g, " ")
       .trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1;
-    utterance.pitch = 1;
+    if (!cleanText) return;
 
-    const lower = cleanText.toLowerCase();
-    if (/[äöüß]|\b(hallo|guten|danke|bitte|karriere|lebenslauf)\b/.test(lower)) utterance.lang = "de-DE";
-    else if (/[¿¡]|\b(hola|gracias|trabajo|habilidades)\b/.test(lower)) utterance.lang = "es-ES";
-    else if (/\b(bonjour|merci|carrière|compétences|emploi)\b/.test(lower)) utterance.lang = "fr-FR";
-    else utterance.lang = "en-US";
+    try {
+      setSpeaking(true);
 
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
+      const token = await getToken();
+      const response = await fetch(`${basePath}/api/voice/tts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ text: cleanText, voice: "alloy" }),
+      });
 
-    window.speechSynthesis.speak(utterance);
-  }, []);
+      if (!response.ok) throw new Error("Neural voice unavailable");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        setSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
+
+      audio.onerror = () => {
+        setSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
+
+      await audio.play();
+      return;
+    } catch {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+        setSpeaking(false);
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 0.92;
+      utterance.pitch = 1.03;
+
+      const lower = cleanText.toLowerCase();
+      if (/[äöüß]|\b(hallo|guten|danke|bitte|karriere|lebenslauf)\b/.test(lower)) utterance.lang = "de-DE";
+      else if (/[¿¡]|\b(hola|gracias|trabajo|habilidades)\b/.test(lower)) utterance.lang = "es-ES";
+      else if (/\b(bonjour|merci|carrière|compétences|emploi)\b/.test(lower)) utterance.lang = "fr-FR";
+      else utterance.lang = "en-US";
+
+      utterance.onstart = () => setSpeaking(true);
+      utterance.onend = () => setSpeaking(false);
+      utterance.onerror = () => setSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [getToken]);
 
   const stopSpeaking = useCallback(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
