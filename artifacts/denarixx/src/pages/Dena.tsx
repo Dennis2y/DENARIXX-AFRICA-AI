@@ -102,6 +102,8 @@ function DenaPageContent() {
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [careerToolsOpen, setCareerToolsOpen] = useState(false);
@@ -527,6 +529,47 @@ function DenaPageContent() {
   };
 
   // Send a message
+  const generateImageFromInput = async () => {
+    const prompt = input.trim();
+
+    if (!prompt) return;
+
+    setGeneratingImage(true);
+
+    try {
+      const token = await getToken();
+
+      const res = await fetch(`${basePath}/api/images/generate`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt,
+          size: "1024x1024",
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Image generation failed", await res.text());
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data.image) {
+        setGeneratedImages((prev) => [data.image, ...prev].slice(0, 12));
+        setInput("");
+      }
+    } catch (err) {
+      console.error("Image generation failed", err);
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || streaming) return;
@@ -1645,6 +1688,26 @@ function DenaPageContent() {
           </div>
         )}
 
+        {generatedImages.length > 0 && (
+          <div className="mx-auto mb-4 grid w-full max-w-4xl grid-cols-1 gap-3 px-4 sm:grid-cols-2 lg:grid-cols-3">
+            {generatedImages.map((src, index) => (
+              <div key={`${src.slice(0, 30)}-${index}`} className="overflow-hidden rounded-2xl border border-border bg-card">
+                <img src={src} alt={`DENA generated image ${index + 1}`} className="aspect-square w-full object-cover" />
+                <div className="flex items-center justify-between p-2">
+                  <span className="text-xs text-muted-foreground">DENA Image</span>
+                  <a
+                    href={src}
+                    download={`dena-image-${index + 1}.png`}
+                    className="rounded-md px-2 py-1 text-xs text-primary hover:bg-muted"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Input area */}
         <div className="border-t border-border bg-background/50 p-4 backdrop-blur-sm flex-shrink-0">
           <div
@@ -1735,6 +1798,18 @@ function DenaPageContent() {
                 >
                   {uploadingDocument ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
                   Attach
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={generateImageFromInput}
+                  disabled={streaming || loadingConv || generatingImage || !input.trim()}
+                  variant="outline"
+                  className="hidden h-10 rounded-2xl px-3 text-sm sm:inline-flex"
+                  title="Generate image from prompt"
+                >
+                  {generatingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Image
                 </Button>
 
                 <Button
