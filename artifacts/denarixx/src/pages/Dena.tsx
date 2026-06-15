@@ -1473,10 +1473,19 @@ function DenaPageContent() {
                     {msg.role === "user" ? (
                       <span>{msg.content}</span>
                     ) : (
-                      <TypewriterText
-                        text={msg.content}
-                        isActive={streaming && i === messages.length - 1 && msg.content.length > 0}
-                      />
+                      <>
+                        {(msg.provider || msg.model) && (
+                          <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-2 py-1 text-[11px] text-muted-foreground">
+                            <span>DENA</span>
+                            {msg.provider && <span>• {msg.provider}</span>}
+                            {msg.model && <span>• {msg.model}</span>}
+                          </div>
+                        )}
+                        <TypewriterText
+                          text={msg.content}
+                          isActive={streaming && i === messages.length - 1 && msg.content.length > 0}
+                        />
+                      </>
                     )}
 
                     {msg.content.trim() && (
