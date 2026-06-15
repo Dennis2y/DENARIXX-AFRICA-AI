@@ -553,14 +553,8 @@ function DenaPageContent() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ x: sidebarOpen ? 0 : "-100%" }}
-        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed lg:static lg:translate-x-0 top-0 left-0 h-full w-72 z-40 flex flex-col border-r border-border bg-card lg:flex"
-        style={{ transform: undefined }}
-      >
-        <div className={`fixed lg:static top-0 left-0 h-full w-72 z-40 flex flex-col border-r border-border bg-card transition-transform duration-300 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
+      <aside className="hidden lg:flex h-full w-72 flex-shrink-0 flex-col border-r border-border bg-card">
+        <div className="h-full w-72 flex flex-col border-r border-border bg-card">
           {/* Sidebar header */}
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -626,7 +620,69 @@ function DenaPageContent() {
             </Link>
           </div>
         </div>
-      </motion.aside>
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed lg:hidden top-0 left-0 h-full w-72 z-40 flex flex-col border-r border-border bg-card transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Sidebar header */}
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <div className="font-semibold text-sm">DENA AI</div>
+              <div className="text-xs text-green-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" />
+                Online
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-3">
+          <Button
+            onClick={newConversation}
+            className="w-full gap-2 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20"
+            variant="ghost"
+          >
+            <Plus className="w-4 h-4" />
+            New Conversation
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1">
+          {conversations.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-6">No saved conversations yet.<br />Start chatting to save history.</p>
+          )}
+          {conversations.map(conv => (
+            <button
+              key={conv.id}
+              onClick={() => loadConversation(conv.id)}
+              className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors group flex items-start gap-2 ${activeConvId === conv.id ? "bg-primary/10 border border-primary/20 text-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}
+            >
+              <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-60" />
+              <div className="flex-1 min-w-0">
+                <div className="truncate font-medium text-xs leading-tight">{conv.title}</div>
+                <div className="text-[10px] opacity-50 mt-0.5">{timeAgo(conv.updatedAt)}</div>
+              </div>
+              <button
+                onClick={(e) => deleteConversation(conv.id, e)}
+                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
