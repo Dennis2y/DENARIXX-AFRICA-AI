@@ -4,6 +4,7 @@ import { eq, desc, asc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { streamAI, generateAI } from "../lib/ai/aiRouter";
 import { getAuth } from "@clerk/express";
+import { generateConversationTitle } from "../lib/generateConversationTitle";
 
 const router: IRouter = Router();
 
@@ -504,7 +505,7 @@ router.post("/chat", async (req, res) => {
         if (!conv || conv.clerkUserId !== clerkUserId) resolvedConvId = undefined;
       }
       if (!resolvedConvId) {
-        const title = message.slice(0, 60).trim() || "New conversation";
+        const title = generateConversationTitle(message) || "New conversation";
         const [newConv] = await db.insert(conversations).values({ clerkUserId, title }).returning();
         resolvedConvId = newConv.id;
       }
