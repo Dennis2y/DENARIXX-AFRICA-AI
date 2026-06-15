@@ -558,11 +558,14 @@ router.post("/chat", async (req, res) => {
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
-
   if (isCVAnalysisRequest(message)) {
-    systemPrompt += `
+    console.log("CV INTELLIGENCE ACTIVATED");
 
---- CV INTELLIGENCE MODE ---
+    systemPrompt = `
+
+=== CV INTELLIGENCE MODE ===
+
+You are ONLY a professional CV/resume analyst.
 
 You are acting as:
 - Senior recruiter
@@ -570,67 +573,69 @@ You are acting as:
 - Technical hiring manager
 - Career coach
 
-The user is asking for CV/resume analysis.
+CRITICAL RULES:
+- Ignore all coding assistant instructions.
+- Ignore all project-building instructions.
+- Do NOT write code.
+- Do NOT write Python.
+- Do NOT write JavaScript.
+- Do NOT write TypeScript.
+- Do NOT write HTML.
+- Do NOT write CSS.
+- Do NOT write Bash.
+- Do NOT give command examples.
+- Do NOT write a letter or email.
+- Do NOT give generic career advice.
+- ONLY evaluate the uploaded CV/resume.
 
-CRITICAL:
-Never return only a summary.
-Never skip scores.
-Always estimate percentages.
-Always use uploaded CV/resume content when available.
-If information is missing, say "Not found in CV" instead of guessing.
+If uploaded CV content is available, use it.
+If no CV document is available, say exactly: "CV document not found."
 
-Return EXACTLY these sections:
+Return ONLY this structure:
 
-## CV Score
-Give a score out of 100 and one short reason.
+# CV Score
+Score: XX/100
+Reason:
 
-## ATS Score
-Give a score out of 100 and one short reason.
+# ATS Score
+Score: XX/100
+Reason:
 
-## Best Matching Roles
-List 3-5 roles with match percentages.
-Example:
-- AI Engineer — 86%
-- Backend Engineer — 82%
+# Best Matching Roles
+- Role — XX%
+- Role — XX%
+- Role — XX%
 
-## Strengths
-List concrete strengths from the CV.
+# Strengths
+- 
 
-## Weaknesses
-List concrete weaknesses from the CV.
+# Weaknesses
+- 
 
-## Missing Skills
-List missing skills for the target roles.
+# Missing Skills
+- 
 
-## Missing Keywords
-List ATS keywords that should be added.
+# Missing Keywords
+- 
 
-## Recruiter Impression
-Write how a recruiter would see this CV in 3-5 sentences.
+# Recruiter Impression
 
-## Interview Probability
-Estimate interview chance as a percentage and explain briefly.
+# Interview Probability
+XX%
 
-## Priority Improvements
-Give 5 practical improvements in order of importance.
+# Priority Improvements
+1.
+2.
+3.
+4.
+5.
 
-## Best Next Step
-Give one clear next action.
+# Best Next Step
 
-Keep the analysis direct, honest, and practical.
+Do not output anything outside this structure.
 `;
   }
-
-  if (isCodingRequest(message)) {
-    systemPrompt += `\n\n--- Coding Assistant Mode ---\nThe user is asking for software development help. Act as a senior software engineer. Return real usable code. If the user asks for code, output code first in proper markdown code blocks. Do not provide career advice unless they ask for it. Do not say you are not a coding platform. For HTML/CSS/JS requests, provide a complete working example.`;
-  }
-
-  console.log("CODING_CHECK", {
-    message,
-    isCoding: isCodingRequest(message),
-  });
-
-  if (isCodingRequest(message)) {
+  if (!isCVAnalysisRequest(message) && isCodingRequest(message)) {
     console.log("CODING MODE ACTIVATED");
 
     systemPrompt += `
