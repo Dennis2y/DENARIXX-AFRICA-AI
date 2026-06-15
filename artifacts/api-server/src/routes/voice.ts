@@ -28,8 +28,8 @@ router.post("/tts", requireAuth, async (req, res) => {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const audio = await client.audio.speech.create({
-      model: process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
-      voice: voice || process.env.OPENAI_TTS_VOICE || "alloy",
+      model: process.env.OPENAI_TTS_MODEL || "tts-1-hd",
+      voice: voice || process.env.OPENAI_TTS_VOICE || "nova",
       input: cleanText,
       response_format: "mp3",
     });
