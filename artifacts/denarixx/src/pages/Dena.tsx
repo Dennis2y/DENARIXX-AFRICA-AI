@@ -93,7 +93,7 @@ function timeAgo(iso: string) {
 
 function DenaPageContent() {
   const { user } = useUser();
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
@@ -658,11 +658,21 @@ function DenaPageContent() {
               </div>
             </button>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button variant="ghost" size="sm" className="justify-start gap-2 text-xs">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-start gap-2 text-xs"
+                onClick={() => window.location.href = "/settings"}
+              >
                 <Settings className="w-3.5 h-3.5" />
                 Settings
               </Button>
-              <Button variant="ghost" size="sm" className="justify-start gap-2 text-xs">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-start gap-2 text-xs"
+                onClick={() => signOut()}
+              >
                 <LogOut className="w-3.5 h-3.5" />
                 Log out
               </Button>
