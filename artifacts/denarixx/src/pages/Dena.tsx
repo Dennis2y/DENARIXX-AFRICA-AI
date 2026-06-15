@@ -100,6 +100,7 @@ function DenaPageContent() {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const [input, setInput] = useState("");
+  const [dragActive, setDragActive] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [careerToolsOpen, setCareerToolsOpen] = useState(false);
@@ -128,7 +129,7 @@ function DenaPageContent() {
   const [connectedServices, setConnectedServices] = useState<string[]>([]);
   const [billingPlan, setBillingPlan] = useState("Free");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
@@ -619,6 +620,18 @@ function DenaPageContent() {
     }
     if (savedPlan) setBillingPlan(savedPlan);
   }, []);
+
+  const autoResizeComposer = () => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`;
+  };
+
+  useEffect(() => {
+    autoResizeComposer();
+  }, [input]);
 
   const firstName = user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Explorer";
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? "";
@@ -1588,38 +1601,72 @@ function DenaPageContent() {
         )}
 
         {/* Input area */}
-        <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm flex-shrink-0">
-          {pendingDocument && (
-            <div className="max-w-3xl mx-auto mb-2 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{pendingDocument.filename}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Attached to next message{pendingDocument.chunkCount ? ` • ${pendingDocument.chunkCount} chunks` : ""}
-                  </p>
+        <div className="border-t border-border bg-background/50 p-4 backdrop-blur-sm flex-shrink-0">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) uploadDocument(file);
+            }}
+            className={`mx-auto w-full max-w-4xl rounded-3xl border bg-card/95 shadow-2xl transition-colors ${
+              dragActive ? "border-primary ring-2 ring-primary/30" : "border-border"
+            }`}
+          >
+            {pendingDocument && (
+              <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2 text-sm">
+                  <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium">{pendingDocument.filename}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Attached to next message{pendingDocument.chunkCount ? ` • ${pendingDocument.chunkCount} chunks` : ""}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingDocument(null)}
+                  className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Remove attachment"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                onClick={() => setPendingDocument(null)}
-                className="text-muted-foreground hover:text-red-400 transition-colors"
-                title="Remove attachment"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            )}
+
+            {dragActive && (
+              <div className="border-b border-border px-4 py-3 text-center text-sm text-primary">
+                Drop your file here to attach it to DENA
+              </div>
+            )}
+
+            <div className="px-4 pt-4">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  autoResizeComposer();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!streaming && !loadingConv && input.trim()) sendMessage();
+                  }
+                }}
+                placeholder={editingMessageIndex !== null ? "Edit your message and resend..." : "Ask DENA anything about your career..."}
+                disabled={streaming || loadingConv}
+                rows={1}
+                className="max-h-[220px] min-h-[42px] w-full resize-none bg-transparent text-sm leading-6 outline-none placeholder:text-muted-foreground disabled:opacity-60"
+              />
             </div>
-          )}
-          <div className="flex items-center gap-2 max-w-3xl mx-auto">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
-              placeholder={editingMessageIndex !== null ? "Edit your message and resend..." : "Ask DENA anything about your career..."}
-              disabled={streaming || loadingConv}
-              className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 placeholder:text-muted-foreground disabled:opacity-50 transition-colors"
-            />
+
             <input
               ref={documentInputRef}
               type="file"
@@ -1630,35 +1677,85 @@ function DenaPageContent() {
                 if (file) uploadDocument(file);
               }}
             />
-            <Button
-              type="button"
-              onClick={() => documentInputRef.current?.click()}
-              disabled={streaming || loadingConv || uploadingDocument}
-              variant="outline"
-              className="rounded-xl h-11 w-11 p-0 flex-shrink-0"
-              title="Upload document"
-            >
-              {uploadingDocument ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-            </Button>
-            <Button
-              type="button"
-              onClick={toggleListening}
-              disabled={streaming || loadingConv}
-              variant="outline"
-              className={`rounded-xl h-11 w-11 p-0 flex-shrink-0 ${listening ? "border-red-400 text-red-400 animate-pulse" : ""}`}
-              title={listening ? "Stop listening" : "Speak to DENA"}
-            >
-              {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </Button>
-            <Button
-              onClick={sendMessage}
-              disabled={!input.trim() || streaming || loadingConv}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl h-11 w-11 p-0 flex-shrink-0"
-            >
-              {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </Button>
+
+            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => documentInputRef.current?.click()}
+                  disabled={streaming || loadingConv || uploadingDocument}
+                  variant="outline"
+                  className="h-10 rounded-2xl px-3 text-sm"
+                  title="Upload document"
+                >
+                  {uploadingDocument ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
+                  Attach
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={openLibraryPanel}
+                  disabled={streaming || loadingConv}
+                  variant="outline"
+                  className="hidden h-10 rounded-2xl px-3 text-sm sm:inline-flex"
+                  title="Open Library"
+                >
+                  <Library className="mr-2 h-4 w-4" />
+                  Library
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => setCareerToolsOpen((value) => !value)}
+                  disabled={streaming || loadingConv}
+                  variant="outline"
+                  className="hidden h-10 rounded-2xl px-3 text-sm md:inline-flex"
+                  title="Career tools"
+                >
+                  <Briefcase className="mr-2 h-4 w-4" />
+                  Career Tools
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setModelMenuOpen((value) => !value)}
+                  disabled={streaming || loadingConv}
+                  variant="outline"
+                  className="hidden h-10 rounded-2xl px-3 text-xs sm:inline-flex"
+                  title="AI model"
+                >
+                  {selectedProvider.label} · {selectedMode.label}
+                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={toggleListening}
+                  disabled={streaming || loadingConv}
+                  variant="outline"
+                  className={`h-10 w-10 rounded-2xl p-0 flex-shrink-0 ${listening ? "border-red-400 text-red-400 animate-pulse" : ""}`}
+                  title={listening ? "Stop listening" : "Speak to DENA"}
+                >
+                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+
+                <Button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || streaming || loadingConv}
+                  className={`h-10 w-10 rounded-2xl p-0 flex-shrink-0 ${
+                    input.trim() && !streaming && !loadingConv ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""
+                  }`}
+                  title={streaming ? "DENA is responding" : "Send"}
+                >
+                  {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
           </div>
-          <p className="text-center text-[10px] text-muted-foreground mt-2">
+
+          <p className="mt-2 text-center text-[10px] text-muted-foreground">
             {uploadingDocument ? "Uploading document…" : listening ? "Listening… speak now." : speaking ? "DENA is speaking…" : "DENA can make mistakes. Verify important info."}
           </p>
         </div>
