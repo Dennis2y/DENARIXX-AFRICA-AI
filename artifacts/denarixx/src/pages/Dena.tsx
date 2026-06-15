@@ -21,7 +21,7 @@ type Conversation = { id: number; title: string; updatedAt: string };
 
 const WELCOME: Message = {
   role: "assistant",
-  content: "Hi! I'm **DENA** 🌍 — your personal AI guide to Africa's most powerful career platform.\n\nAsk me anything about your career, the platform, skill development, or the African job market. I remember our conversations so we can pick up where we left off!",
+  content: "Hi! I'm **DENA** 🌍 — your personal AI guide to Africa's most powerful career platform.\n\nAsk me anything about your career, coding, project building, CVs, documents, skill development, or the African job market. I can help you write code, debug errors, build apps, explain documents, and improve your career. I remember our conversations so we can pick up where we left off!",
 };
 
 function MarkdownMessage({ content }: { content: string }) {
@@ -756,6 +756,8 @@ function DenaPageContent() {
               "How do I use SkillSwap?",
               "Build me a CV",
               "Career advice for Africa",
+              "Build me a React project",
+              "Explain this code",
               "What jobs match my profile?",
             ].map(prompt => (
               <button
