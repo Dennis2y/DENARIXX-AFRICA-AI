@@ -110,8 +110,8 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
         credentials: "include",
         headers: await authHeaders(),
         body: JSON.stringify({
-          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}`,
-          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}`,
+          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.`,
+          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.`,
         }),
       });
 
