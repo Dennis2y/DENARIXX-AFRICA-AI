@@ -109,6 +109,10 @@ function DenaPageContent() {
   const [pendingDocument, setPendingDocument] = useState<PendingDocument | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("general");
+  const [settingsLanguage, setSettingsLanguage] = useState("English");
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [appearanceMode, setAppearanceMode] = useState("dark");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -543,21 +547,27 @@ function DenaPageContent() {
     conv.title.toLowerCase().includes(sidebarSearch.toLowerCase())
   );
 
+  const applyAppearance = (mode: string) => {
+    setAppearanceMode(mode);
+    localStorage.setItem("dena-appearance", mode);
+    if (mode === "light") document.documentElement.classList.remove("dark");
+    if (mode === "dark") document.documentElement.classList.add("dark");
+    if (mode === "system") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.classList.toggle("dark", prefersDark);
+    }
+  };
+
+  const saveDenaSettings = () => {
+    localStorage.setItem("dena-language", settingsLanguage);
+    localStorage.setItem("dena-custom-instructions", customInstructions);
+    localStorage.setItem("dena-appearance", appearanceMode);
+    setSettingsOpen(false);
+  };
+
   return (
     <div className="flex h-[100dvh] bg-background text-foreground overflow-hidden">
       {/* Mobile sidebar overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-30 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
       {/* DENA Account Settings Modal */}
       <AnimatePresence>
         {settingsOpen && (
@@ -569,64 +579,182 @@ function DenaPageContent() {
             onClick={() => setSettingsOpen(false)}
           >
             <motion.div
-              className="w-full max-w-xl rounded-2xl border border-border bg-card shadow-2xl"
+              className="flex h-[78vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
               initial={{ scale: 0.96, y: 12 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.96, y: 12 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                <div>
-                  <h2 className="text-xl font-semibold">Account Settings</h2>
-                  <p className="text-sm text-muted-foreground">Manage your DENA account details.</p>
-                </div>
-                <button
-                  onClick={() => setSettingsOpen(false)}
-                  className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5">
-                <div className="flex items-center gap-4 rounded-xl border border-border bg-background/60 p-4">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-bold">
-                    {firstName.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{firstName}</div>
-                    <div className="text-sm text-muted-foreground truncate">{userEmail}</div>
-                  </div>
+              <aside className="w-60 border-r border-border bg-background/50 p-3">
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                  <Search className="w-4 h-4 text-muted-foreground" />
+                  <input placeholder="Search settings" className="w-full bg-transparent text-sm outline-none" />
                 </div>
 
-                <div className="grid gap-3">
-                  <div className="rounded-xl border border-border p-4">
-                    <div className="text-sm font-medium mb-1">Profile</div>
-                    <div className="text-sm text-muted-foreground">Your visible DENA account profile.</div>
-                  </div>
+                {[
+                  ["general", "General"],
+                  ["account", "Account"],
+                  ["privacy", "Privacy"],
+                  ["billing", "Billing"],
+                  ["capabilities", "Capabilities"],
+                  ["connectors", "Connectors"],
+                  ["code", "DENA Code"],
+                  ["language", "Language"],
+                  ["help", "Help"],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setSettingsTab(id)}
+                    className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                      settingsTab === id ? "bg-primary/15 text-primary" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </aside>
 
-                  <div className="rounded-xl border border-border p-4">
-                    <div className="text-sm font-medium mb-1">Security</div>
-                    <div className="text-sm text-muted-foreground">Authentication is managed securely by Clerk.</div>
+              <main className="flex-1 overflow-y-auto">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-6 py-4 backdrop-blur">
+                  <div>
+                    <h2 className="text-xl font-semibold">Settings</h2>
+                    <p className="text-sm text-muted-foreground">Customize DENA for your work.</p>
                   </div>
-
-                  <div className="rounded-xl border border-border p-4">
-                    <div className="text-sm font-medium mb-1">DENA Mode</div>
-                    <div className="text-sm text-muted-foreground">
-                      Career assistant, coding assistant, CV intelligence, job matching, and roadmaps are active.
-                    </div>
-                  </div>
+                  <button onClick={() => setSettingsOpen(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button variant="ghost" onClick={() => setSettingsOpen(false)}>
-                    Close
-                  </Button>
-                  <Button variant="destructive" onClick={() => signOut()}>
-                    Log out
-                  </Button>
+                <div className="p-6 space-y-5">
+                  {settingsTab === "general" && (
+                    <>
+                      <h3 className="text-lg font-semibold">General</h3>
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="mb-3 font-medium">Appearance</div>
+                        <div className="flex gap-2">
+                          {["light", "dark", "system"].map((mode) => (
+                            <Button key={mode} variant={appearanceMode === mode ? "default" : "outline"} onClick={() => applyAppearance(mode)}>
+                              {mode}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="mb-2 font-medium">Instructions for DENA</div>
+                        <textarea
+                          value={customInstructions}
+                          onChange={(e) => setCustomInstructions(e.target.value)}
+                          placeholder="e.g. keep explanations brief, focus on coding, answer in English..."
+                          className="min-h-28 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {settingsTab === "account" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Account</h3>
+                      <div className="flex items-center gap-4 rounded-xl border border-border p-4">
+                        <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-bold">
+                          {firstName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium">{firstName}</div>
+                          <div className="text-sm text-muted-foreground">{userEmail}</div>
+                        </div>
+                      </div>
+                      <Button variant="destructive" onClick={() => signOut()}>Log out</Button>
+                    </>
+                  )}
+
+                  {settingsTab === "privacy" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Privacy</h3>
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="font-medium">Data controls</div>
+                        <p className="mt-1 text-sm text-muted-foreground">CVs, documents, conversations, and AI outputs should be protected before production launch.</p>
+                      </div>
+                      <Button variant="outline" onClick={() => alert("Privacy export feature coming next.")}>Export my data</Button>
+                    </>
+                  )}
+
+                  {settingsTab === "billing" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Billing</h3>
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="font-medium">Current plan</div>
+                        <p className="text-sm text-muted-foreground">Development / Free plan</p>
+                      </div>
+                      <Button onClick={() => alert("Upgrade flow will be connected later.")}>Upgrade plan</Button>
+                    </>
+                  )}
+
+                  {settingsTab === "capabilities" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Capabilities</h3>
+                      {["Coding Assistant", "CV Intelligence", "Job Match Engine", "Career Roadmaps", "Interview Coach", "Multi-document RAG", "ElevenLabs Voice"].map((cap) => (
+                        <div key={cap} className="flex items-center justify-between rounded-xl border border-border p-4">
+                          <span>{cap}</span>
+                          <span className="text-xs text-green-400">Active</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {settingsTab === "connectors" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Connectors</h3>
+                      {["GitHub", "LinkedIn", "Google Drive", "Gmail", "Calendar"].map((conn) => (
+                        <div key={conn} className="flex items-center justify-between rounded-xl border border-border p-4">
+                          <span>{conn}</span>
+                          <Button size="sm" variant="outline" onClick={() => alert(`${conn} connector coming soon.`)}>Connect</Button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {settingsTab === "code" && (
+                    <>
+                      <h3 className="text-lg font-semibold">DENA Code</h3>
+                      <div className="rounded-xl border border-border p-4">
+                        <p className="text-sm text-muted-foreground">DENA can write code, explain code, debug errors, and generate file-by-file implementations.</p>
+                      </div>
+                      <Button onClick={() => { setSettingsOpen(false); setInput("Build me a React + Fastify project"); }}>Try DENA Code</Button>
+                    </>
+                  )}
+
+                  {settingsTab === "language" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Language</h3>
+                      <select
+                        value={settingsLanguage}
+                        onChange={(e) => setSettingsLanguage(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background p-3 text-sm outline-none"
+                      >
+                        {["English", "German", "French", "Spanish", "Portuguese", "Italian"].map((lang) => (
+                          <option key={lang} value={lang}>{lang}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+
+                  {settingsTab === "help" && (
+                    <>
+                      <h3 className="text-lg font-semibold">Help</h3>
+                      <div className="grid gap-3">
+                        <Button variant="outline" onClick={() => setInput("How do I use DENA?")}>How to use DENA</Button>
+                        <Button variant="outline" onClick={() => setInput("How do I use SkillSwap?")}>How to use SkillSwap</Button>
+                        <Button variant="outline" onClick={() => setInput("Analyze my CV")}>Analyze my CV</Button>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex justify-end gap-3 border-t border-border pt-4">
+                    <Button variant="ghost" onClick={() => setSettingsOpen(false)}>Cancel</Button>
+                    <Button onClick={saveDenaSettings}>Save changes</Button>
+                  </div>
                 </div>
-              </div>
+              </main>
             </motion.div>
           </motion.div>
         )}
