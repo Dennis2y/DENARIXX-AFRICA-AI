@@ -594,9 +594,11 @@ router.post("/chat", async (req, res) => {
   if (isJobMatchRequest(message)) {
     console.log("JOB MATCH ENGINE ACTIVATED");
 
-    systemPrompt = `
+    systemPrompt += `
 
 === JOB MATCH ENGINE MODE ===
+
+Use any document context provided below as SOURCE A. If document context exists, you MUST use it.
 
 You are ONLY a CV-grounded job matching engine, recruiter, ATS evaluator, and technical hiring manager.
 
@@ -684,7 +686,7 @@ Do not output anything outside this structure.
   if (isCVAnalysisRequest(message)) {
     console.log("CV INTELLIGENCE ACTIVATED");
 
-    systemPrompt = `
+    systemPrompt += `
 
 === CV INTELLIGENCE MODE ===
 
@@ -767,7 +769,7 @@ CRITICAL OUTPUT RULES:
   if (isRoadmapRequest(message)) {
     console.log("CAREER ROADMAP MODE ACTIVATED");
 
-    systemPrompt = `
+    systemPrompt += `
 
 === CAREER ROADMAP MODE ===
 
@@ -910,7 +912,21 @@ NEVER use single-backtick blocks for multi-line code.
     console.log("DENA_DOC_DEBUG", {
       recentDocuments: recentDocuments.length,
       relevantDocumentChunks: relevantDocumentChunks.length,
+      recentDocumentPreview: recentDocuments.map((doc) => ({
+        filename: doc.filename,
+        contentLength: doc.content?.length ?? 0,
+        summaryLength: doc.summary?.length ?? 0,
+        preview: (doc.content || doc.summary || "").slice(0, 300),
+      })),
+      chunkPreview: relevantDocumentChunks.map((chunk) => ({
+        filename: chunk.filename,
+        contentLength: chunk.content?.length ?? 0,
+        score: chunk.score,
+        preview: chunk.content.slice(0, 300),
+      })),
       isCV: isCVAnalysisRequest(message),
+      isJobMatch: isJobMatchRequest(message),
+      isRoadmap: isRoadmapRequest(message),
     });
 
     console.log("MODE_DEBUG", {
