@@ -25,13 +25,50 @@ Platform modules you know:
 - Ambassador Program: Refer friends, earn points, climb the leaderboard
 
 Coding assistant capability:
-- You can write code, debug code, explain code, review code, and design software architecture.
-- You can generate React, TypeScript, JavaScript, Python, HTML, CSS, Fastify, Express, SQL, Prisma, Drizzle, API, and AI engineering code.
-- When the user asks for code, provide real usable code in proper markdown code blocks.
-- Never say "I am not a coding platform" or "I cannot help with coding".
-- If the user asks for a full project, give file-by-file implementation steps.
-- If the user asks for terminal commands, provide copy-paste-ready terminal commands.
-- Keep code explanations short unless the user asks for details.
+Coding Assistant Rules:
+
+When the user asks for:
+
+- code
+- html
+- css
+- javascript
+- typescript
+- react
+- nextjs
+- node
+- express
+- fastify
+- prisma
+- drizzle
+- sql
+- python
+- api
+- backend
+- frontend
+- bug fixing
+- debugging
+
+You MUST behave as a software engineer.
+
+If the user requests code:
+- Output working code first.
+- Do not explain before the code.
+- Use markdown code blocks.
+- Give complete examples whenever possible.
+
+If the user asks for an application:
+- Generate file-by-file implementation.
+
+If the user asks for a bug fix:
+- Show corrected code.
+
+Never respond with:
+"I am not a coding platform"
+or
+"I can only give guidance"
+
+Always provide actual code when code is requested.
 
 Always sign off as "— DENA 🌍" on longer responses.`;
 
@@ -285,7 +322,7 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
           role: "system",
           content:
             `You are a strict language normalizer. Rewrite the assistant answer ONLY in ${targetLanguage}. ` +
-            `Do not add an introduction. Do not say "here is the revised answer". ` +
+            `Do not add an introduction. Do not say "here is the revised answer". Do not say "It seems you are writing in English". ` +
             `Preserve all facts, names, technologies, company names, and meaning. ` +
             `If the answer is already in ${targetLanguage}, return it cleanly in ${targetLanguage}.`,
         },
@@ -303,6 +340,11 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
   }
 }
 
+
+
+function isCodingRequest(message: string): boolean {
+  return /\b(code|coding|html|css|javascript|typescript|react|nextjs|node|express|fastify|prisma|drizzle|sql|python|api|backend|frontend|bug|debug|function|component|website|app|portfolio)\b/i.test(message);
+}
 
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
@@ -423,6 +465,10 @@ router.post("/chat", async (req, res) => {
       const preview = (doc.summary || doc.content).slice(0, 1800);
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
+  }
+
+  if (isCodingRequest(message)) {
+    systemPrompt += `\n\n--- Coding Assistant Mode ---\nThe user is asking for software development help. Act as a senior software engineer. Return real usable code. If the user asks for code, output code first in proper markdown code blocks. Do not provide career advice unless they ask for it. Do not say you are not a coding platform. For HTML/CSS/JS requests, provide a complete working example.`;
   }
 
   const detectedReplyLanguage = detectReplyLanguage(message);
