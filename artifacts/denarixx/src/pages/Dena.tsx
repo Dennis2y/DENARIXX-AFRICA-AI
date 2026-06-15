@@ -10,6 +10,7 @@ import {
   ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText, Search, Library, UserCircle, Settings, LogOut, Briefcase, MessageCircle, ChevronDown, Zap, Brain, Bot, Copy, Check, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ArtifactPanel } from "../components/artifacts/ArtifactPanel";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -105,6 +106,7 @@ function DenaPageContent() {
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [careerToolsOpen, setCareerToolsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [artifactPanelOpen, setArtifactPanelOpen] = useState(false);
   const [libraryDocuments, setLibraryDocuments] = useState<LibraryDocument[]>([]);
   const [pinnedConversationIds, setPinnedConversationIds] = useState<number[]>([]);
   const [conversationMenuId, setConversationMenuId] = useState<number | null>(null);
@@ -1706,6 +1708,17 @@ function DenaPageContent() {
 
                 <Button
                   type="button"
+                  onClick={() => setArtifactPanelOpen(true)}
+                  disabled={streaming || loadingConv}
+                  variant="outline"
+                  className="hidden h-10 rounded-2xl px-3 text-sm lg:inline-flex"
+                  title="Open Canvas"
+                >
+                  Canvas
+                </Button>
+
+                <Button
+                  type="button"
                   onClick={() => setCareerToolsOpen((value) => !value)}
                   disabled={streaming || loadingConv}
                   variant="outline"
@@ -1759,6 +1772,13 @@ function DenaPageContent() {
             {uploadingDocument ? "Uploading document…" : listening ? "Listening… speak now." : speaking ? "DENA is speaking…" : "DENA can make mistakes. Verify important info."}
           </p>
         </div>
+      <ArtifactPanel
+        open={artifactPanelOpen}
+        onClose={() => setArtifactPanelOpen(false)}
+        basePath={basePath}
+        getToken={getToken}
+      />
+
       </div>
     </div>
   );
