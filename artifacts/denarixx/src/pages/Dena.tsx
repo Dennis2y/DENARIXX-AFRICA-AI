@@ -101,6 +101,7 @@ function DenaPageContent() {
   const [input, setInput] = useState("");
   const [sidebarSearch, setSidebarSearch] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [careerToolsOpen, setCareerToolsOpen] = useState(false);
   const [aiProvider, setAiProvider] = useState("auto");
   const [aiMode, setAiMode] = useState("balanced");
   const [temporaryChat, setTemporaryChat] = useState(false);
@@ -684,6 +685,30 @@ function DenaPageContent() {
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  const startSidebarPrompt = (prompt: string) => {
+    setCareerToolsOpen(false);
+    setInput(prompt);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const openLibrary = () => {
+    const uploadButton = document.querySelector('[aria-label="Attach document"]') as HTMLButtonElement | null;
+    if (uploadButton) {
+      uploadButton.click();
+      return;
+    }
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    if (fileInput) {
+      fileInput.click();
+      return;
+    }
+
+    startSidebarPrompt("I want to upload or analyze a document in DENA.");
+  };
+
+
+
   return (
     <div className="flex h-[100dvh] bg-background text-foreground overflow-hidden">
       {/* Mobile sidebar overlay */}
@@ -960,14 +985,37 @@ function DenaPageContent() {
               <Plus className="w-4 h-4" />
               New chat
             </Button>
-            <Button className="w-full justify-start gap-2" variant="ghost">
+            <Button onClick={openLibrary} className="w-full justify-start gap-2" variant="ghost">
               <Library className="w-4 h-4" />
               Library
             </Button>
-            <Button className="w-full justify-start gap-2" variant="ghost">
+            <Button
+              onClick={() => setCareerToolsOpen((value) => !value)}
+              className="w-full justify-start gap-2"
+              variant="ghost"
+            >
               <Briefcase className="w-4 h-4" />
               Career tools
             </Button>
+            {careerToolsOpen && (
+              <div className="ml-6 mt-1 space-y-1 border-l border-border pl-3">
+                <button onClick={() => startSidebarPrompt("Analyze my CV")} className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                  CV Intelligence
+                </button>
+                <button onClick={() => startSidebarPrompt("Compare my CV with this job description:")} className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                  Job Match Engine
+                </button>
+                <button onClick={() => startSidebarPrompt("Create an AI Engineer roadmap for Germany")} className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                  Career Roadmap
+                </button>
+                <button onClick={() => startSidebarPrompt("Practice an AI Engineer interview with me")} className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                  Interview Coach
+                </button>
+                <button onClick={() => startSidebarPrompt("Help me build a React and Fastify project")} className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                  Coding Assistant
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="px-3 pt-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
