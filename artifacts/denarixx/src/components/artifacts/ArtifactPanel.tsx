@@ -35,6 +35,19 @@ function renderCanvasMarkdown(content: string) {
   return html;
 }
 
+
+function cleanCanvasOutputByType(raw: string, type: string) {
+  if (type === "code" || type === "html" || type === "markdown") return raw;
+
+  return raw
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/`{1,3}/g, "")
+    .replace(/$begin:math:display$\(\.\*\?\)$end:math:display$$begin:math:text$\(\.\*\?\)$end:math:text$/g, "$1")
+    .trim();
+}
+
 export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPanelProps) {
   const [artifacts, setArtifacts] = useState<DenaArtifact[]>([]);
   const [activeArtifact, setActiveArtifact] = useState<DenaArtifact | null>(null);
@@ -110,8 +123,8 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
         credentials: "include",
         headers: await authHeaders(),
         body: JSON.stringify({
-          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.`,
-          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.`,
+          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.\n- If the artifact type is resume, cover-letter, business-plan, or document, write in clean plain text with NO markdown symbols like **, *, #, backticks, or markdown links.\n- Only use raw code syntax when the artifact type is code or html.`,
+          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.\n- If the artifact type is resume, cover-letter, business-plan, or document, write in clean plain text with NO markdown symbols like **, *, #, backticks, or markdown links.\n- Only use raw code syntax when the artifact type is code or html.`,
         }),
       });
 
