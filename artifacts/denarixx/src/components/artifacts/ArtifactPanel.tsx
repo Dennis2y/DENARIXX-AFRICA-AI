@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Download, Maximize2, Minimize2, Plus, Save, Trash2, X } from "lucide-react";
+import { Copy, Download, Maximize2, Minimize2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "../ui/button";
 
 export type DenaArtifact = {
@@ -26,6 +26,7 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
   const [content, setContent] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const hasActiveChanges = useMemo(() => {
     if (!activeArtifact) return content.trim().length > 0;
@@ -74,6 +75,42 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
     setTitle("Untitled artifact");
     setType("document");
     setContent("");
+  }
+
+  async function generateArtifact() {
+    const prompt = content.trim();
+
+    if (!prompt) return;
+
+    setGenerating(true);
+
+    try {
+      const res = await fetch(`${basePath}/api/ai/generate`, {
+        method: "POST",
+        credentials: "include",
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}`,
+        }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const generated =
+        data.content ||
+        data.text ||
+        data.result ||
+        data.output ||
+        data.message ||
+        "";
+
+      if (generated) {
+        setContent(generated);
+      }
+    } finally {
+      setGenerating(false);
+    }
   }
 
   async function saveArtifact() {
@@ -208,6 +245,11 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
             </div>
 
             <div className="flex items-center gap-2">
+              <Button size="sm" onClick={generateArtifact} disabled={!content.trim() || generating}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                {generating ? "Generating..." : "Generate"}
+              </Button>
+
               <Button size="sm" variant="outline" onClick={copyArtifact} disabled={!content.trim()}>
                 <Copy className="mr-2 h-4 w-4" />
                 Copy
