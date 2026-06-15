@@ -603,6 +603,10 @@ CRITICAL RULES:
 - Only mark a skill as FOUND if it clearly appears in SOURCE A.
 - If a skill is not clearly found in SOURCE A, mark it as MISSING or PARTIAL.
 - Always provide evidence from the CV when marking a skill as FOUND.
+- Evidence must be copied or closely paraphrased only from SOURCE A.
+- Never invent quoted CV evidence.
+- If exact evidence is not available, write "Not found in CV".
+- Do not mark AWS, Docker, Kubernetes, TypeScript, FastAPI, RAG, LLMs, PostgreSQL, or CI/CD as Found unless they explicitly appear in SOURCE A.
 - Do NOT write code.
 - Do NOT give generic career advice.
 - Do NOT write an email or cover letter.
