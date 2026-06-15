@@ -7,7 +7,7 @@ import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
-  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText, Copy, Check
+  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText, Copy, Check, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -353,6 +353,14 @@ function DenaPageContent() {
     }
   };
 
+  const editUserMessage = (content: string, index: number) => {
+    setInput(content);
+    setMessages((prev) => prev.slice(0, index));
+    setActiveConvId(null);
+    setPendingDocument(null);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
   // Send a message
   const sendMessage = async () => {
     const text = input.trim();
@@ -646,6 +654,17 @@ function DenaPageContent() {
                             <Copy className="w-3.5 h-3.5" />
                           )}
                         </button>
+
+                        {msg.role === "user" && (
+                          <button
+                            type="button"
+                            onClick={() => editUserMessage(msg.content, i)}
+                            className="inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-1 text-[11px] text-primary-foreground transition-colors hover:bg-white/25"
+                            title="Edit message"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
