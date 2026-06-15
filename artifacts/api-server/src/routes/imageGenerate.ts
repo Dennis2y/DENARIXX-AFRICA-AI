@@ -41,8 +41,12 @@ router.post("/", requireAuth, async (req: Request, res: Response): Promise<void>
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
     });
   } catch (err) {
-    req.log.error({ err }, "Image generation failed");
-    res.status(500).json({ error: "Image generation failed" });
+    const message = err instanceof Error ? err.message : "Image generation failed";
+    req.log.error({ err, message }, "Image generation failed");
+    res.status(500).json({
+      error: "Image generation failed",
+      detail: process.env.NODE_ENV === "production" ? undefined : message,
+    });
   }
 });
 
