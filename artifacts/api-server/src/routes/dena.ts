@@ -377,6 +377,22 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
 
 
 
+
+function isCVAnalysisRequest(message: string): boolean {
+  const text = message.toLowerCase();
+
+  return (
+    text.includes("analyze my cv") ||
+    text.includes("analyse my cv") ||
+    text.includes("review my cv") ||
+    text.includes("rate my cv") ||
+    text.includes("cv score") ||
+    text.includes("resume score") ||
+    text.includes("improve my cv") ||
+    text.includes("ats score")
+  );
+}
+
 function isRoadmapRequest(message: string): boolean {
   const text = message.toLowerCase();
 
