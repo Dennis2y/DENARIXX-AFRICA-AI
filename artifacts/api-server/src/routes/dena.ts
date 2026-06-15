@@ -376,6 +376,21 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
 
 
 
+
+function isRoadmapRequest(message: string): boolean {
+  const text = message.toLowerCase();
+
+  return (
+    text.includes("roadmap") ||
+    text.includes("career path") ||
+    text.includes("learning path") ||
+    text.includes("become a") ||
+    text.includes("how do i become") ||
+    text.includes("career plan") ||
+    text.includes("skills roadmap")
+  );
+}
+
 function isCodingRequest(message: string): boolean {
   const text = message.toLowerCase();
 

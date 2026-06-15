@@ -757,6 +757,7 @@ function DenaPageContent() {
               "Build me a CV",
               "Career advice for Africa",
               "Build me a React project",
+              "Create an AI Engineer roadmap",
               "Explain this code",
               "What jobs match my profile?",
             ].map(prompt => (
