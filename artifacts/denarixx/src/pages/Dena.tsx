@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser, useAuth, Show } from "@clerk/react";
+import { useUser, useAuth, useClerk, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
@@ -94,6 +94,7 @@ function timeAgo(iso: string) {
 function DenaPageContent() {
   const { user } = useUser();
   const { getToken, signOut } = useAuth();
+  const { openUserProfile } = useClerk();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
@@ -662,7 +663,7 @@ function DenaPageContent() {
                 variant="ghost"
                 size="sm"
                 className="justify-start gap-2 text-xs"
-                onClick={() => window.location.href = "/settings"}
+                onClick={() => openUserProfile()}
               >
                 <Settings className="w-3.5 h-3.5" />
                 Settings
