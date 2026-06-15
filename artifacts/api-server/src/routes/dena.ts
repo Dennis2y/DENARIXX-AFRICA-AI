@@ -571,9 +571,17 @@ router.post("/chat", async (req, res) => {
     systemPrompt += `\n\n--- Long-term User Memory ---\n${savedMemoryLines.map((m) => `- ${m}`).join("\n")}\nUse these memories carefully to personalize help. Do not mention memory unless it is useful.`;
   }
 
-  if (relevantDocumentChunks.length) {
+  const isSpecialAnalysisMode =
+    isCVAnalysisRequest(message) || isJobMatchRequest(message) || isRoadmapRequest(message);
+
+  if (isSpecialAnalysisMode && recentDocuments.length) {
+    systemPrompt += `\n\n--- FULL RECENT UPLOADED DOCUMENT CONTEXT ---\n${recentDocuments.map((doc, index) => {
+      const preview = (doc.content || doc.summary || "").slice(0, 9000);
+      return `Document ${index + 1}: ${doc.filename}\n${preview}`;
+    }).join("\n\n---\n\n")}\nFor CV analysis, job matching, and roadmaps, treat this as SOURCE A/profile evidence. Use only this document evidence when saying a skill is found.`;
+  } else if (relevantDocumentChunks.length) {
     systemPrompt += `\n\n--- Relevant Uploaded Document Chunks ---\n${relevantDocumentChunks.map((chunk, index) => {
-      return `Source ${index + 1}: ${chunk.filename}\n${chunk.content.slice(0, 2200)}`;
+      return `Source ${index + 1}: ${chunk.filename}\n${chunk.content.slice(0, 3500)}`;
     }).join("\n\n---\n\n")}\nUse these chunks when answering questions about uploaded files, CVs, notes, documents, or when the user says "this document". If the chunks do not contain the answer, say that clearly.`;
   } else if (recentDocuments.length) {
     systemPrompt += `\n\n--- Recently Uploaded Documents ---\n${recentDocuments.map((doc) => {
@@ -581,6 +589,8 @@ router.post("/chat", async (req, res) => {
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
+
+
   if (isJobMatchRequest(message)) {
     console.log("JOB MATCH ENGINE ACTIVATED");
 
