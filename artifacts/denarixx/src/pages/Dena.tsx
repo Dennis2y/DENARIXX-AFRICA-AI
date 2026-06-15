@@ -113,6 +113,8 @@ function DenaPageContent() {
   const [settingsLanguage, setSettingsLanguage] = useState("English");
   const [customInstructions, setCustomInstructions] = useState("");
   const [appearanceMode, setAppearanceMode] = useState("dark");
+  const [connectedServices, setConnectedServices] = useState<string[]>([]);
+  const [billingPlan, setBillingPlan] = useState("Free");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -541,6 +543,24 @@ function DenaPageContent() {
     }
   };
 
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem("dena-language");
+    const savedInstructions = localStorage.getItem("dena-custom-instructions");
+    const savedAppearance = localStorage.getItem("dena-appearance");
+    const savedConnectors = localStorage.getItem("dena-connected-services");
+    const savedPlan = localStorage.getItem("dena-billing-plan");
+
+    if (savedLanguage) setSettingsLanguage(savedLanguage);
+    if (savedInstructions) setCustomInstructions(savedInstructions);
+    if (savedAppearance) applyAppearance(savedAppearance);
+    if (savedConnectors) {
+      try {
+        setConnectedServices(JSON.parse(savedConnectors));
+      } catch {}
+    }
+    if (savedPlan) setBillingPlan(savedPlan);
+  }, []);
+
   const firstName = user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Explorer";
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? "";
   const filteredConversations = conversations.filter((conv) =>
@@ -562,7 +582,56 @@ function DenaPageContent() {
     localStorage.setItem("dena-language", settingsLanguage);
     localStorage.setItem("dena-custom-instructions", customInstructions);
     localStorage.setItem("dena-appearance", appearanceMode);
+    localStorage.setItem("dena-connected-services", JSON.stringify(connectedServices));
+    localStorage.setItem("dena-billing-plan", billingPlan);
     setSettingsOpen(false);
+  };
+
+  const toggleConnector = (name: string) => {
+    setConnectedServices((prev) => {
+      const next = prev.includes(name)
+        ? prev.filter((item) => item !== name)
+        : [...prev, name];
+
+      localStorage.setItem("dena-connected-services", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const exportDenaData = () => {
+    const data = {
+      profile: {
+        firstName,
+        email: userEmail,
+      },
+      settings: {
+        language: settingsLanguage,
+        appearance: appearanceMode,
+        customInstructions,
+        connectedServices,
+        billingPlan,
+      },
+      conversations: conversations.map((conv) => ({
+        id: conv.id,
+        title: conv.title,
+        updatedAt: conv.updatedAt,
+      })),
+      exportedAt: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "dena-data-export.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const startSettingsPrompt = (prompt: string) => {
+    setSettingsOpen(false);
+    setInput(prompt);
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
   return (
@@ -674,7 +743,7 @@ function DenaPageContent() {
                         <div className="font-medium">Data controls</div>
                         <p className="mt-1 text-sm text-muted-foreground">CVs, documents, conversations, and AI outputs should be protected before production launch.</p>
                       </div>
-                      <Button variant="outline" onClick={() => alert("Privacy export feature coming next.")}>Export my data</Button>
+                      <Button variant="outline" onClick={exportDenaData}>Export my data</Button>
                     </>
                   )}
 
@@ -683,9 +752,22 @@ function DenaPageContent() {
                       <h3 className="text-lg font-semibold">Billing</h3>
                       <div className="rounded-xl border border-border p-4">
                         <div className="font-medium">Current plan</div>
-                        <p className="text-sm text-muted-foreground">Development / Free plan</p>
+                        <p className="text-sm text-muted-foreground">{billingPlan} plan</p>
                       </div>
-                      <Button onClick={() => alert("Upgrade flow will be connected later.")}>Upgrade plan</Button>
+                      <div className="flex gap-2">
+                        {["Free", "Pro", "Team"].map((plan) => (
+                          <Button
+                            key={plan}
+                            variant={billingPlan === plan ? "default" : "outline"}
+                            onClick={() => {
+                              setBillingPlan(plan);
+                              localStorage.setItem("dena-billing-plan", plan);
+                            }}
+                          >
+                            {plan}
+                          </Button>
+                        ))}
+                      </div>
                     </>
                   )}
 
@@ -707,7 +789,13 @@ function DenaPageContent() {
                       {["GitHub", "LinkedIn", "Google Drive", "Gmail", "Calendar"].map((conn) => (
                         <div key={conn} className="flex items-center justify-between rounded-xl border border-border p-4">
                           <span>{conn}</span>
-                          <Button size="sm" variant="outline" onClick={() => alert(`${conn} connector coming soon.`)}>Connect</Button>
+                          <Button
+                            size="sm"
+                            variant={connectedServices.includes(conn) ? "default" : "outline"}
+                            onClick={() => toggleConnector(conn)}
+                          >
+                            {connectedServices.includes(conn) ? "Connected" : "Connect"}
+                          </Button>
                         </div>
                       ))}
                     </>
@@ -719,7 +807,7 @@ function DenaPageContent() {
                       <div className="rounded-xl border border-border p-4">
                         <p className="text-sm text-muted-foreground">DENA can write code, explain code, debug errors, and generate file-by-file implementations.</p>
                       </div>
-                      <Button onClick={() => { setSettingsOpen(false); setInput("Build me a React + Fastify project"); }}>Try DENA Code</Button>
+                      <Button onClick={() => startSettingsPrompt("Build me a React + Fastify project")}>Try DENA Code</Button>
                     </>
                   )}
 
@@ -742,9 +830,9 @@ function DenaPageContent() {
                     <>
                       <h3 className="text-lg font-semibold">Help</h3>
                       <div className="grid gap-3">
-                        <Button variant="outline" onClick={() => setInput("How do I use DENA?")}>How to use DENA</Button>
-                        <Button variant="outline" onClick={() => setInput("How do I use SkillSwap?")}>How to use SkillSwap</Button>
-                        <Button variant="outline" onClick={() => setInput("Analyze my CV")}>Analyze my CV</Button>
+                        <Button variant="outline" onClick={() => startSettingsPrompt("How do I use DENA?")}>How to use DENA</Button>
+                        <Button variant="outline" onClick={() => startSettingsPrompt("How do I use SkillSwap?")}>How to use SkillSwap</Button>
+                        <Button variant="outline" onClick={() => startSettingsPrompt("Analyze my CV")}>Analyze my CV</Button>
                       </div>
                     </>
                   )}
