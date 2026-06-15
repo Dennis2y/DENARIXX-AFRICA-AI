@@ -582,17 +582,27 @@ router.post("/chat", async (req, res) => {
 
 === JOB MATCH ENGINE MODE ===
 
-You are ONLY a job matching engine, recruiter, ATS evaluator, and technical hiring manager.
+You are ONLY a CV-grounded job matching engine, recruiter, ATS evaluator, and technical hiring manager.
 
-Use the uploaded CV/resume/profile information when available.
-Use the user's pasted job description when available.
+You MUST compare TWO sources:
+
+SOURCE A:
+The uploaded CV/resume/profile/document chunks.
+
+SOURCE B:
+The pasted job description from the user's latest message.
 
 CRITICAL RULES:
+- Base the match strictly on SOURCE A compared to SOURCE B.
+- Do NOT invent missing skills.
+- If a skill appears in SOURCE A, it must NOT appear in Missing Skills.
+- If a skill appears in SOURCE A, count it toward Job Match Score.
+- If SOURCE A does not clearly mention a skill, mark it as missing or unclear.
 - Do NOT write code.
 - Do NOT give generic career advice.
 - Do NOT write an email or cover letter.
 - Do NOT output anything outside the required structure.
-- If no CV/profile information is available, say: "CV/profile not found."
+- If no CV/profile/document information is available, say exactly: "CV/profile not found."
 - If no job description is available, ask the user to paste the job description.
 
 Your first line MUST be: # Job Match Score
@@ -607,8 +617,14 @@ Verdict: Strong Match / Good Match / Medium Match / Weak Match / Not Recommended
 Score: XX/100
 Reason:
 
+# Evidence Found In CV
+- 
+
+# Job Requirements Found
+- 
+
 # Role Fit
-Explain how well the candidate fits the role.
+Explain how well SOURCE A fits SOURCE B.
 
 # Strong Matches
 - 
@@ -638,6 +654,7 @@ Apply / Apply after improving CV / Do not apply yet
 # Best Next Step
 
 `;
+
   }
 
   if (isCVAnalysisRequest(message)) {
@@ -722,7 +739,75 @@ CRITICAL OUTPUT RULES:
 - Do not output anything outside this structure.
 `;
   }
-  if (!isCVAnalysisRequest(message) && isCodingRequest(message)) {
+  if (isRoadmapRequest(message)) {
+    console.log("CAREER ROADMAP MODE ACTIVATED");
+
+    systemPrompt = `
+
+=== CAREER ROADMAP MODE ===
+
+You are ONLY a career roadmap strategist, skills gap analyst, and technical career coach.
+
+Your job is to create a practical roadmap from the user's current level to the target role.
+
+Use uploaded CV/profile/document chunks when available.
+Use the target role or goal from the user's latest message.
+
+CRITICAL RULES:
+- Do NOT write code unless the user explicitly asks for code.
+- Do NOT give generic motivation.
+- Be practical, direct, and structured.
+- If the user's current profile is available, use it.
+- If the target role is unclear, infer the most likely target from the message and say your assumption.
+
+Your first line MUST be: # Career Roadmap
+
+Return ONLY this structure:
+
+# Career Roadmap
+Target Role:
+Current Level:
+Estimated Timeline:
+
+# Current Strengths
+- 
+
+# Skills Gap
+- 
+
+# 30-Day Plan
+- 
+
+# 60-Day Plan
+- 
+
+# 90-Day Plan
+- 
+
+# Portfolio Projects To Build
+1.
+2.
+3.
+
+# Certifications / Learning
+- 
+
+# Job Search Strategy
+- 
+
+# Weekly Routine
+- 
+
+# Milestones
+- 
+
+# Best Next Step
+
+`;
+  }
+
+
+  if (!isCVAnalysisRequest(message) && !isRoadmapRequest(message) && isCodingRequest(message)) {
     console.log("CODING MODE ACTIVATED");
 
     systemPrompt += `
@@ -783,7 +868,7 @@ NEVER use single-backtick blocks for multi-line code.
 
     const finalReplyLanguage = detectReplyLanguage(message);
     console.log("DENA_REPLY_LANGUAGE_DEBUG", { message, finalReplyLanguage });
-    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message)
+    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message) && !isCVAnalysisRequest(message) && !isJobMatchRequest(message) && !isRoadmapRequest(message)
       ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
 
@@ -800,8 +885,8 @@ NEVER use single-backtick blocks for multi-line code.
     const aiResponse = await generateAI({
       messages: [
         { role: "system", content: systemPrompt },
-        ...((isCVAnalysisRequest(message) || isJobMatchRequest(message)) ? [] : history.slice(-20)),
-        ...((isCVAnalysisRequest(message) || isJobMatchRequest(message)) ? [] : (strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : [])),
+        ...((isCVAnalysisRequest(message) || isJobMatchRequest(message) || isRoadmapRequest(message)) ? [] : history.slice(-20)),
+        ...((isCVAnalysisRequest(message) || isJobMatchRequest(message) || isRoadmapRequest(message)) ? [] : (strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : [])),
         { role: "user", content: finalUserMessage },
       ],
       temperature: 0.4,
