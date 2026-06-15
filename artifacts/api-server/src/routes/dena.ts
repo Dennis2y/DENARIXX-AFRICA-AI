@@ -315,6 +315,11 @@ async function saveUserMemories(userId: number, rawMemories: string[]) {
 async function forceReplyLanguage(targetLanguage: string, answer: string): Promise<string> {
   if (!targetLanguage || !answer.trim()) return answer;
 
+  // Never rewrite code-heavy responses; language normalization can corrupt code blocks.
+  if (/```[\s\S]*?```/.test(answer) || /`(?:html|css|javascript|typescript|python|sql)[\s\S]*?`/i.test(answer)) {
+    return answer;
+  }
+
   try {
     const fixed = await generateAI({
       messages: [
@@ -323,6 +328,7 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
           content:
             `You are a strict language normalizer. Rewrite the assistant answer ONLY in ${targetLanguage}. ` +
             `Do not add an introduction. Do not say "here is the revised answer". Do not say "It seems you are writing in English". ` +
+            `Preserve ALL code blocks exactly as-is. Do not translate, explain, summarize, remove, or reformat code. ` +
             `Preserve all facts, names, technologies, company names, and meaning. ` +
             `If the answer is already in ${targetLanguage}, return it cleanly in ${targetLanguage}.`,
         },
@@ -561,7 +567,7 @@ Output code first.
 
     const finalReplyLanguage = detectReplyLanguage(message);
     console.log("DENA_REPLY_LANGUAGE_DEBUG", { message, finalReplyLanguage });
-    const finalUserMessage = finalReplyLanguage
+    const finalUserMessage = finalReplyLanguage && !isCodingRequest(message)
       ? `REPLY LANGUAGE: ${finalReplyLanguage}\n\nYou MUST answer only in ${finalReplyLanguage}.\nIf uploaded documents or retrieved chunks are in another language, translate the facts into ${finalReplyLanguage}.\nDo not answer in the uploaded document language unless it is also ${finalReplyLanguage}.\n\nUSER QUESTION:\n${message}`
       : message;
 
@@ -580,7 +586,9 @@ Output code first.
 
     let fullResponse = aiResponse.content || "";
 
-    if (finalReplyLanguage && !isCodingRequest(message)) {
+    const responseHasCode = /```[\s\S]*?```/.test(fullResponse) || /`(?:html|css|javascript|typescript|python|sql)[\s\S]*?`/i.test(fullResponse);
+
+    if (finalReplyLanguage && !isCodingRequest(message) && !responseHasCode) {
       fullResponse = await forceReplyLanguage(finalReplyLanguage, fullResponse);
     }
 
