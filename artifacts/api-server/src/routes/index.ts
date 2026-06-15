@@ -16,12 +16,14 @@ import documentsRouter from "./documents";
 import aiGenerateRouter from "./aiGenerate";
 import aiStatusRouter from "./aiStatus";
 import voiceRouter from "./voice";
+import artifactsRouter from "./artifacts";
 
 const router: IRouter = Router();
 
 router.use("/ai/status", aiStatusRouter);
 router.use("/ai/generate", aiGenerateRouter);
 router.use("/voice", voiceRouter);
+router.use("/artifacts", artifactsRouter);
 
 router.use(healthRouter);
 router.use(waitlistRouter);
