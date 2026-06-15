@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { generateAI } from "../lib/ai/aiRouter";
 import { requireAuth } from "../middlewares/requireAuth";
+import { buildDenaUserContext } from "../lib/denaContextEngine";
 
 const router = Router();
 
@@ -15,11 +16,23 @@ router.post("/", requireAuth, async (req, res) => {
     };
 
     const prompt = (body.prompt || body.message || "").trim();
+    const clerkUserId = (req as any).clerkUserId as string | undefined;
+    const denaContext = clerkUserId ? await buildDenaUserContext(clerkUserId) : null;
 
     const messages =
       Array.isArray(body.messages) && body.messages.length
-        ? body.messages
+        ? [
+            {
+              role: "system" as const,
+              content: denaContext?.context || "No verified user context available. Do not invent personal details.",
+            },
+            ...body.messages,
+          ]
         : [
+            {
+              role: "system" as const,
+              content: denaContext?.context || "No verified user context available. Do not invent personal details.",
+            },
             {
               role: "user" as const,
               content: prompt,
