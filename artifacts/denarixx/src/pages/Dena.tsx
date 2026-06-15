@@ -529,6 +529,11 @@ function DenaPageContent() {
   };
 
   // Send a message
+  const isImagePrompt = (value: string) => {
+    return /\b(generate|create|make|draw|design|render|visualize)\b/i.test(value)
+      && /\b(image|picture|photo|poster|logo|illustration|art|dashboard visual|mockup)\b/i.test(value);
+  };
+
   const generateImageFromInput = async () => {
     const prompt = input.trim();
 
@@ -553,7 +558,9 @@ function DenaPageContent() {
       });
 
       if (!res.ok) {
-        console.error("Image generation failed", await res.text());
+        const errorText = await res.text();
+        console.error("Image generation failed", errorText);
+        alert(`Image generation failed: ${errorText}`);
         return;
       }
 
@@ -571,6 +578,13 @@ function DenaPageContent() {
   };
 
   const sendMessage = async () => {
+    const imagePromptCandidate = input.trim();
+
+    if (imagePromptCandidate && !streaming && !loadingConv && isImagePrompt(imagePromptCandidate)) {
+      await generateImageFromInput();
+      return;
+    }
+
     const text = input.trim();
     if (!text || streaming) return;
     setInput("");
