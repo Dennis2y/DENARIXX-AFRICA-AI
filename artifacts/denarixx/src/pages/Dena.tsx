@@ -486,6 +486,38 @@ function DenaPageContent() {
     }
   };
 
+  const saveMessageToCanvas = async (msg: Message) => {
+    const content = msg.content.trim();
+    if (!content) return;
+
+    try {
+      const token = await getToken();
+
+      const res = await fetch(`${basePath}/api/artifact-from-message`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: content.slice(0, 60) || "Saved From Chat",
+          type: "document",
+          content,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("Failed to save message to canvas", await res.text());
+        return;
+      }
+
+      setArtifactPanelOpen(true);
+    } catch (err) {
+      console.error("Save to Canvas failed", err);
+    }
+  };
+
   const editUserMessage = (content: string, index: number) => {
     setInput(content);
     setMessages((prev) => prev.slice(0, index));
@@ -1538,6 +1570,17 @@ function DenaPageContent() {
                             <Copy className="w-3.5 h-3.5" />
                           )}
                         </button>
+
+                        {msg.role === "assistant" && (
+                          <button
+                            type="button"
+                            onClick={() => saveMessageToCanvas(msg)}
+                            className="ml-1 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+                            title="Save response to Canvas"
+                          >
+                            Canvas
+                          </button>
+                        )}
 
                         {msg.role === "user" && (
                           <button
