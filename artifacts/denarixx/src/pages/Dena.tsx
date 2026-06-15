@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
@@ -21,35 +24,61 @@ const WELCOME: Message = {
   content: "Hi! I'm **DENA** 🌍 — your personal AI guide to Africa's most powerful career platform.\n\nAsk me anything about your career, the platform, skill development, or the African job market. I remember our conversations so we can pick up where we left off!",
 };
 
-function renderMarkdown(text: string) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code class='bg-muted px-1 rounded text-xs font-mono'>$1</code>")
-    .replace(/\n/g, "<br/>");
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        code(props) {
+          const { children, className, ...rest } = props;
+          const match = /language-(\w+)/.exec(className || "");
+
+          if (match) {
+            return (
+              <SyntaxHighlighter
+                style={oneDark as any}
+                language={match[1]}
+                PreTag="div"
+                customStyle={{
+                  borderRadius: "0.75rem",
+                  padding: "1rem",
+                  fontSize: "0.8rem",
+                  margin: "0.75rem 0",
+                }}
+              >
+                {String(children).replace(/\n$/, "")}
+              </SyntaxHighlighter>
+            );
+          }
+
+          return (
+            <code className="rounded bg-muted px-1 py-0.5 text-[0.85em]" {...rest}>
+              {children}
+            </code>
+          );
+        },
+        p({ children }) {
+          return <p className="mb-2 last:mb-0">{children}</p>;
+        },
+        ul({ children }) {
+          return <ul className="list-disc pl-5 mb-2">{children}</ul>;
+        },
+        ol({ children }) {
+          return <ol className="list-decimal pl-5 mb-2">{children}</ol>;
+        },
+        pre({ children }) {
+          return <>{children}</>;
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 }
 
 function TypewriterText({ text, isActive }: { text: string; isActive: boolean }) {
-  const [pos, setPos] = useState(() => (isActive ? 0 : text.length));
-
-  useEffect(() => {
-    if (!isActive) { setPos(text.length); return; }
-    if (pos >= text.length) return;
-    const t = setTimeout(() => setPos(p => Math.min(p + 3, text.length)), 8);
-    return () => clearTimeout(t);
-  }, [isActive, pos, text]);
-
-  if (!isActive) return <span dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
-  const displayed = text.slice(0, pos);
-  const done = pos >= text.length;
-  return (
-    <span
-      dangerouslySetInnerHTML={{
-        __html: renderMarkdown(displayed) + (!done ? '<span style="display:inline-block;width:2px;height:0.9em;background:currentColor;opacity:0.8;margin-left:1px;vertical-align:middle;border-radius:1px;animation:pulse 1s cubic-bezier(0.4,0,0.6,1) infinite"></span>' : ""),
-      }}
-    />
-  );
+  return <MarkdownMessage content={text} />;
 }
+
 
 function timeAgo(iso: string) {
   const d = new Date(iso);
