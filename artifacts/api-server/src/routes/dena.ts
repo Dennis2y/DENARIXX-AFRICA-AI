@@ -465,7 +465,7 @@ function isCodingRequest(message: string): boolean {
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
   const clerkUserId: string | undefined = (req as any).clerkUserId || getAuth(req)?.userId;
-  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt, activeWorkflow, preferredLanguage, customInstructions } = req.body as {
+  const { message, conversationId, moduleContext, history: inlineHistory, overrideSystemPrompt, activeWorkflow, preferredLanguage, customInstructions, aiProvider, aiMode, temporaryChat } = req.body as {
     message: string;
     conversationId?: number;
     moduleContext?: string;
@@ -474,6 +474,9 @@ router.post("/chat", async (req, res) => {
     activeWorkflow?: string;
     preferredLanguage?: string;
     customInstructions?: string;
+    aiProvider?: "auto" | "openai" | "gemini" | "anthropic" | "groq" | "mistral";
+    aiMode?: "instant" | "balanced" | "careful";
+    temporaryChat?: boolean;
   };
 
   if (!message || typeof message !== "string") {
@@ -489,7 +492,7 @@ router.post("/chat", async (req, res) => {
   let relevantDocumentChunks: Array<{ filename: string; content: string; score: number }> = [];
   let resolvedConvId: number | undefined = conversationId;
 
-  if (clerkUserId) {
+  if (clerkUserId && !temporaryChat) {
     try {
       const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
       if (user) {
@@ -532,7 +535,7 @@ router.post("/chat", async (req, res) => {
   }
 
   // Save user message to DB
-  if (resolvedConvId) {
+  if (resolvedConvId && !temporaryChat) {
     try {
       await db.insert(messages).values({ conversationId: resolvedConvId, role: "user", content: message });
     } catch (err) {
@@ -572,6 +575,10 @@ router.post("/chat", async (req, res) => {
 
   if (preferredLanguage) {
     systemPrompt += `\n\n--- User Preferred Language ---\nWhen possible, reply in ${preferredLanguage}, unless the user's latest message clearly asks for another language.`;
+  }
+
+  if (aiMode) {
+    systemPrompt += `\n\n--- Response Mode ---\nMode: ${aiMode}. Instant = concise and fast. Balanced = clear and practical. Careful = more detailed and cautious.`;
   }
 
   if (customInstructions?.trim()) {
@@ -965,7 +972,8 @@ NEVER use single-backtick blocks for multi-line code.
         ...((isCVAnalysisRequest(message) || isJobMatchRequest(message) || isRoadmapRequest(message)) ? [] : (strictLanguageSystemMessage(message) ? [strictLanguageSystemMessage(message)!] : [])),
         { role: "user", content: finalUserMessage },
       ],
-      temperature: 0.4,
+      provider: aiProvider && aiProvider !== "auto" ? aiProvider : undefined,
+      temperature: aiMode === "instant" ? 0.25 : aiMode === "careful" ? 0.2 : 0.4,
     });
 
     console.log("RAW_AI_RESPONSE");
@@ -988,7 +996,7 @@ NEVER use single-backtick blocks for multi-line code.
     }
 
     // Save assistant response to DB
-    if (resolvedConvId && fullResponse) {
+    if (resolvedConvId && fullResponse && !temporaryChat) {
       try {
         await db.insert(messages).values({ conversationId: resolvedConvId, role: "assistant", content: fullResponse });
         await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, resolvedConvId));

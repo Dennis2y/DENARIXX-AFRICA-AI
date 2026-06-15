@@ -7,7 +7,7 @@ import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
-  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText, Search, Library, UserCircle, Settings, LogOut, Briefcase, MessageCircle, Copy, Check, Pencil
+  ChevronLeft, Menu, X, Mic, MicOff, Volume2, VolumeX, Paperclip, FileText, Search, Library, UserCircle, Settings, LogOut, Briefcase, MessageCircle, ChevronDown, Zap, Brain, Bot, Copy, Check, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -100,6 +100,10 @@ function DenaPageContent() {
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [aiProvider, setAiProvider] = useState("auto");
+  const [aiMode, setAiMode] = useState("balanced");
+  const [temporaryChat, setTemporaryChat] = useState(false);
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
@@ -480,6 +484,9 @@ function DenaPageContent() {
           documentId: pendingDocument?.id,
           preferredLanguage: localStorage.getItem("dena-language") || undefined,
           customInstructions: localStorage.getItem("dena-custom-instructions") || undefined,
+          aiProvider,
+          aiMode,
+          temporaryChat,
         }),
       });
 
@@ -568,6 +575,24 @@ function DenaPageContent() {
   const filteredConversations = conversations.filter((conv) =>
     conv.title.toLowerCase().includes(sidebarSearch.toLowerCase())
   );
+
+  const aiProviders = [
+    { id: "auto", label: "Auto", description: "Uses configured fallback order" },
+    { id: "openai", label: "OpenAI", description: "Uses OPENAI_API_KEY" },
+    { id: "gemini", label: "Gemini", description: "Uses GEMINI_API_KEY" },
+    { id: "anthropic", label: "Anthropic", description: "Uses ANTHROPIC_API_KEY" },
+    { id: "groq", label: "Groq", description: "Uses GROQ_API_KEY" },
+    { id: "mistral", label: "Mistral", description: "Uses MISTRAL_API_KEY" },
+  ];
+
+  const aiModes = [
+    { id: "instant", label: "Instant", description: "Fast, direct answers", icon: Zap },
+    { id: "balanced", label: "Balanced", description: "Best default quality/speed", icon: Bot },
+    { id: "careful", label: "Careful", description: "More detailed, lower-risk answers", icon: Brain },
+  ];
+
+  const selectedProvider = aiProviders.find((p) => p.id === aiProvider) ?? aiProviders[0];
+  const selectedMode = aiModes.find((m) => m.id === aiMode) ?? aiModes[1];
 
   const applyAppearance = (mode: string) => {
     setAppearanceMode(mode);
@@ -1081,7 +1106,81 @@ function DenaPageContent() {
               <p className="text-sm font-medium">New Conversation</p>
             )}
           </div>
-          <div className="text-sm text-muted-foreground hidden sm:block">
+          <div className="relative hidden sm:block">
+            <button
+              onClick={() => setModelMenuOpen((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:bg-muted"
+            >
+              <span>{selectedProvider.label}</span>
+              <span className="text-xs text-muted-foreground">· {selectedMode.label}</span>
+              {temporaryChat && <span className="text-xs text-yellow-400">Temporary</span>}
+              <ChevronDown className="w-4 h-4" />
+            </button>
+
+            {modelMenuOpen && (
+              <div className="absolute right-0 top-10 z-50 w-80 rounded-2xl border border-border bg-card p-3 shadow-2xl">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Response mode</div>
+                <div className="space-y-1">
+                  {aiModes.map((mode) => {
+                    const Icon = mode.icon;
+                    return (
+                      <button
+                        key={mode.id}
+                        onClick={() => setAiMode(mode.id)}
+                        className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left ${
+                          aiMode === mode.id ? "bg-primary/15 text-primary" : "hover:bg-muted"
+                        }`}
+                      >
+                        <Icon className="mt-0.5 h-4 w-4" />
+                        <div>
+                          <div className="text-sm font-medium">{mode.label}</div>
+                          <div className="text-xs text-muted-foreground">{mode.description}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="my-3 border-t border-border" />
+
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">AI provider</div>
+                <div className="space-y-1">
+                  {aiProviders.map((provider) => (
+                    <button
+                      key={provider.id}
+                      onClick={() => setAiProvider(provider.id)}
+                      className={`flex w-full items-start justify-between rounded-lg px-3 py-2 text-left ${
+                        aiProvider === provider.id ? "bg-primary/15 text-primary" : "hover:bg-muted"
+                      }`}
+                    >
+                      <div>
+                        <div className="text-sm font-medium">{provider.label}</div>
+                        <div className="text-xs text-muted-foreground">{provider.description}</div>
+                      </div>
+                      {aiProvider === provider.id && <span className="text-xs">✓</span>}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="my-3 border-t border-border" />
+
+                <button
+                  onClick={() => setTemporaryChat((v) => !v)}
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 hover:bg-muted"
+                >
+                  <div>
+                    <div className="text-sm font-medium">Temporary chat</div>
+                    <div className="text-xs text-muted-foreground">Do not save this chat to history</div>
+                  </div>
+                  <span className={`h-6 w-11 rounded-full p-1 transition-colors ${temporaryChat ? "bg-primary" : "bg-muted"}`}>
+                    <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${temporaryChat ? "translate-x-5" : ""}`} />
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="text-sm text-muted-foreground hidden lg:block">
             Hey, {firstName} 👋
           </div>
         </div>
