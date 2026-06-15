@@ -22,23 +22,28 @@ router.post("/", requireAuth, async (req: Request, res: Response): Promise<void>
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+    const model = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
+
     const image = await client.images.generate({
-      model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
+      model,
       prompt: cleanPrompt,
       size: size || "1024x1024",
       n: 1,
+      ...(model === "gpt-image-1" ? {} : { response_format: "url" as const }),
     });
 
-    const b64 = image.data?.[0]?.b64_json;
+    const item = image.data?.[0];
+    const b64 = item?.b64_json;
+    const url = item?.url;
 
-    if (!b64) {
+    if (!b64 && !url) {
       res.status(500).json({ error: "No image returned" });
       return;
     }
 
     res.json({
-      image: `data:image/png;base64,${b64}`,
-      model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
+      image: b64 ? `data:image/png;base64,${b64}` : url,
+      model,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Image generation failed";
