@@ -786,16 +786,48 @@ function DenaPageContent() {
                   {settingsTab === "connectors" && (
                     <>
                       <h3 className="text-lg font-semibold">Connectors</h3>
-                      {["GitHub", "LinkedIn", "Google Drive", "Gmail", "Calendar"].map((conn) => (
-                        <div key={conn} className="flex items-center justify-between rounded-xl border border-border p-4">
-                          <span>{conn}</span>
-                          <Button
-                            size="sm"
-                            variant={connectedServices.includes(conn) ? "default" : "outline"}
-                            onClick={() => toggleConnector(conn)}
-                          >
-                            {connectedServices.includes(conn) ? "Connected" : "Connect"}
-                          </Button>
+                      {[
+                        {
+                          name: "GitHub",
+                          url: "https://github.com/settings/developers",
+                          description: "Create a GitHub OAuth App before enabling repository/project access."
+                        },
+                        {
+                          name: "LinkedIn",
+                          url: "https://www.linkedin.com/developers/apps",
+                          description: "Create a LinkedIn app before enabling profile/job data access."
+                        },
+                        {
+                          name: "Google Drive",
+                          url: "https://console.cloud.google.com/apis/credentials",
+                          description: "Create Google OAuth credentials before enabling Drive document access."
+                        },
+                        {
+                          name: "Gmail",
+                          url: "https://console.cloud.google.com/apis/credentials",
+                          description: "Create Google OAuth credentials before enabling Gmail access."
+                        },
+                        {
+                          name: "Calendar",
+                          url: "https://console.cloud.google.com/apis/credentials",
+                          description: "Create Google OAuth credentials before enabling Calendar access."
+                        },
+                      ].map((conn) => (
+                        <div key={conn.name} className="rounded-xl border border-border p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="font-medium">{conn.name}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">{conn.description}</div>
+                              <div className="mt-2 text-[11px] text-yellow-400">Setup required — real OAuth backend not connected yet.</div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(conn.url, "_blank", "noopener,noreferrer")}
+                            >
+                              Open setup
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </>
