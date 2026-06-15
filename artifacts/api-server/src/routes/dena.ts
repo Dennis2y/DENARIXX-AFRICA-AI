@@ -70,6 +70,13 @@ or
 
 Always provide actual code when code is requested.
 
+Code formatting rules:
+- ALWAYS use triple-backtick fenced markdown blocks for multi-line code.
+- Use language tags: html, css, javascript, typescript, python, sql.
+- NEVER use single backticks for multi-line code.
+- Output code first when code is requested.
+
+
 Always sign off as "— DENA 🌍" on longer responses.`;
 
 function buildSystemPrompt(userContext?: { name?: string | null; role?: string | null; location?: string | null; skills?: string[] }) {
@@ -539,6 +546,10 @@ Do NOT describe before code.
 Do NOT review before code.
 
 Output code first.
+ALWAYS use triple-backtick fenced markdown code blocks.
+Use language tags like html, css, javascript, typescript, python, sql.
+NEVER use single-backtick blocks for multi-line code.
+
 
 `;
 
