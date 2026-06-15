@@ -342,9 +342,37 @@ async function forceReplyLanguage(targetLanguage: string, answer: string): Promi
 
 
 
+
 function isCodingRequest(message: string): boolean {
-  return /\b(code|coding|html|css|javascript|typescript|react|nextjs|node|express|fastify|prisma|drizzle|sql|python|api|backend|frontend|bug|debug|function|component|website|app|portfolio)\b/i.test(message);
+  const text = message.toLowerCase();
+
+  return (
+    text.includes("code") ||
+    text.includes("coding") ||
+    text.includes("html") ||
+    text.includes("css") ||
+    text.includes("javascript") ||
+    text.includes("typescript") ||
+    text.includes("react") ||
+    text.includes("nextjs") ||
+    text.includes("node") ||
+    text.includes("express") ||
+    text.includes("fastify") ||
+    text.includes("prisma") ||
+    text.includes("drizzle") ||
+    text.includes("python") ||
+    text.includes("sql") ||
+    text.includes("api") ||
+    text.includes("backend") ||
+    text.includes("frontend") ||
+    text.includes("portfolio page") ||
+    text.includes("website") ||
+    text.includes("application") ||
+    text.includes("bug") ||
+    text.includes("debug")
+  );
 }
+
 
 // POST /api/dena/chat — streaming chat, persists to DB when authenticated
 router.post("/chat", async (req, res) => {
@@ -471,6 +499,46 @@ router.post("/chat", async (req, res) => {
     systemPrompt += `\n\n--- Coding Assistant Mode ---\nThe user is asking for software development help. Act as a senior software engineer. Return real usable code. If the user asks for code, output code first in proper markdown code blocks. Do not provide career advice unless they ask for it. Do not say you are not a coding platform. For HTML/CSS/JS requests, provide a complete working example.`;
   }
 
+  console.log("CODING_CHECK", {
+    message,
+    isCoding: isCodingRequest(message),
+  });
+
+  if (isCodingRequest(message)) {
+    console.log("CODING MODE ACTIVATED");
+
+    systemPrompt += `
+
+--- CODING ASSISTANT MODE ---
+
+CRITICAL:
+
+If user asks for HTML:
+Return HTML code immediately.
+
+If user asks for CSS:
+Return CSS code immediately.
+
+If user asks for JavaScript:
+Return JavaScript code immediately.
+
+If user asks for React:
+Return React code immediately.
+
+If user asks for Python:
+Return Python code immediately.
+
+Do NOT explain before code.
+Do NOT describe before code.
+Do NOT review before code.
+
+Output code first.
+
+`;
+
+  }
+
+
   const detectedReplyLanguage = detectReplyLanguage(message);
   if (detectedReplyLanguage) {
     systemPrompt += `\n\n--- Reply Language Rule ---\nThe latest user message is in ${detectedReplyLanguage}. Reply only in ${detectedReplyLanguage}, even if uploaded documents are in another language. Use document facts but translate the answer into ${detectedReplyLanguage}.`;
@@ -507,9 +575,12 @@ router.post("/chat", async (req, res) => {
       temperature: 0.4,
     });
 
+    console.log("RAW_AI_RESPONSE");
+    console.log(aiResponse.content);
+
     let fullResponse = aiResponse.content || "";
 
-    if (finalReplyLanguage) {
+    if (finalReplyLanguage && !isCodingRequest(message)) {
       fullResponse = await forceReplyLanguage(finalReplyLanguage, fullResponse);
     }
 
