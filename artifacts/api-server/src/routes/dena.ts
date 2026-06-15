@@ -209,7 +209,7 @@ async function loadRelevantDocumentChunks(
         eq(documentChunks.isActive, true),
       ))
       .orderBy(desc(documentChunks.createdAt))
-      .limit(120);
+      .limit(240);
 
     const scored = rows
       .map((row) => {
@@ -225,11 +225,11 @@ async function loadRelevantDocumentChunks(
       })
       .filter((row) => row.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
+      .slice(0, 12);
 
     if (scored.length > 0) return scored;
 
-    return rows.slice(0, 3).map((row) => ({ ...row, score: 0 }));
+    return rows.slice(0, 8).map((row) => ({ ...row, score: 0 }));
   } catch {
     return [];
   }
@@ -577,7 +577,7 @@ router.post("/chat", async (req, res) => {
     }).join("\n\n---\n\n")}\nUse these chunks when answering questions about uploaded files, CVs, notes, documents, or when the user says "this document". If the chunks do not contain the answer, say that clearly.`;
   } else if (recentDocuments.length) {
     systemPrompt += `\n\n--- Recently Uploaded Documents ---\n${recentDocuments.map((doc) => {
-      const preview = (doc.summary || doc.content).slice(0, 1800);
+      const preview = (doc.summary || doc.content).slice(0, 4000);
       return `Document: ${doc.filename}\n${preview}`;
     }).join("\n\n---\n\n")}\nUse these documents when the user asks about uploaded files, CVs, notes, documents, or says "this document".`;
   }
