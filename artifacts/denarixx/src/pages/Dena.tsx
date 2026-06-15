@@ -211,241 +211,85 @@ function DenaPageContent() {
     typeof window !== "undefined" &&
     (("SpeechRecognition" in window) || ("webkitSpeechRecognition" in window));
 
-  const speakText = useCallback(async (text: string) => {
-    const cleanText = text
-      .replace(/```[\s\S]*?```/g, "Code block omitted from voice.")
-      .replace(/\*\*/g, "")
-      .replace(/[#_`>\-]/g, "")
-      .replace(/\n+/g, " ")
-      .trim();
+  const stopSpeaking = useCallback(() => {
+    const audio = audioRef.current;
 
+    if (audio) {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = "";
+        audio.load();
+      } catch {}
+    }
+
+    audioRef.current = null;
+    setSpeaking(false);
+  }, []);
+
+  const speakText = useCallback(async (text: string) => {
+    const cleanText = text.trim();
     if (!cleanText) return;
+
+    // If audio is already playing, stop immediately.
+    if (speaking || audioRef.current) {
+      stopSpeaking();
+      return;
+    }
 
     try {
       setSpeaking(true);
 
       const token = await getToken();
-      const response = await fetch(`${basePath}/api/voice/tts`, {
+      const res = await fetch(`${basePath}/api/voice/tts`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        credentials: "include",
-        body: JSON.stringify({ text: cleanText, voice: "nova" }),
+        body: JSON.stringify({ text: cleanText }),
       });
 
-      if (!response.ok) throw new Error("Neural voice unavailable");
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-
-      if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
+      if (!res.ok) {
+        throw new Error("TTS failed");
       }
 
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+
       audioRef.current = audio;
 
-      audio.onended = () => {
-        setSpeaking(false);
+      const cleanup = () => {
         URL.revokeObjectURL(url);
+        if (audioRef.current === audio) {
+          audioRef.current = null;
+        }
+        setSpeaking(false);
       };
 
-      audio.onerror = () => {
-        setSpeaking(false);
-        URL.revokeObjectURL(url);
+      audio.onended = cleanup;
+      audio.onerror = cleanup;
+      audio.onpause = () => {
+        if (audio.currentTime === 0 || audio.ended) cleanup();
       };
 
       await audio.play();
-      return;
     } catch {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        setSpeaking(false);
-        return;
+      const audio = audioRef.current;
+      if (audio) {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.src = "";
+          audio.load();
+        } catch {}
       }
-
-      window.speechSynthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 0.92;
-      utterance.pitch = 1.03;
-
-      const lower = cleanText.toLowerCase();
-      if (/[äöüß]|\b(hallo|guten|danke|bitte|karriere|lebenslauf)\b/.test(lower)) utterance.lang = "de-DE";
-      else if (/[¿¡]|\b(hola|gracias|trabajo|habilidades)\b/.test(lower)) utterance.lang = "es-ES";
-      else if (/\b(bonjour|merci|carrière|compétences|emploi)\b/.test(lower)) utterance.lang = "fr-FR";
-      else utterance.lang = "en-US";
-
-      utterance.onstart = () => setSpeaking(true);
-      utterance.onend = () => setSpeaking(false);
-      utterance.onerror = () => setSpeaking(false);
-
-      window.speechSynthesis.speak(utterance);
-    }
-  }, [getToken]);
-
-  const stopSpeaking = useCallback(() => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+      audioRef.current = null;
       setSpeaking(false);
     }
-  }, []);
-
-  const toggleListening = useCallback(() => {
-    if (!speechSupported) {
-      alert("Voice input is not supported in this browser. Try Chrome.");
-      return;
-    }
-
-    if (listening) {
-      recognitionRef.current?.stop?.();
-      setListening(false);
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = navigator.language || "en-US";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
-
-    recognition.onresult = (event: any) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setInput(transcript.trim());
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, [listening, speechSupported]);
-
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.stop?.();
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
-
-  // Focus input on mount
-  useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, []);
-
-  // Load conversation list
-  const fetchConversations = useCallback(async () => {
-    try {
-      const token = await getToken();
-      const res = await fetch(`${basePath}/api/dena/conversations`, {
-        credentials: "include",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setConversations(data.conversations ?? []);
-    } catch {}
-  }, [getToken]);
-
-  useEffect(() => { fetchConversations(); }, [fetchConversations]);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("dena-pinned-conversations");
-      if (saved) setPinnedConversationIds(JSON.parse(saved));
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    async function fetchProviderStatus() {
-      try {
-        const res = await fetch(`${basePath}/api/dena/ai-status`, { credentials: "include" });
-        if (!res.ok) return;
-        const data = await res.json();
-        setProviderStatus(data.providers ?? { auto: true });
-        setProviderModels(data.models ?? {});
-        setProviderModels(data.models ?? {});
-      } catch {}
-    }
-
-    fetchProviderStatus();
-  }, []);
-
-  // Load a specific conversation
-  const loadConversation = async (convId: number) => {
-    if (loadingConv || convId === activeConvId) return;
-    setLoadingConv(true);
-    setSidebarOpen(false);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${basePath}/api/dena/conversations/${convId}/messages`, {
-        credentials: "include",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) throw new Error("Not found");
-      const data = await res.json();
-      const loaded: Message[] = data.messages.map((m: any) => ({
-        role: m.role,
-        content: m.content,
-        id: m.id,
-        provider: m.provider,
-        model: m.model,
-      }));
-      setMessages(loaded.length ? loaded : [WELCOME]);
-      setActiveConvId(convId);
-    } catch {
-      setMessages([WELCOME]);
-      setActiveConvId(null);
-    } finally {
-      setLoadingConv(false);
-    }
-  };
-
-  // Start a new conversation
-  const newConversation = () => {
-    setActiveConvId(null);
-    setMessages([WELCOME]);
-    setInput("");
-    setSidebarOpen(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
-  };
-
-  // Delete a conversation
-  const deleteConversation = async (convId: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const token = await getToken();
-      await fetch(`${basePath}/api/dena/conversations/${convId}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      setConversations(prev => prev.filter(c => c.id !== convId));
-      if (activeConvId === convId) newConversation();
-    } catch {}
-  };
+  }, [basePath, getToken, speaking, stopSpeaking]);
 
   const copyMessage = async (content: string, index: number) => {
     const text = content.trim();
