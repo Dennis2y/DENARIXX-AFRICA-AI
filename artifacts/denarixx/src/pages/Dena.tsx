@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser, useAuth, useClerk, Show } from "@clerk/react";
+import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import {
   Sparkles, Send, Loader2, Plus, Trash2, MessageSquare,
@@ -94,7 +94,6 @@ function timeAgo(iso: string) {
 function DenaPageContent() {
   const { user } = useUser();
   const { getToken, signOut } = useAuth();
-  const { openUserProfile } = useClerk();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
@@ -109,6 +108,7 @@ function DenaPageContent() {
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [pendingDocument, setPendingDocument] = useState<PendingDocument | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -558,6 +558,80 @@ function DenaPageContent() {
         )}
       </AnimatePresence>
 
+      {/* DENA Account Settings Modal */}
+      <AnimatePresence>
+        {settingsOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSettingsOpen(false)}
+          >
+            <motion.div
+              className="w-full max-w-xl rounded-2xl border border-border bg-card shadow-2xl"
+              initial={{ scale: 0.96, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-border px-6 py-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Account Settings</h2>
+                  <p className="text-sm text-muted-foreground">Manage your DENA account details.</p>
+                </div>
+                <button
+                  onClick={() => setSettingsOpen(false)}
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="flex items-center gap-4 rounded-xl border border-border bg-background/60 p-4">
+                  <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-bold">
+                    {firstName.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{firstName}</div>
+                    <div className="text-sm text-muted-foreground truncate">{userEmail}</div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="text-sm font-medium mb-1">Profile</div>
+                    <div className="text-sm text-muted-foreground">Your visible DENA account profile.</div>
+                  </div>
+
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="text-sm font-medium mb-1">Security</div>
+                    <div className="text-sm text-muted-foreground">Authentication is managed securely by Clerk.</div>
+                  </div>
+
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="text-sm font-medium mb-1">DENA Mode</div>
+                    <div className="text-sm text-muted-foreground">
+                      Career assistant, coding assistant, CV intelligence, job matching, and roadmaps are active.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="ghost" onClick={() => setSettingsOpen(false)}>
+                    Close
+                  </Button>
+                  <Button variant="destructive" onClick={() => signOut()}>
+                    Log out
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <aside className="hidden lg:flex h-full w-72 flex-shrink-0 flex-col border-r border-border bg-card">
         <div className="h-full w-72 flex flex-col border-r border-border bg-card">
@@ -663,7 +737,7 @@ function DenaPageContent() {
                 variant="ghost"
                 size="sm"
                 className="justify-start gap-2 text-xs"
-                onClick={() => openUserProfile()}
+                onClick={() => setSettingsOpen(true)}
               >
                 <Settings className="w-3.5 h-3.5" />
                 Settings
