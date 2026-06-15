@@ -319,6 +319,24 @@ async function saveUserMemories(userId: number, rawMemories: string[]) {
 }
 
 
+
+function normalizeCodeFences(text: string): string {
+  return text
+    .replace(/`(html|css|javascript|js|typescript|ts|python|sql)\n([\s\S]*?)\n`/gi, (_match, lang, code) => {
+      const fixedLang = String(lang).toLowerCase()
+        .replace("js", "javascript")
+        .replace("ts", "typescript");
+      return "```" + fixedLang + "\n" + String(code).trim() + "\n```";
+    })
+    .replace(/`(html|css|javascript|js|typescript|ts|python|sql)\s+([\s\S]*?)`/gi, (_match, lang, code) => {
+      const fixedLang = String(lang).toLowerCase()
+        .replace("js", "javascript")
+        .replace("ts", "typescript");
+      return "```" + fixedLang + "\n" + String(code).trim() + "\n```";
+    });
+}
+
+
 async function forceReplyLanguage(targetLanguage: string, answer: string): Promise<string> {
   if (!targetLanguage || !answer.trim()) return answer;
 
@@ -597,11 +615,15 @@ NEVER use single-backtick blocks for multi-line code.
 
     let fullResponse = aiResponse.content || "";
 
+    fullResponse = normalizeCodeFences(fullResponse);
+
     const responseHasCode = /```[\s\S]*?```/.test(fullResponse) || /`(?:html|css|javascript|typescript|python|sql)[\s\S]*?`/i.test(fullResponse);
 
     if (finalReplyLanguage && !isCodingRequest(message) && !responseHasCode) {
       fullResponse = await forceReplyLanguage(finalReplyLanguage, fullResponse);
     }
+
+    fullResponse = normalizeCodeFences(fullResponse);
 
     if (resolvedUserId) {
       await saveUserMemories(resolvedUserId, extractSimpleMemories(message));
