@@ -1005,8 +1005,18 @@ NEVER use single-backtick blocks for multi-line code.
       }
     }
 
-    res.write(`data: ${JSON.stringify({ content: fullResponse, conversationId: resolvedConvId })}\n\n`);
-    res.write(`data: ${JSON.stringify({ done: true, conversationId: resolvedConvId })}\n\n`);
+    res.write(`data: ${JSON.stringify({
+      content: fullResponse,
+      conversationId: resolvedConvId,
+      provider: aiResponse.provider,
+      model: aiResponse.model,
+    })}\n\n`);
+    res.write(`data: ${JSON.stringify({
+      done: true,
+      conversationId: resolvedConvId,
+      provider: aiResponse.provider,
+      model: aiResponse.model,
+    })}\n\n`);
     res.end();
     return;
 
@@ -1032,6 +1042,13 @@ router.get("/ai-status", async (_req, res) => {
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       groq: !!process.env.GROQ_API_KEY,
       mistral: !!process.env.MISTRAL_API_KEY,
+    },
+    models: {
+      openai: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      gemini: process.env.GEMINI_MODEL || "gemini-1.5-flash",
+      anthropic: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+      groq: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      mistral: process.env.MISTRAL_MODEL || "mistral-large-latest",
     },
     fallbackOrder: (process.env.AI_FALLBACK_ORDER || "openai,gemini,groq,anthropic,mistral")
       .split(",")

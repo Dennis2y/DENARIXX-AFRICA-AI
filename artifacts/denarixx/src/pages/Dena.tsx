@@ -15,7 +15,7 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Role = "user" | "assistant";
 type MessageAttachment = { id: number; filename: string; type: "document" };
-type Message = { role: Role; content: string; id?: number; attachments?: MessageAttachment[] };
+type Message = { role: Role; content: string; id?: number; attachments?: MessageAttachment[]; provider?: string; model?: string };
 type PendingDocument = { id: number; filename: string; summary?: string | null; chunkCount?: number };
 type Conversation = { id: number; title: string; updatedAt: string };
 
@@ -105,6 +105,7 @@ function DenaPageContent() {
   const [aiMode, setAiMode] = useState("balanced");
   const [temporaryChat, setTemporaryChat] = useState(false);
   const [providerStatus, setProviderStatus] = useState<Record<string, boolean>>({ auto: true });
+  const [providerModels, setProviderModels] = useState<Record<string, string>>({});
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
@@ -367,6 +368,8 @@ function DenaPageContent() {
         if (!res.ok) return;
         const data = await res.json();
         setProviderStatus(data.providers ?? { auto: true });
+        setProviderModels(data.models ?? {});
+        setProviderModels(data.models ?? {});
       } catch {}
     }
 
@@ -388,7 +391,13 @@ function DenaPageContent() {
       });
       if (!res.ok) throw new Error("Not found");
       const data = await res.json();
-      const loaded: Message[] = data.messages.map((m: any) => ({ role: m.role, content: m.content, id: m.id }));
+      const loaded: Message[] = data.messages.map((m: any) => ({
+        role: m.role,
+        content: m.content,
+        id: m.id,
+        provider: m.provider,
+        model: m.model,
+      }));
       setMessages(loaded.length ? loaded : [WELCOME]);
       setActiveConvId(convId);
     } catch {
@@ -1172,7 +1181,9 @@ function DenaPageContent() {
                     >
                       <div>
                         <div className="text-sm font-medium">{provider.label}</div>
-                        <div className="text-xs text-muted-foreground">{provider.description}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {provider.id === "auto" ? provider.description : (providerModels[provider.id] || provider.description)}
+                        </div>
                         <div className={`mt-1 text-[11px] ${providerStatus[provider.id] ? "text-green-400" : "text-red-400"}`}>
                           {providerStatus[provider.id] ? "Available" : "Not configured"}
                         </div>
