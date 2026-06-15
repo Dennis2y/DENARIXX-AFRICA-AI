@@ -332,12 +332,18 @@ function DenaPageContent() {
   // Load conversation list
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await fetch(`${basePath}/api/dena/conversations`, { credentials: "include" });
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/dena/conversations`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) return;
       const data = await res.json();
       setConversations(data.conversations ?? []);
     } catch {}
-  }, []);
+  }, [getToken]);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
@@ -347,7 +353,13 @@ function DenaPageContent() {
     setLoadingConv(true);
     setSidebarOpen(false);
     try {
-      const res = await fetch(`${basePath}/api/dena/conversations/${convId}/messages`, { credentials: "include" });
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/dena/conversations/${convId}/messages`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error("Not found");
       const data = await res.json();
       const loaded: Message[] = data.messages.map((m: any) => ({ role: m.role, content: m.content, id: m.id }));
@@ -374,7 +386,14 @@ function DenaPageContent() {
   const deleteConversation = async (convId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await fetch(`${basePath}/api/dena/conversations/${convId}`, { method: "DELETE", credentials: "include" });
+      const token = await getToken();
+      await fetch(`${basePath}/api/dena/conversations/${convId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       setConversations(prev => prev.filter(c => c.id !== convId));
       if (activeConvId === convId) newConversation();
     } catch {}
