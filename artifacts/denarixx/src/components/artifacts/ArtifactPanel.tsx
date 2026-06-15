@@ -18,6 +18,23 @@ type ArtifactPanelProps = {
   getToken: () => Promise<string | null>;
 };
 
+
+function renderCanvasMarkdown(content: string) {
+  const html = content
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/^### (.*)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.*)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.*)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/^- (.*)$/gm, "<li>$1</li>")
+    .replace(/\n/g, "<br />");
+
+  return html;
+}
+
 export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPanelProps) {
   const [artifacts, setArtifacts] = useState<DenaArtifact[]>([]);
   const [activeArtifact, setActiveArtifact] = useState<DenaArtifact | null>(null);
@@ -80,7 +97,10 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
   async function generateArtifact() {
     const prompt = content.trim();
 
-    if (!prompt) return;
+    if (!prompt) {
+      alert("Write an instruction first, then click Generate.");
+      return;
+    }
 
     setGenerating(true);
 
@@ -90,24 +110,46 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
         credentials: "include",
         headers: await authHeaders(),
         body: JSON.stringify({
+          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}`,
           prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}`,
         }),
       });
 
-      if (!res.ok) return;
+      const raw = await res.text();
 
-      const data = await res.json();
+      if (!res.ok) {
+        alert(`Canvas generation failed: ${res.status}\n${raw}`);
+        return;
+      }
+
+      let data: any = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { content: raw };
+      }
+
       const generated =
         data.content ||
         data.text ||
         data.result ||
         data.output ||
         data.message ||
+        data.reply ||
+        data.data?.content ||
+        data.data?.text ||
         "";
 
-      if (generated) {
-        setContent(generated);
+      if (!generated) {
+        alert("Canvas generation returned no content. Check the server response in terminal logs.");
+        console.log("Canvas generate response:", data);
+        return;
       }
+
+      setContent(generated);
+    } catch (err) {
+      console.error("Canvas generation error:", err);
+      alert("Canvas generation failed. Check browser console and API logs.");
     } finally {
       setGenerating(false);
     }
@@ -319,9 +361,12 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
                 Preview
               </div>
 
-              <div className="prose prose-invert max-w-none whitespace-pre-wrap rounded-xl border border-border bg-card p-5 text-sm leading-7">
-                {content || "Preview will appear here..."}
-              </div>
+              <div
+                className="prose prose-invert max-w-none rounded-xl border border-border bg-card p-5 text-sm leading-7"
+                dangerouslySetInnerHTML={{
+                  __html: content ? renderCanvasMarkdown(content) : "Preview will appear here...",
+                }}
+              />
             </section>
           </div>
         </main>
