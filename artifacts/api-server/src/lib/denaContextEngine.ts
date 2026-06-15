@@ -65,12 +65,20 @@ ${savedResumes.length ? savedResumes.map((r: any) => `- ${r.title || "Resume"}\n
 Uploaded Documents:
 ${docs.length ? docs.map((d) => `Document: ${d.filename}\n${String(d.summary || d.content || "").slice(0, 3000)}`).join("\n\n---\n\n") : "- [No uploaded documents provided]"}
 
-=== GROUNDING RULES ===
-- Use only the verified context above and the user's current instruction.
-- Never invent names, degrees, employers, job dates, certifications, phone numbers, addresses, meetings, salaries, achievements, or education.
-- If information is missing, write [Add accurate detail].
-- For public platform users, personalize only from their own stored profile, documents, memories, and resumes.
-- For cover letters and CVs, keep the result realistic, truthful, and ATS-friendly.
+=== STRICT GROUNDING RULES ===
+You are generating content for a real user on a public platform.
+
+NON-NEGOTIABLE:
+- Use ONLY the verified context above and the user's latest instruction.
+- Never invent degrees, universities, employers, job dates, years of experience, certifications, addresses, phone numbers, meetings, salaries, achievements, or personal claims.
+- Never invent enthusiasm such as "I am a fan of BMW" unless the user clearly said it.
+- Never change the user's gender.
+- If a detail is missing, write [Add accurate detail].
+- If experience level is not proven, do not say "experienced", "senior", or "5+ years".
+- Keep the output in ONE language only.
+- Use the same language as the user's instruction unless the user explicitly asks for another language.
+- Do not mix German and English.
+- For cover letters and CVs, be realistic, truthful, ATS-friendly, and conservative.
 - For business plans, do not invent financial numbers unless the user asks for assumptions; label assumptions clearly.
 `;
 

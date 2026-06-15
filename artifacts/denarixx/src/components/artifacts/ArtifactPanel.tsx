@@ -123,8 +123,18 @@ export function ArtifactPanel({ open, onClose, basePath, getToken }: ArtifactPan
         credentials: "include",
         headers: await authHeaders(),
         body: JSON.stringify({
-          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.\n- If the artifact type is resume, cover-letter, business-plan, or document, write in clean plain text with NO markdown symbols like **, *, #, backticks, or markdown links.\n- Only use raw code syntax when the artifact type is code or html.`,
-          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.\n- If the artifact type is resume, cover-letter, business-plan, or document, write in clean plain text with NO markdown symbols like **, *, #, backticks, or markdown links.\n- Only use raw code syntax when the artifact type is code or html.`,
+          message: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.
+- Output in exactly one language.
+- Use the same language as the user's instruction unless the user explicitly asks for another language.
+- Do not mix German and English.
+- Do not invent experience years, degrees, universities, employers, certifications, addresses, phone numbers, meetings, or personal claims.
+- If personal information is missing, use [Add accurate detail].\n- If the artifact type is resume, cover-letter, business-plan, or document, write in clean plain text with NO markdown symbols like **, *, #, backticks, or markdown links.\n- Only use raw code syntax when the artifact type is code or html.`,
+          prompt: `Create a high-quality ${type} artifact titled "${title}". Use this instruction:\n\n${prompt}\n\nImportant rules:\n- Do not invent fake dates, fake phone numbers, fake emails, fake companies, fake degrees, fake certifications, or fake achievements.\n- If a detail is missing, write [Add accurate detail].\n- Keep the output professional, realistic, and directly based only on the user's provided facts.
+- Output in exactly one language.
+- Use the same language as the user's instruction unless the user explicitly asks for another language.
+- Do not mix German and English.
+- Do not invent experience years, degrees, universities, employers, certifications, addresses, phone numbers, meetings, or personal claims.
+- If personal information is missing, use [Add accurate detail].\n- If the artifact type is resume, cover-letter, business-plan, or document, write in clean plain text with NO markdown symbols like **, *, #, backticks, or markdown links.\n- Only use raw code syntax when the artifact type is code or html.`,
         }),
       });
 
