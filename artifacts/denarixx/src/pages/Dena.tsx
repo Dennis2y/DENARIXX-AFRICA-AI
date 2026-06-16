@@ -124,6 +124,7 @@ function DenaPageContent() {
   const [speaking, setSpeaking] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [pendingDocument, setPendingDocument] = useState<PendingDocument | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ name: string; dataUrl: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
@@ -135,6 +136,7 @@ function DenaPageContent() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
@@ -535,6 +537,23 @@ function DenaPageContent() {
       && /\b(image|picture|photo|poster|logo|illustration|art|dashboard visual|mockup)\b/i.test(value);
   };
 
+  const uploadPromptImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload an image file.");
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      if (!dataUrl) return;
+      setPendingImage({ name: file.name, dataUrl });
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const generateImageFromInput = async () => {
     const prompt = input.trim();
 
@@ -555,6 +574,7 @@ function DenaPageContent() {
         body: JSON.stringify({
           prompt,
           size: "1024x1024",
+          referenceImage: pendingImage?.dataUrl,
         }),
       });
 
@@ -1740,6 +1760,8 @@ function DenaPageContent() {
           </div>
         )}
 
+        <div ref={messagesEndRef} />
+
         {/* Input area */}
         <div className="border-t border-border bg-background/50 p-4 backdrop-blur-sm flex-shrink-0">
           <div
@@ -1758,7 +1780,22 @@ function DenaPageContent() {
               dragActive ? "border-primary ring-2 ring-primary/30" : "border-border"
             }`}
           >
-            {pendingDocument && (
+            {pendingImage && (
+            <div className="mx-auto mb-2 flex max-w-4xl items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <img src={pendingImage.dataUrl} alt={pendingImage.name} className="h-12 w-12 rounded-lg object-cover" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium">{pendingImage.name}</p>
+                  <p className="text-[10px] text-muted-foreground">Attached image for generation</p>
+                </div>
+              </div>
+              <button onClick={() => setPendingImage(null)} className="text-muted-foreground hover:text-red-400">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {pendingDocument && (
               <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2 text-sm">
                   <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
@@ -1810,11 +1847,14 @@ function DenaPageContent() {
             <input
               ref={documentInputRef}
               type="file"
-              accept=".txt,.md,.json,.csv,.pdf,.docx,.doc"
+              accept=".txt,.md,.json,.csv,.pdf,.docx,.doc,image/*"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) uploadDocument(file);
+                if (file) {
+                  if (file.type.startsWith("image/")) uploadPromptImage(file);
+                  else uploadDocument(file);
+                }
               }}
             />
 
