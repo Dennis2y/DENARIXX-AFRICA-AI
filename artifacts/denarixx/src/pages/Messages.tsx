@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { LiveMeetingRoom } from "@/components/meetings/LiveMeetingRoom";
+import { LiveMiniMeeting } from "@/components/meetings/LiveMiniMeeting";
 import { useLiveMeeting } from "@/components/meetings/useLiveMeeting";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -228,7 +228,7 @@ function ThreadView({
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-background">
       {activeMeeting && (
-        <LiveMeetingRoom
+        <LiveMiniMeeting
           token={activeMeeting.token}
           serverUrl={activeMeeting.serverUrl}
           roomName={activeMeeting.roomName}
