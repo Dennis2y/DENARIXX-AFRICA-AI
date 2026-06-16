@@ -163,6 +163,7 @@ function ThreadView({
   const { activeMeeting, startingMeeting, startMeeting, endMeeting } = useLiveMeeting(basePath, getToken);
 
   const [text, setText] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messages = data?.messages ?? [];
@@ -238,9 +239,33 @@ function ThreadView({
             <Video className="h-4 w-4" />
           </Button>
 
-          <Button size="sm" variant="ghost" className="h-11 w-11 rounded-full p-0">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
+          <div className="relative">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setMoreOpen((value) => !value)}
+              className="h-11 w-11 rounded-full p-0"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+
+            {moreOpen && (
+              <div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-border bg-card p-2 shadow-2xl">
+                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
+                  View profile
+                </button>
+                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
+                  Search messages
+                </button>
+                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
+                  Clear chat
+                </button>
+                <button className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10">
+                  Block user
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -287,7 +312,7 @@ function ThreadView({
         )}
       </div>
 
-      <div className="flex-shrink-0 border-t border-border bg-background/95 px-5 py-4 backdrop-blur-xl">
+      <div className="flex-shrink-0 border-t border-border bg-background/95 px-5 py-4 pr-24 backdrop-blur-xl">
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
           <input
             value={text}
