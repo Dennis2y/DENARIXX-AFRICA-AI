@@ -82,6 +82,80 @@ router.get("/inbox", requireAuth, async (req, res) => {
   }
 });
 
+
+// POST /api/messages/dev/seed — create a demo conversation for local testing
+router.post("/dev/seed", requireAuth, async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).json({ error: "Dev seed disabled in production" });
+      return;
+    }
+
+    const clerkUserId = (req as any).clerkUserId as string;
+    const me = await getDbUser(clerkUserId);
+
+    if (!me) {
+      res.status(404).json({ error: "Current user not found in database" });
+      return;
+    }
+
+    const demoClerkId = "demo-denarixx-africa-partner";
+    const demoEmail = "demo.partner@denarixx.local";
+
+    let [partner] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, demoClerkId))
+      .limit(1);
+
+    if (!partner) {
+      [partner] = await db
+        .insert(usersTable)
+        .values({
+          clerkUserId: demoClerkId,
+          email: demoEmail,
+          name: "Ama Denarixx",
+          role: "AI Career Mentor",
+          bio: "Demo Denarixx Africa AI partner for testing messages, calls, profiles, and community features.",
+          location: "Accra, Ghana",
+          userType: "mentor",
+        })
+        .returning();
+    }
+
+    const existing = await db
+      .select({ id: directMessages.id })
+      .from(directMessages)
+      .where(
+        or(
+          and(eq(directMessages.fromUserId, me.id), eq(directMessages.toUserId, partner.id)),
+          and(eq(directMessages.fromUserId, partner.id), eq(directMessages.toUserId, me.id))
+        )
+      )
+      .limit(1);
+
+    if (existing.length === 0) {
+      await db.insert(directMessages).values([
+        {
+          fromUserId: partner.id,
+          toUserId: me.id,
+          content: "Hi, welcome to Denarixx Africa AI. This is a demo conversation for testing messages and LiveKit calls.",
+        },
+        {
+          fromUserId: me.id,
+          toUserId: partner.id,
+          content: "Great. I want to test chat, audio call, video call, profile view, and community networking.",
+        },
+      ]);
+    }
+
+    res.json({ success: true, partnerId: partner.id });
+  } catch (err) {
+    req.log.error({ err }, "Failed to seed demo conversation");
+    res.status(500).json({ error: "Failed to seed demo conversation" });
+  }
+});
+
 // GET /api/messages/:partnerId — thread with a user
 router.get("/:partnerId", requireAuth, async (req, res) => {
   try {

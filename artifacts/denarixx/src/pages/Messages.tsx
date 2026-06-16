@@ -412,11 +412,15 @@ function InboxList({
   selectedId,
   onSelect,
   isLoading,
+  onSeedDemo,
+  seedDemoPending,
 }: {
   conversations: Conversation[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   isLoading: boolean;
+  onSeedDemo: () => void;
+  seedDemoPending: boolean;
 }) {
   const [search, setSearch] = useState("");
 
@@ -453,6 +457,14 @@ function InboxList({
             <p className="text-xs mt-1 text-center px-6">
               Messages from employers and connections will appear here.
             </p>
+            <Button
+              size="sm"
+              onClick={onSeedDemo}
+              disabled={seedDemoPending}
+              className="mt-4 rounded-xl bg-cyan-400 text-black hover:bg-cyan-300"
+            >
+              {seedDemoPending ? "Creating demo…" : "Create demo conversation"}
+            </Button>
           </div>
         ) : (
           filtered.map(conv => (
@@ -505,6 +517,27 @@ function MessagesContent() {
   }, [partnerParam]);
 
   const conversations = data?.conversations ?? [];
+  const qc = useQueryClient();
+
+  const seedDemo = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      const r = await fetch(`${basePath}/api/messages/dev/seed`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["messages-inbox"] });
+      if (data?.partnerId) setSelectedId(data.partnerId);
+    },
+  });
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -516,6 +549,8 @@ function MessagesContent() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           isLoading={isLoading}
+          onSeedDemo={() => seedDemo.mutate()}
+          seedDemoPending={seedDemo.isPending}
         />
 
         <div className="min-h-0">
