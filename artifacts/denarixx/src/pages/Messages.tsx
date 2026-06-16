@@ -1,9 +1,17 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Show, useAuth } from "@clerk/react";
 import { Redirect, useLocation, useSearch } from "wouter";
 import {
-  ArrowLeft, Send, MessageCircle, User, Search, RefreshCw, ChevronLeft, Briefcase, Phone, Video
+  ArrowLeft,
+  Send,
+  MessageCircle,
+  Search,
+  RefreshCw,
+  ChevronLeft,
+  Briefcase,
+  Phone,
+  Video,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,34 +22,39 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function NavBar() {
   const [, setLocation] = useLocation();
+
   return (
-    <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
+    <nav className="border-b border-border bg-background/90 backdrop-blur-xl sticky top-0 z-40">
       <div className="container mx-auto px-4 h-16 flex items-center gap-3">
         <button onClick={() => setLocation("/dashboard")} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm">Dashboard</span>
         </button>
-        <div className="w-px h-4 bg-border" />
+
+        <div className="w-px h-5 bg-border" />
+
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded bg-cyan-400/20 flex items-center justify-center border border-cyan-400/30">
-            <MessageCircle className="w-4 h-4 text-cyan-400" />
+          <div className="w-9 h-9 rounded-xl bg-cyan-400/15 flex items-center justify-center border border-cyan-400/30">
+            <MessageCircle className="w-5 h-5 text-cyan-400" />
           </div>
-          <span className="font-bold text-base">Messages</span>
+          <span className="font-bold text-xl">Messages</span>
         </div>
       </div>
     </nav>
   );
 }
 
-function Avatar({ name, url, size = 36 }: { name?: string | null; url?: string | null; size?: number }) {
+function Avatar({ name, url, size = 40 }: { name?: string | null; url?: string | null; size?: number }) {
   const initials = (name ?? "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
   if (url) {
     return <img src={url} alt={name ?? "User"} className="rounded-full object-cover flex-shrink-0" style={{ width: size, height: size }} />;
   }
+
   return (
     <div
-      className="rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0 text-primary font-bold"
-      style={{ width: size, height: size, fontSize: size * 0.35 }}
+      className="rounded-full bg-cyan-400/15 border border-cyan-400/30 flex items-center justify-center flex-shrink-0 text-cyan-300 font-bold"
+      style={{ width: size, height: size, fontSize: size * 0.34 }}
     >
       {initials}
     </div>
@@ -76,7 +89,7 @@ function useInbox(getToken: () => Promise<string | null>) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (!r.ok) throw new Error("Failed");
+      if (!r.ok) throw new Error("Failed to load inbox");
       return r.json();
     },
     refetchInterval: 15_000,
@@ -94,7 +107,7 @@ function useThread(partnerId: number | null, getToken: () => Promise<string | nu
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (!r.ok) throw new Error("Failed");
+      if (!r.ok) throw new Error("Failed to load messages");
       return r.json();
     },
     enabled: partnerId !== null,
@@ -104,11 +117,14 @@ function useThread(partnerId: number | null, getToken: () => Promise<string | nu
 
 function useSendMessage(partnerId: number | null, getToken: () => Promise<string | null>, jobApplicationId?: number | null) {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: async (content: string) => {
-      const body: Record<string, unknown> = { content };
-      if (jobApplicationId) body.jobApplicationId = jobApplicationId;
       const token = await getToken();
+      const body: Record<string, unknown> = { content };
+
+      if (jobApplicationId) body.jobApplicationId = jobApplicationId;
+
       const r = await fetch(`${basePath}/api/messages/${partnerId}`, {
         method: "POST",
         headers: {
@@ -118,6 +134,7 @@ function useSendMessage(partnerId: number | null, getToken: () => Promise<string
         credentials: "include",
         body: JSON.stringify(body),
       });
+
       if (!r.ok) throw new Error("Failed to send");
       return r.json();
     },
@@ -144,9 +161,9 @@ function ThreadView({
   const { data, isLoading } = useThread(partnerId, getToken);
   const { mutateAsync: send, isPending } = useSendMessage(partnerId, getToken, jobApplicationId);
   const { activeMeeting, startingMeeting, startMeeting, endMeeting } = useLiveMeeting(basePath, getToken);
+
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const messages = data?.messages ?? [];
   const partner = data?.partner;
@@ -159,6 +176,7 @@ function ThreadView({
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed || isPending) return;
+
     setText("");
     await send(trimmed);
   };
@@ -174,7 +192,7 @@ function ThreadView({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex h-full min-h-0 flex-col bg-background">
       {activeMeeting && (
         <LiveMeetingRoom
           token={activeMeeting.token}
@@ -184,15 +202,18 @@ function ThreadView({
         />
       )}
 
-      {/* Thread header */}
-      <div className="sticky top-0 z-30 flex items-center gap-3 px-5 py-4 border-b border-border bg-background/95 backdrop-blur-xl flex-shrink-0 shadow-sm">
+      <div className="sticky top-0 z-30 flex h-[76px] flex-shrink-0 items-center gap-3 border-b border-border bg-background/95 px-5 backdrop-blur-xl shadow-sm">
         <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors lg:hidden">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <Avatar name={partner?.name} url={partner?.avatarUrl} size={36} />
+
+        <Avatar name={partner?.name} url={partner?.avatarUrl} size={44} />
+
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm truncate">{partner?.name ?? "User"}</p>
-          {partner?.role && <p className="text-xs text-muted-foreground truncate">{partner.role}</p>}
+          <p className="truncate text-base font-semibold">{partner?.name ?? "User"}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {partner?.role || "Online"} • Secure messages and live calls
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -202,7 +223,7 @@ function ThreadView({
             disabled={startingMeeting || !myId}
             onClick={() => startDirectCall("audio")}
             title="Start audio call"
-            className="h-11 w-11 rounded-full p-0 border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20"
+            className="h-11 w-11 rounded-full border-cyan-400/30 bg-cyan-400/10 p-0 text-cyan-300 hover:bg-cyan-400/20"
           >
             <Phone className="h-4 w-4" />
           </Button>
@@ -212,69 +233,73 @@ function ThreadView({
             disabled={startingMeeting || !myId}
             onClick={() => startDirectCall("video")}
             title="Start video call"
-            className="h-11 w-11 rounded-full p-0 bg-cyan-400 text-black shadow-lg shadow-cyan-400/20 hover:bg-cyan-300"
+            className="h-11 w-11 rounded-full bg-cyan-400 p-0 text-black shadow-lg shadow-cyan-400/20 hover:bg-cyan-300"
           >
             <Video className="h-4 w-4" />
+          </Button>
+
+          <Button size="sm" variant="ghost" className="h-11 w-11 rounded-full p-0">
+            <MoreVertical className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Job context banner */}
       {jobTitle && (
-        <div className="mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
+        <div className="mx-5 mt-3 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
           <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
           <span className="truncate">Re: <span className="font-semibold">{jobTitle}</span> application</span>
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         {isLoading ? (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading…
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <MessageCircle className="w-10 h-10 mb-3 opacity-30" />
+            <MessageCircle className="w-12 h-12 mb-3 opacity-30" />
             <p className="font-medium">No messages yet</p>
             <p className="text-sm mt-1">Say hello to {partner?.name ?? "your connection"}!</p>
           </div>
         ) : (
-          messages.map(msg => {
-            const isMe = msg.fromUserId === myId;
-            return (
-              <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
-                  isMe
-                    ? "bg-primary text-primary-foreground rounded-br-sm"
-                    : "bg-card border border-border text-foreground rounded-bl-sm"
-                }`}>
-                  <p className="leading-relaxed">{msg.content}</p>
-                  <p className={`text-xs mt-1 ${isMe ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                    {new Date(msg.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
+          <div className="space-y-3 pb-4">
+            {messages.map(msg => {
+              const isMe = msg.fromUserId === myId;
+
+              return (
+                <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[68%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                    isMe
+                      ? "bg-cyan-400 text-black rounded-br-md"
+                      : "bg-card border border-border text-foreground rounded-bl-md"
+                  }`}>
+                    <p className="leading-relaxed">{msg.content}</p>
+                    <p className={`text-[11px] mt-1 ${isMe ? "text-black/60" : "text-muted-foreground"}`}>
+                      {new Date(msg.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+            <div ref={bottomRef} />
+          </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-4 py-3 border-t border-border bg-background flex-shrink-0">
-        <div className="flex gap-2">
+      <div className="flex-shrink-0 border-t border-border bg-background/95 px-5 py-4 backdrop-blur-xl">
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
           <input
-            ref={inputRef}
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
             placeholder="Type a message…"
-            className="flex-1 bg-card border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+            className="h-11 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
             disabled={isPending}
             autoFocus
           />
-          <Button onClick={handleSend} disabled={!text.trim() || isPending} size="sm" className="px-4 h-10">
+
+          <Button onClick={handleSend} disabled={!text.trim() || isPending} size="sm" className="h-10 w-10 rounded-full bg-cyan-400 p-0 text-black hover:bg-cyan-300">
             <Send className="w-4 h-4" />
           </Button>
         </div>
@@ -295,26 +320,29 @@ function InboxList({
   isLoading: boolean;
 }) {
   const [search, setSearch] = useState("");
+
   const filtered = conversations.filter(c =>
     c.partner?.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.partner?.role?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-3 border-b border-border flex-shrink-0">
+    <div className="flex h-full min-h-0 flex-col border-r border-border bg-card/20">
+      <div className="flex-shrink-0 border-b border-border px-4 py-4">
+        <p className="mb-3 text-lg font-bold">Inbox</p>
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search conversations…"
-            className="w-full pl-9 pr-3 py-2 bg-card border border-border rounded-lg text-sm outline-none focus:border-primary/50 transition-colors"
+            className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition-colors focus:border-cyan-400/50"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading…
@@ -324,7 +352,7 @@ function InboxList({
             <MessageCircle className="w-10 h-10 mb-3 opacity-30" />
             <p className="font-medium text-sm">No conversations yet</p>
             <p className="text-xs mt-1 text-center px-6">
-              Messages from employers about your applications will appear here.
+              Messages from employers and connections will appear here.
             </p>
           </div>
         ) : (
@@ -332,31 +360,28 @@ function InboxList({
             <button
               key={conv.partnerId}
               onClick={() => onSelect(conv.partnerId)}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-card/60 transition-colors border-b border-border/50 text-left ${
-                selectedId === conv.partnerId ? "bg-card border-l-2 border-l-primary" : ""
+              className={`w-full flex items-center gap-3 px-4 py-4 text-left border-b border-border/60 transition-colors ${
+                selectedId === conv.partnerId ? "bg-cyan-400/10 border-l-4 border-l-cyan-400" : "hover:bg-muted/40"
               }`}
             >
-              <div className="relative flex-shrink-0">
-                <Avatar name={conv.partner?.name} url={conv.partner?.avatarUrl} size={40} />
-                {conv.unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground rounded-full text-xs font-bold flex items-center justify-center">
-                    {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
-                  </span>
-                )}
-              </div>
+              <Avatar name={conv.partner?.name} url={conv.partner?.avatarUrl} size={44} />
+
               <div className="min-w-0 flex-1">
-                <div className="flex justify-between items-baseline gap-1">
-                  <p className={`text-sm truncate ${conv.unreadCount > 0 ? "font-bold text-foreground" : "font-medium"}`}>
-                    {conv.partner?.name ?? "Unknown"}
-                  </p>
-                  <p className="text-xs text-muted-foreground flex-shrink-0">
-                    {new Date(conv.lastMessage.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                  </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold text-sm truncate">{conv.partner?.name ?? "User"}</p>
+                  <span className="text-[11px] text-muted-foreground">
+                    {new Date(conv.lastMessage.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                  </span>
                 </div>
-                <p className={`text-xs truncate mt-0.5 ${conv.unreadCount > 0 ? "text-foreground/80" : "text-muted-foreground"}`}>
-                  {conv.lastMessage.content}
-                </p>
+
+                <p className="text-xs text-muted-foreground truncate mt-1">{conv.lastMessage.content}</p>
               </div>
+
+              {conv.unreadCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1.5 text-[10px] font-bold text-black">
+                  {conv.unreadCount}
+                </span>
+              )}
             </button>
           ))
         )}
@@ -366,65 +391,47 @@ function InboxList({
 }
 
 function MessagesContent() {
-  const search = useSearch();
-  const params = new URLSearchParams(search);
-  const partnerParam = params.get("partner");
-  const jobParam = params.get("job");
-  const appIdParam = params.get("appId");
-
-  const [selectedId, setSelectedId] = useState<number | null>(
-    partnerParam ? parseInt(partnerParam, 10) : null
-  );
   const { getToken } = useAuth();
   const { data, isLoading } = useInbox(getToken);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const search = useSearch();
+
+  const params = new URLSearchParams(search);
+  const partnerParam = params.get("partnerId");
+  const jobTitle = params.get("jobTitle");
+  const jobApplicationId = params.get("jobApplicationId");
+
+  useEffect(() => {
+    if (partnerParam) setSelectedId(Number(partnerParam));
+  }, [partnerParam]);
+
   const conversations = data?.conversations ?? [];
 
-  const showThread = selectedId !== null && !isNaN(selectedId);
-
-  const jobTitle = jobParam ? decodeURIComponent(jobParam) : null;
-  const jobApplicationId = appIdParam ? parseInt(appIdParam, 10) : null;
-
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <NavBar />
 
-      <div className="flex-1 flex overflow-hidden" style={{ height: "calc(100vh - 64px)" }}>
-        {/* Sidebar: conversation list */}
-        <div className={`${showThread ? "hidden lg:flex" : "flex"} flex-col w-full lg:w-80 xl:w-96 border-r border-border bg-background flex-shrink-0`}>
-          <div className="px-4 py-4 border-b border-border">
-            <h2 className="font-bold text-lg flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-cyan-400" />
-              Inbox
-              {conversations.some(c => c.unreadCount > 0) && (
-                <span className="ml-auto bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
-                  {conversations.reduce((a, c) => a + c.unreadCount, 0)} new
-                </span>
-              )}
-            </h2>
-          </div>
-          <InboxList
-            conversations={conversations}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            isLoading={isLoading}
-          />
-        </div>
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[360px_1fr]">
+        <InboxList
+          conversations={conversations}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          isLoading={isLoading}
+        />
 
-        {/* Thread panel */}
-        <div className={`${showThread ? "flex" : "hidden lg:flex"} flex-col flex-1 overflow-hidden`}>
-          {selectedId !== null ? (
+        <div className="min-h-0">
+          {selectedId ? (
             <ThreadView
-              key={selectedId}
               partnerId={selectedId}
               onBack={() => setSelectedId(null)}
               jobTitle={jobTitle}
-              jobApplicationId={jobApplicationId}
+              jobApplicationId={jobApplicationId ? Number(jobApplicationId) : null}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-              <MessageCircle className="w-16 h-16 mb-4 opacity-20" />
-              <p className="font-semibold text-lg">Select a conversation</p>
-              <p className="text-sm mt-1">Choose a conversation from your inbox to start messaging.</p>
+            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+              <MessageCircle className="w-16 h-16 mb-4 opacity-25" />
+              <p className="text-xl font-semibold">Select a conversation</p>
+              <p className="text-sm mt-2">Choose a conversation from your inbox to start messaging or calling.</p>
             </div>
           )}
         </div>
@@ -433,12 +440,13 @@ function MessagesContent() {
   );
 }
 
-export default function Messages() {
+export default function MessagesPage() {
   return (
     <>
       <Show when="signed-in">
         <MessagesContent />
       </Show>
+
       <Show when="signed-out">
         <Redirect to="/sign-in" />
       </Show>
