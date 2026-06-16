@@ -2,9 +2,11 @@ import "@livekit/components-styles";
 import {
   ControlBar,
   GridLayout,
+  LayoutContextProvider,
   LiveKitRoom,
   ParticipantTile,
   RoomAudioRenderer,
+  useCreateLayoutContext,
   useTracks,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
@@ -35,6 +37,8 @@ function MeetingStage() {
 }
 
 export function LiveMeetingRoom({ token, serverUrl, roomName, onClose }: LiveMeetingRoomProps) {
+  const layoutContext = useCreateLayoutContext();
+
   return (
     <div className="fixed inset-0 z-[100] bg-black">
       <div className="flex h-full flex-col">
@@ -57,15 +61,17 @@ export function LiveMeetingRoom({ token, serverUrl, roomName, onClose }: LiveMee
           audio
           className="flex min-h-0 flex-1 flex-col bg-black"
         >
-          <div className="min-h-0 flex-1">
-            <MeetingStage />
-          </div>
+          <LayoutContextProvider value={layoutContext}>
+            <div className="min-h-0 flex-1">
+              <MeetingStage />
+            </div>
 
-          <RoomAudioRenderer />
+            <RoomAudioRenderer />
 
-          <div className="border-t border-white/10 bg-black p-3">
-            <ControlBar controls={{ chat: true, screenShare: true }} />
-          </div>
+            <div className="border-t border-white/10 bg-black p-3">
+              <ControlBar controls={{ chat: true, screenShare: true }} />
+            </div>
+          </LayoutContextProvider>
         </LiveKitRoom>
       </div>
     </div>
