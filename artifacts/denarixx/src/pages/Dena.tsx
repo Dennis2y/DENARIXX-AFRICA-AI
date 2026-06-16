@@ -567,6 +567,7 @@ function DenaPageContent() {
       const data = await res.json();
 
       const imageSrc =
+        data.imageUrl ||
         data.image ||
         data.url ||
         (data.b64 ? `data:${data.mimeType || "image/png"};base64,${data.b64}` : "");
