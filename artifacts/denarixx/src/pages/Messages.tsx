@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Show } from "@clerk/react";
+import { Show, useAuth } from "@clerk/react";
 import { Redirect, useLocation, useSearch } from "wouter";
 import {
-  ArrowLeft, Send, MessageCircle, User, Search, RefreshCw, ChevronLeft, Briefcase
+  ArrowLeft, Send, MessageCircle, User, Search, RefreshCw, ChevronLeft, Briefcase, Phone, Video
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { LiveMeetingRoom } from "@/components/meetings/LiveMeetingRoom";
+import { useLiveMeeting } from "@/components/meetings/useLiveMeeting";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -124,6 +126,8 @@ function ThreadView({
 }) {
   const { data, isLoading } = useThread(partnerId);
   const { mutateAsync: send, isPending } = useSendMessage(partnerId, jobApplicationId);
+  const { getToken } = useAuth();
+  const { activeMeeting, startingMeeting, startMeeting, endMeeting } = useLiveMeeting(basePath, getToken);
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -143,8 +147,27 @@ function ThreadView({
     await send(trimmed);
   };
 
+  const startDirectCall = async (mode: "audio" | "video") => {
+    await startMeeting({
+      roomName: `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`,
+      displayName: partner?.name || "Denarixx User",
+      meetingType: "direct",
+    });
+
+    await send(`${mode === "video" ? "Video" : "Audio"} call started. Join from this chat.`);
+  };
+
   return (
     <div className="flex flex-col h-full">
+      {activeMeeting && (
+        <LiveMeetingRoom
+          token={activeMeeting.token}
+          serverUrl={activeMeeting.serverUrl}
+          roomName={activeMeeting.roomName}
+          onClose={endMeeting}
+        />
+      )}
+
       {/* Thread header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
         <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors lg:hidden">
@@ -154,6 +177,29 @@ function ThreadView({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm truncate">{partner?.name ?? "User"}</p>
           {partner?.role && <p className="text-xs text-muted-foreground truncate">{partner.role}</p>}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={startingMeeting || !myId}
+            onClick={() => startDirectCall("audio")}
+            title="Start audio call"
+            className="h-9 w-9 rounded-full p-0"
+          >
+            <Phone className="h-4 w-4" />
+          </Button>
+
+          <Button
+            size="sm"
+            disabled={startingMeeting || !myId}
+            onClick={() => startDirectCall("video")}
+            title="Start video call"
+            className="h-9 w-9 rounded-full p-0 bg-cyan-400 text-black hover:bg-cyan-300"
+          >
+            <Video className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
