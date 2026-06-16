@@ -19,6 +19,7 @@ import voiceRouter from "./voice";
 import imageGenerateRouter from "./imageGenerate";
 import artifactsRouter from "./artifacts";
 import artifactFromMessageRouter from "./artifactFromMessage";
+import meetingsRouter from "./meetings";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,7 @@ router.use("/voice", voiceRouter);
 router.use("/images/generate", imageGenerateRouter);
 router.use("/artifacts", artifactsRouter);
 router.use("/artifact-from-message", artifactFromMessageRouter);
+router.use("/meetings", meetingsRouter);
 
 router.use(healthRouter);
 router.use(waitlistRouter);
