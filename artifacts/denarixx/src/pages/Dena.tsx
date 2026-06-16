@@ -16,7 +16,7 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Role = "user" | "assistant";
 type MessageAttachment = { id: number; filename: string; type: "document" };
-type Message = { role: Role; content: string; id?: number; attachments?: MessageAttachment[]; provider?: string; model?: string };
+type Message = { role: Role; content: string; id?: number; attachments?: MessageAttachment[]; provider?: string; model?: string; imageUrl?: string };
 type PendingDocument = { id: number; filename: string; summary?: string | null; chunkCount?: number };
 type Conversation = { id: number; title: string; updatedAt: string };
 type LibraryDocument = { id: number; filename: string; summary?: string | null; updatedAt?: string; createdAt?: string };
@@ -135,6 +135,7 @@ function DenaPageContent() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
@@ -574,7 +575,15 @@ function DenaPageContent() {
 
       if (imageSrc) {
         setGeneratedImages((prev) => [imageSrc, ...prev].slice(0, 12));
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: prompt },
+          { role: "assistant", content: `Generated image: ${prompt}`, imageUrl: imageSrc },
+        ]);
         setInput("");
+        window.setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        }, 100);
       } else {
         console.error("Image response missing image/url/b64", data);
         alert("Image generated, but frontend could not read the image response.");
@@ -1712,7 +1721,7 @@ function DenaPageContent() {
         )}
 
         {generatedImages.length > 0 && (
-          <div className="mx-auto mb-4 grid w-full max-w-4xl grid-cols-1 gap-3 px-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto mb-4 grid max-h-[260px] w-full max-w-4xl grid-cols-1 gap-3 overflow-y-auto px-4 sm:grid-cols-2 lg:grid-cols-3">
             {generatedImages.map((src, index) => (
               <div key={`${src.slice(0, 30)}-${index}`} className="overflow-hidden rounded-2xl border border-border bg-card">
                 <img src={src} alt={`DENA generated image ${index + 1}`} className="aspect-square w-full object-cover" />
