@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
-import { directMessages } from "@workspace/db";
+import { directMessages, userBlocks } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { eq, and, or, desc, inArray } from "drizzle-orm";
 
@@ -9,6 +9,28 @@ const router: IRouter = Router();
 async function getDbUser(clerkUserId: string) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
   return user ?? null;
+}
+
+
+async function getBlockStatus(myId: number, partnerId: number) {
+  const rows = await db
+    .select()
+    .from(userBlocks)
+    .where(
+      or(
+        and(eq(userBlocks.blockerUserId, myId), eq(userBlocks.blockedUserId, partnerId)),
+        and(eq(userBlocks.blockerUserId, partnerId), eq(userBlocks.blockedUserId, myId))
+      )
+    );
+
+  const blockedByMe = rows.some((row) => row.blockerUserId === myId);
+  const blockedMe = rows.some((row) => row.blockerUserId === partnerId);
+
+  return {
+    blockedByMe,
+    blockedMe,
+    isBlocked: blockedByMe || blockedMe,
+  };
 }
 
 // GET /api/messages/unread-count — total unread (must be before /:partnerId)
@@ -156,6 +178,70 @@ router.post("/dev/seed", requireAuth, async (req, res) => {
   }
 });
 
+
+// GET /api/messages/:partnerId/block-status — check if either side blocked
+router.get("/:partnerId/block-status", requireAuth, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const partnerId = parseInt(req.params.partnerId as string, 10);
+    if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
+
+    const me = await getDbUser(clerkUserId);
+    if (!me) { res.status(404).json({ error: "User not found" }); return; }
+
+    const status = await getBlockStatus(me.id, partnerId);
+    res.json(status);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get block status");
+    res.status(500).json({ error: "Failed to get block status" });
+  }
+});
+
+// POST /api/messages/:partnerId/block — block a user
+router.post("/:partnerId/block", requireAuth, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const partnerId = parseInt(req.params.partnerId as string, 10);
+    if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
+
+    const me = await getDbUser(clerkUserId);
+    if (!me) { res.status(404).json({ error: "User not found" }); return; }
+    if (me.id === partnerId) { res.status(400).json({ error: "Cannot block yourself" }); return; }
+
+    await db
+      .insert(userBlocks)
+      .values({ blockerUserId: me.id, blockedUserId: partnerId })
+      .onConflictDoNothing();
+
+    res.json({ success: true, blockedByMe: true, blockedMe: false, isBlocked: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to block user");
+    res.status(500).json({ error: "Failed to block user" });
+  }
+});
+
+// DELETE /api/messages/:partnerId/block — unblock a user
+router.delete("/:partnerId/block", requireAuth, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const partnerId = parseInt(req.params.partnerId as string, 10);
+    if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
+
+    const me = await getDbUser(clerkUserId);
+    if (!me) { res.status(404).json({ error: "User not found" }); return; }
+
+    await db
+      .delete(userBlocks)
+      .where(and(eq(userBlocks.blockerUserId, me.id), eq(userBlocks.blockedUserId, partnerId)));
+
+    const status = await getBlockStatus(me.id, partnerId);
+    res.json({ success: true, ...status });
+  } catch (err) {
+    req.log.error({ err }, "Failed to unblock user");
+    res.status(500).json({ error: "Failed to unblock user" });
+  }
+});
+
 // GET /api/messages/:partnerId — thread with a user
 router.get("/:partnerId", requireAuth, async (req, res) => {
   try {
@@ -189,7 +275,9 @@ router.get("/:partnerId", requireAuth, async (req, res) => {
       .set({ isRead: true })
       .where(and(eq(directMessages.fromUserId, partnerId), eq(directMessages.toUserId, me.id), eq(directMessages.isRead, false)));
 
-    res.json({ messages: msgs, partner: partner ?? null, myId: me.id });
+    const blockStatus = await getBlockStatus(me.id, partnerId);
+
+    res.json({ messages: msgs, partner: partner ?? null, myId: me.id, blockStatus });
   } catch (err) {
     req.log.error({ err }, "Failed to load messages");
     res.status(500).json({ error: "Failed to load messages" });
@@ -211,6 +299,16 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
     const me = await getDbUser(clerkUserId);
     if (!me) { res.status(404).json({ error: "User not found" }); return; }
     if (me.id === partnerId) { res.status(400).json({ error: "Cannot message yourself" }); return; }
+
+    const blockStatus = await getBlockStatus(me.id, partnerId);
+    if (blockStatus.blockedByMe) {
+      res.status(403).json({ error: "You blocked this user. Unblock them before sending messages." });
+      return;
+    }
+    if (blockStatus.blockedMe) {
+      res.status(403).json({ error: "You cannot message this user." });
+      return;
+    }
 
     const [msg] = await db.insert(directMessages).values({
       fromUserId: me.id,

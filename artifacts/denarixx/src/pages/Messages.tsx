@@ -68,6 +68,15 @@ type Conversation = {
   unreadCount: number;
 };
 
+type SearchUser = {
+  id: number;
+  name: string | null;
+  avatarUrl: string | null;
+  role: string | null;
+  location: string | null;
+  userType: string | null;
+};
+
 type Message = {
   id: number;
   fromUserId: number;
@@ -76,6 +85,12 @@ type Message = {
   isRead: boolean;
   jobApplicationId: number | null;
   createdAt: string;
+};
+
+type BlockStatus = {
+  blockedByMe: boolean;
+  blockedMe: boolean;
+  isBlocked: boolean;
 };
 
 function useInbox(getToken: () => Promise<string | null>) {
@@ -97,7 +112,7 @@ function useInbox(getToken: () => Promise<string | null>) {
 }
 
 function useThread(partnerId: number | null, getToken: () => Promise<string | null>) {
-  return useQuery<{ messages: Message[]; partner: Conversation["partner"]; myId: number }>({
+  return useQuery<{ messages: Message[]; partner: Conversation["partner"]; myId: number; blockStatus?: BlockStatus }>({
     queryKey: ["messages-thread", partnerId],
     queryFn: async () => {
       const token = await getToken();
@@ -175,6 +190,7 @@ function ThreadView({
     : messages;
   const partner = data?.partner;
   const myId = data?.myId;
+  const blockStatus = data?.blockStatus ?? { blockedByMe: false, blockedMe: false, isBlocked: false };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -210,9 +226,29 @@ function ThreadView({
     window.location.reload();
   };
 
-  const blockUser = async () => {
-    if (!window.confirm(`Block ${partner?.name || "this user"}? This will clear the chat locally for now.`)) return;
-    await clearChat();
+  const toggleBlockUser = async () => {
+    const isUnblock = blockStatus.blockedByMe;
+    const confirmText = isUnblock
+      ? `Unblock ${partner?.name || "this user"}? You will be able to message them again.`
+      : `Block ${partner?.name || "this user"}? You will no longer be able to send messages to each other.`;
+
+    if (!window.confirm(confirmText)) return;
+
+    const token = await getToken();
+    const res = await fetch(`${basePath}/api/messages/${partnerId}/block`, {
+      method: isUnblock ? "DELETE" : "POST",
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      alert(await res.text());
+      return;
+    }
+
+    window.location.reload();
   };
 
   const startDirectCall = async (mode: "audio" | "video") => {
@@ -293,8 +329,8 @@ function ThreadView({
                 <button onClick={() => { setMoreOpen(false); clearChat(); }} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
                   Clear chat
                 </button>
-                <button onClick={() => { setMoreOpen(false); blockUser(); }} className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10">
-                  Block user
+                <button onClick={() => { setMoreOpen(false); toggleBlockUser(); }} className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10">
+                  {blockStatus.blockedByMe ? "Unblock user" : "Block user"}
                 </button>
               </div>
             )}
@@ -340,6 +376,14 @@ function ThreadView({
               Close
             </Button>
           </div>
+        </div>
+      )}
+
+      {blockStatus.isBlocked && (
+        <div className="mx-5 mt-3 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {blockStatus.blockedByMe
+            ? `You blocked ${partner?.name || "this user"}. Unblock them from the menu to send messages again.`
+            : `${partner?.name || "This user"} has blocked messaging.`}
         </div>
       )}
 
@@ -392,13 +436,13 @@ function ThreadView({
             value={text}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder="Type a message…"
+            placeholder={blockStatus.isBlocked ? "Messaging is blocked…" : "Type a message…"}
             className="h-11 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
-            disabled={isPending}
+            disabled={isPending || blockStatus.isBlocked}
             autoFocus
           />
 
-          <Button onClick={handleSend} disabled={!text.trim() || isPending} size="sm" className="h-10 w-10 rounded-full bg-cyan-400 p-0 text-black hover:bg-cyan-300">
+          <Button onClick={handleSend} disabled={!text.trim() || isPending || blockStatus.isBlocked} size="sm" className="h-10 w-10 rounded-full bg-cyan-400 p-0 text-black hover:bg-cyan-300">
             <Send className="w-4 h-4" />
           </Button>
         </div>
@@ -414,6 +458,7 @@ function InboxList({
   isLoading,
   onSeedDemo,
   seedDemoPending,
+  getToken,
 }: {
   conversations: Conversation[];
   selectedId: number | null;
@@ -421,13 +466,47 @@ function InboxList({
   isLoading: boolean;
   onSeedDemo: () => void;
   seedDemoPending: boolean;
+  getToken: () => Promise<string | null>;
 }) {
   const [search, setSearch] = useState("");
+  const [userResults, setUserResults] = useState<SearchUser[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
 
   const filtered = conversations.filter(c =>
     c.partner?.name?.toLowerCase().includes(search.toLowerCase()) ||
     c.partner?.role?.toLowerCase().includes(search.toLowerCase())
   );
+
+  useEffect(() => {
+    const q = search.trim();
+
+    if (q.length < 2) {
+      setUserResults([]);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setSearchingUsers(true);
+      try {
+        const token = await getToken();
+        const r = await fetch(`${basePath}/api/users/search?q=${encodeURIComponent(q)}`, {
+          credentials: "include",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (r.ok) {
+          const data = await r.json();
+          setUserResults(data.users ?? []);
+        }
+      } finally {
+        setSearchingUsers(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [search, getToken]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r border-border bg-card/20">
@@ -450,12 +529,41 @@ function InboxList({
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading…
           </div>
+        ) : search.trim().length >= 2 && userResults.length > 0 ? (
+          <div className="py-2">
+            <p className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              People
+            </p>
+            {userResults.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => onSelect(user.id)}
+                className="flex w-full items-center gap-3 border-b border-border/60 px-4 py-4 text-left transition-colors hover:bg-muted/40"
+              >
+                <Avatar name={user.name} url={user.avatarUrl} size={44} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{user.name || "Denarixx User"}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user.role || user.userType || "Community member"}
+                    {user.location ? ` • ${user.location}` : ""}
+                  </p>
+                </div>
+                <span className="rounded-full border border-cyan-400/30 px-2 py-1 text-[10px] text-cyan-300">
+                  Message
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : search.trim().length >= 2 && searchingUsers ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Searching people…
+          </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <MessageCircle className="w-10 h-10 mb-3 opacity-30" />
             <p className="font-medium text-sm">No conversations yet</p>
             <p className="text-xs mt-1 text-center px-6">
-              Messages from employers and connections will appear here.
+              Search people above or create a demo conversation.
             </p>
             <Button
               size="sm"
@@ -551,6 +659,7 @@ function MessagesContent() {
           isLoading={isLoading}
           onSeedDemo={() => seedDemo.mutate()}
           seedDemoPending={seedDemo.isPending}
+          getToken={getToken}
         />
 
         <div className="min-h-0">

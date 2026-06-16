@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, ilike, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -45,6 +45,62 @@ router.get("/me", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to load profile" });
   }
 });
+
+
+// GET /api/users/search?q=term — search users to start conversations
+router.get("/search", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const q = String(req.query.q ?? "").trim();
+
+  if (q.length < 2) {
+    res.json({ users: [] });
+    return;
+  }
+
+  try {
+    const [me] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .limit(1);
+
+    if (!me) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const pattern = `%${q}%`;
+
+    const rows = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        avatarUrl: usersTable.avatarUrl,
+        role: usersTable.role,
+        location: usersTable.location,
+        userType: usersTable.userType,
+      })
+      .from(usersTable)
+      .where(
+        and(
+          ne(usersTable.id, me.id),
+          or(
+            ilike(usersTable.name, pattern),
+            ilike(usersTable.role, pattern),
+            ilike(usersTable.location, pattern),
+            ilike(usersTable.email, pattern)
+          )
+        )
+      )
+      .limit(12);
+
+    res.json({ users: rows });
+  } catch (err) {
+    req.log.error({ err }, "Failed to search users");
+    res.status(500).json({ error: "Failed to search users" });
+  }
+});
+
 
 // PATCH /api/users/me — update current user profile
 router.patch("/me", requireAuth, async (req, res) => {
