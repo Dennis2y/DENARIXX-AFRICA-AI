@@ -65,11 +65,17 @@ type Message = {
   createdAt: string;
 };
 
-function useInbox() {
+function useInbox(getToken: () => Promise<string | null>) {
   return useQuery<{ conversations: Conversation[] }>({
     queryKey: ["messages-inbox"],
     queryFn: async () => {
-      const r = await fetch(`${basePath}/api/messages/inbox`, { credentials: "include" });
+      const token = await getToken();
+      const r = await fetch(`${basePath}/api/messages/inbox`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
@@ -77,11 +83,17 @@ function useInbox() {
   });
 }
 
-function useThread(partnerId: number | null) {
+function useThread(partnerId: number | null, getToken: () => Promise<string | null>) {
   return useQuery<{ messages: Message[]; partner: Conversation["partner"]; myId: number }>({
     queryKey: ["messages-thread", partnerId],
     queryFn: async () => {
-      const r = await fetch(`${basePath}/api/messages/${partnerId}`, { credentials: "include" });
+      const token = await getToken();
+      const r = await fetch(`${basePath}/api/messages/${partnerId}`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
@@ -90,15 +102,19 @@ function useThread(partnerId: number | null) {
   });
 }
 
-function useSendMessage(partnerId: number | null, jobApplicationId?: number | null) {
+function useSendMessage(partnerId: number | null, getToken: () => Promise<string | null>, jobApplicationId?: number | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (content: string) => {
       const body: Record<string, unknown> = { content };
       if (jobApplicationId) body.jobApplicationId = jobApplicationId;
+      const token = await getToken();
       const r = await fetch(`${basePath}/api/messages/${partnerId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(body),
       });
@@ -124,9 +140,9 @@ function ThreadView({
   jobTitle?: string | null;
   jobApplicationId?: number | null;
 }) {
-  const { data, isLoading } = useThread(partnerId);
-  const { mutateAsync: send, isPending } = useSendMessage(partnerId, jobApplicationId);
   const { getToken } = useAuth();
+  const { data, isLoading } = useThread(partnerId, getToken);
+  const { mutateAsync: send, isPending } = useSendMessage(partnerId, getToken, jobApplicationId);
   const { activeMeeting, startingMeeting, startMeeting, endMeeting } = useLiveMeeting(basePath, getToken);
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -359,7 +375,8 @@ function MessagesContent() {
   const [selectedId, setSelectedId] = useState<number | null>(
     partnerParam ? parseInt(partnerParam, 10) : null
   );
-  const { data, isLoading } = useInbox();
+  const { getToken } = useAuth();
+  const { data, isLoading } = useInbox(getToken);
   const conversations = data?.conversations ?? [];
 
   const showThread = selectedId !== null && !isNaN(selectedId);
