@@ -153,15 +153,24 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
 });
 
 
+
 // DELETE /api/messages/:partnerId — clear thread with a user
 router.delete("/:partnerId", requireAuth, async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
     const partnerId = parseInt(req.params.partnerId as string, 10);
-    if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
+
+    if (isNaN(partnerId)) {
+      res.status(400).json({ error: "Invalid partnerId" });
+      return;
+    }
 
     const me = await getDbUser(clerkUserId);
-    if (!me) { res.status(404).json({ error: "User not found" }); return; }
+
+    if (!me) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
 
     await db
       .delete(directMessages)

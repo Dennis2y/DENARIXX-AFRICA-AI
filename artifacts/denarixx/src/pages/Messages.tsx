@@ -201,7 +201,9 @@ function ThreadView({
     });
 
     if (!res.ok) {
-      alert(await res.text());
+      const errorText = await res.text();
+      console.error("Clear chat failed:", errorText);
+      alert("Clear chat failed. Please restart the backend and try again.");
       return;
     }
 
