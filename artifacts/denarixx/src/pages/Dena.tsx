@@ -566,9 +566,17 @@ function DenaPageContent() {
 
       const data = await res.json();
 
-      if (data.image) {
-        setGeneratedImages((prev) => [data.image, ...prev].slice(0, 12));
+      const imageSrc =
+        data.image ||
+        data.url ||
+        (data.b64 ? `data:${data.mimeType || "image/png"};base64,${data.b64}` : "");
+
+      if (imageSrc) {
+        setGeneratedImages((prev) => [imageSrc, ...prev].slice(0, 12));
         setInput("");
+      } else {
+        console.error("Image response missing image/url/b64", data);
+        alert("Image generated, but frontend could not read the image response.");
       }
     } catch (err) {
       console.error("Image generation failed", err);
