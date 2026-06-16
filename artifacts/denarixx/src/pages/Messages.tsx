@@ -185,7 +185,7 @@ function ThreadView({
       )}
 
       {/* Thread header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
+      <div className="sticky top-0 z-30 flex items-center gap-3 px-5 py-4 border-b border-border bg-background/95 backdrop-blur-xl flex-shrink-0 shadow-sm">
         <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors lg:hidden">
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -202,7 +202,7 @@ function ThreadView({
             disabled={startingMeeting || !myId}
             onClick={() => startDirectCall("audio")}
             title="Start audio call"
-            className="h-9 w-9 rounded-full p-0"
+            className="h-11 w-11 rounded-full p-0 border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20"
           >
             <Phone className="h-4 w-4" />
           </Button>
@@ -212,7 +212,7 @@ function ThreadView({
             disabled={startingMeeting || !myId}
             onClick={() => startDirectCall("video")}
             title="Start video call"
-            className="h-9 w-9 rounded-full p-0 bg-cyan-400 text-black hover:bg-cyan-300"
+            className="h-11 w-11 rounded-full p-0 bg-cyan-400 text-black shadow-lg shadow-cyan-400/20 hover:bg-cyan-300"
           >
             <Video className="h-4 w-4" />
           </Button>
