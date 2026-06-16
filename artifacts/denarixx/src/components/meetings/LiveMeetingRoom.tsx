@@ -41,6 +41,14 @@ function MeetingStage() {
 export function LiveMeetingRoom({ token, serverUrl, roomName, onClose }: LiveMeetingRoomProps) {
   const layoutContext = useCreateLayoutContext();
   const [chatOpen, setChatOpen] = useState(false);
+  const [activeReaction, setActiveReaction] = useState<string | null>(null);
+
+  const showReaction = (emoji: string) => {
+    setActiveReaction(emoji);
+    window.setTimeout(() => setActiveReaction(null), 1800);
+  };
+
+  const reactions = ["👍", "👏", "😂", "❤️", "🎉", "🔥", "💡", "🙏"];
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#05070d] text-white">
@@ -87,7 +95,12 @@ export function LiveMeetingRoom({ token, serverUrl, roomName, onClose }: LiveMee
               </div>
             </header>
 
-            <main className="flex min-h-0 flex-1">
+            <main className="relative flex min-h-0 flex-1">
+              {activeReaction && (
+                <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2 animate-bounce rounded-full border border-white/20 bg-black/55 px-8 py-5 text-6xl shadow-2xl backdrop-blur-xl">
+                  {activeReaction}
+                </div>
+              )}
               <section className="relative min-w-0 flex-1">
                 <div className="absolute left-5 top-5 z-10 rounded-full border border-white/10 bg-black/45 px-3 py-1.5 text-xs text-white/70 backdrop-blur-xl">
                   HD Video • Secure LiveKit Session
@@ -117,7 +130,21 @@ export function LiveMeetingRoom({ token, serverUrl, roomName, onClose }: LiveMee
             <RoomAudioRenderer />
 
             <footer className="border-t border-white/10 bg-black/70 px-4 py-3 backdrop-blur-xl">
-              <div className="mx-auto flex max-w-5xl items-center justify-center rounded-3xl border border-white/10 bg-white/5 px-4 py-2 shadow-2xl">
+              <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 shadow-2xl md:flex-row md:justify-center">
+                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-2">
+                  {reactions.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => showReaction(emoji)}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-xl transition hover:scale-110 hover:bg-white/10"
+                      title={`React ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+
                 <ControlBar controls={{ chat: false, screenShare: true }} />
               </div>
             </footer>
