@@ -164,9 +164,15 @@ function ThreadView({
 
   const [text, setText] = useState("");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [messageSearch, setMessageSearch] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messages = data?.messages ?? [];
+  const visibleMessages = messageSearch.trim()
+    ? messages.filter((msg) => msg.content.toLowerCase().includes(messageSearch.toLowerCase()))
+    : messages;
   const partner = data?.partner;
   const myId = data?.myId;
 
@@ -180,6 +186,31 @@ function ThreadView({
 
     setText("");
     await send(trimmed);
+  };
+
+  const clearChat = async () => {
+    if (!window.confirm("Clear this chat for testing? This will delete the conversation messages from the database.")) return;
+
+    const token = await getToken();
+    const res = await fetch(`${basePath}/api/messages/${partnerId}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      alert(await res.text());
+      return;
+    }
+
+    window.location.reload();
+  };
+
+  const blockUser = async () => {
+    if (!window.confirm(`Block ${partner?.name || "this user"}? This will clear the chat locally for now.`)) return;
+    await clearChat();
   };
 
   const startDirectCall = async (mode: "audio" | "video") => {
@@ -251,16 +282,16 @@ function ThreadView({
 
             {moreOpen && (
               <div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-border bg-card p-2 shadow-2xl">
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
+                <button onClick={() => { setProfileOpen(true); setMoreOpen(false); }} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
                   View profile
                 </button>
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
+                <button onClick={() => { setSearchOpen(true); setMoreOpen(false); }} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
                   Search messages
                 </button>
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
+                <button onClick={() => { setMoreOpen(false); clearChat(); }} className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-muted">
                   Clear chat
                 </button>
-                <button className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10">
+                <button onClick={() => { setMoreOpen(false); blockUser(); }} className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10">
                   Block user
                 </button>
               </div>
@@ -268,6 +299,47 @@ function ThreadView({
           </div>
         </div>
       </div>
+
+      {profileOpen && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-[420px] max-w-[92vw] rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-center gap-4">
+              <Avatar name={partner?.name} url={partner?.avatarUrl} size={64} />
+              <div className="min-w-0">
+                <p className="truncate text-xl font-bold">{partner?.name || "User"}</p>
+                <p className="text-sm text-muted-foreground">{partner?.role || "Denarixx member"}</p>
+                <p className="mt-1 text-xs text-cyan-300">Available for messages and live calls</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button onClick={() => startDirectCall("audio")} variant="outline" className="rounded-2xl">Audio call</Button>
+              <Button onClick={() => startDirectCall("video")} className="rounded-2xl bg-cyan-400 text-black hover:bg-cyan-300">Video call</Button>
+            </div>
+
+            <Button onClick={() => setProfileOpen(false)} variant="ghost" className="mt-4 w-full rounded-2xl">
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {searchOpen && (
+        <div className="border-b border-border bg-card/50 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <input
+              value={messageSearch}
+              onChange={(e) => setMessageSearch(e.target.value)}
+              placeholder="Search inside this chat..."
+              className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-cyan-400/50"
+              autoFocus
+            />
+            <Button variant="outline" onClick={() => { setSearchOpen(false); setMessageSearch(""); }} className="rounded-xl">
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
 
       {jobTitle && (
         <div className="mx-5 mt-3 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
@@ -281,7 +353,7 @@ function ThreadView({
           <div className="flex items-center justify-center h-full text-muted-foreground">
             <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading…
           </div>
-        ) : messages.length === 0 ? (
+        ) : visibleMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <MessageCircle className="w-12 h-12 mb-3 opacity-30" />
             <p className="font-medium">No messages yet</p>
@@ -289,7 +361,7 @@ function ThreadView({
           </div>
         ) : (
           <div className="space-y-3 pb-4">
-            {messages.map(msg => {
+            {visibleMessages.map(msg => {
               const isMe = msg.fromUserId === myId;
 
               return (

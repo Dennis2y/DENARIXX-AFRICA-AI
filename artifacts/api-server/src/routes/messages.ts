@@ -152,4 +152,31 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
   }
 });
 
+
+// DELETE /api/messages/:partnerId — clear thread with a user
+router.delete("/:partnerId", requireAuth, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const partnerId = parseInt(req.params.partnerId as string, 10);
+    if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
+
+    const me = await getDbUser(clerkUserId);
+    if (!me) { res.status(404).json({ error: "User not found" }); return; }
+
+    await db
+      .delete(directMessages)
+      .where(
+        or(
+          and(eq(directMessages.fromUserId, me.id), eq(directMessages.toUserId, partnerId)),
+          and(eq(directMessages.fromUserId, partnerId), eq(directMessages.toUserId, me.id))
+        )
+      );
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to clear messages");
+    res.status(500).json({ error: "Failed to clear messages" });
+  }
+});
+
 export default router;
