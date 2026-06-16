@@ -268,41 +268,40 @@ export function LiveMeetingRoom({ token, serverUrl, roomName, onClose }: LiveMee
 
             <RoomAudioRenderer />
 
-            <footer className="border-t border-black/40 bg-[#111] px-4 py-3">
-              <div className="mx-auto flex max-w-6xl items-center justify-center gap-2">
-                <ControlBar controls={{ chat: false, screenShare: true }} />
+            <footer className="border-t border-white/10 bg-black/90 px-4 py-3 shadow-[0_-20px_60px_rgba(0,0,0,0.45)]">
+              <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+                <div className="flex items-center rounded-3xl border border-white/10 bg-white/5 px-3 py-2">
+                  <ControlBar controls={{ chat: false, screenShare: true }} />
+                </div>
 
-                <button onClick={() => setParticipantsOpen(true)} className="flex min-w-[86px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs hover:bg-white/10">
-                  <Users className="h-5 w-5" />
-                  Participants
-                </button>
+                <div className="flex items-center gap-2 rounded-3xl border border-white/10 bg-white/5 px-3 py-2">
+                  <button onClick={() => setParticipantsOpen(true)} className="flex min-w-[78px] flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs text-white/80 transition hover:bg-white/10 hover:text-white">
+                    <Users className="h-5 w-5" />
+                    People
+                  </button>
 
-                <button onClick={() => setChatOpen(true)} className="flex min-w-[76px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs hover:bg-white/10">
-                  <MessageSquare className="h-5 w-5" />
-                  Chat
-                </button>
+                  <button onClick={() => setChatOpen(true)} className="flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs text-white/80 transition hover:bg-white/10 hover:text-white">
+                    <MessageSquare className="h-5 w-5" />
+                    Chat
+                  </button>
 
-                <button onClick={() => setReactionsOpen((value) => !value)} className="flex min-w-[76px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs hover:bg-white/10">
-                  <Heart className="h-5 w-5" />
-                  React
-                </button>
+                  <button onClick={() => setReactionsOpen((value) => !value)} className="flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs text-white/80 transition hover:bg-white/10 hover:text-white">
+                    <Heart className="h-5 w-5" />
+                    React
+                  </button>
 
-                <button className="flex min-w-[76px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs hover:bg-white/10">
-                  <MonitorUp className="h-5 w-5" />
-                  Share
-                </button>
+                  <button onClick={() => setHostToolsOpen(true)} className="flex min-w-[78px] flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs text-white/80 transition hover:bg-white/10 hover:text-white">
+                    <Shield className="h-5 w-5" />
+                    Host
+                  </button>
 
-                <button onClick={() => setHostToolsOpen(true)} className="flex min-w-[86px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs hover:bg-white/10">
-                  <Shield className="h-5 w-5" />
-                  Host tools
-                </button>
+                  <button onClick={() => setMoreOpen((value) => !value)} className="flex min-w-[70px] flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs text-white/80 transition hover:bg-white/10 hover:text-white">
+                    <MoreHorizontal className="h-5 w-5" />
+                    More
+                  </button>
+                </div>
 
-                <button onClick={() => setMoreOpen((value) => !value)} className="flex min-w-[76px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs hover:bg-white/10">
-                  <MoreHorizontal className="h-5 w-5" />
-                  More
-                </button>
-
-                <button onClick={onClose} className="ml-4 flex min-w-[76px] flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs text-red-300 hover:bg-red-500/15">
+                <button onClick={onClose} className="flex min-w-[82px] flex-col items-center gap-1 rounded-3xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-300 transition hover:bg-red-500/20">
                   <X className="h-5 w-5" />
                   End
                 </button>
