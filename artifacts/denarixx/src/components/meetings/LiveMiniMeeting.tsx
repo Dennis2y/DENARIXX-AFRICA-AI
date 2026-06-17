@@ -2,6 +2,7 @@ import "@livekit/components-styles";
 import {
   ControlBar,
   GridLayout,
+  ParticipantTile,
   LiveKitRoom,
   RoomAudioRenderer,
   useParticipants,
@@ -82,7 +83,7 @@ function MiniStage() {
 
   return (
     <GridLayout tracks={tracks} className="h-full gap-2 p-2">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950" />
+      <ParticipantTile className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950" />
     </GridLayout>
   );
 }

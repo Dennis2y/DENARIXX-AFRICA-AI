@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   Briefcase,
   Phone,
+  PhoneCall,
   MapPin,
   Globe,
   Linkedin,
@@ -123,6 +124,18 @@ type BlockStatus = {
   blockedMe: boolean;
   isBlocked: boolean;
 };
+
+
+function parseCallMessage(content: string) {
+  const lower = content.toLowerCase();
+  const isCall = lower.includes("call started") && lower.includes("join from this chat");
+  if (!isCall) return null;
+
+  return {
+    mode: lower.includes("video") ? "video" : "audio",
+  } as { mode: "audio" | "video" };
+}
+
 
 function useInbox(getToken: () => Promise<string | null>) {
   return useQuery<{ conversations: Conversation[] }>({
@@ -437,7 +450,7 @@ function ThreadView({
       roomName: `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`,
       displayName: partner?.name || "Denarixx User",
       meetingType: "direct",
-      avatarUrl: partner?.avatarUrl || null,
+      avatarUrl: null,
     });
 
     await send(`${mode === "video" ? "Video" : "Audio"} call started. Join from this chat.`);
@@ -585,7 +598,33 @@ function ThreadView({
                       ? "bg-cyan-400 text-black rounded-br-md"
                       : "bg-card border border-border text-foreground rounded-bl-md"
                   }`}>
-                    <p className="leading-relaxed">{msg.content}</p>
+                    {parseCallMessage(msg.content) ? (
+                      <div className="min-w-[230px]">
+                        <div className={`mb-3 flex items-center gap-3 ${isMe ? "text-black" : "text-foreground"}`}>
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isMe ? "bg-black/10" : "bg-cyan-400/10 text-cyan-300"}`}>
+                            {parseCallMessage(msg.content)?.mode === "video" ? <Video className="h-5 w-5" /> : <PhoneCall className="h-5 w-5" />}
+                          </div>
+                          <div>
+                            <p className="font-bold">
+                              {parseCallMessage(msg.content)?.mode === "video" ? "Video call" : "Audio call"}
+                            </p>
+                            <p className={`text-xs ${isMe ? "text-black/60" : "text-muted-foreground"}`}>Started from this chat</p>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          disabled={startingMeeting || !myId}
+                          onClick={() => startDirectCall(parseCallMessage(msg.content)?.mode || "audio")}
+                          className={`w-full rounded-xl ${isMe ? "bg-black text-white hover:bg-black/80" : "bg-cyan-400 text-black hover:bg-cyan-300"}`}
+                        >
+                          Join call
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="leading-relaxed">{msg.content}</p>
+                    )}
+
                     <p className={`text-[11px] mt-1 ${isMe ? "text-black/60" : "text-muted-foreground"}`}>
                       {new Date(msg.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
                     </p>

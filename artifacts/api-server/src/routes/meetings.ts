@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { AccessToken } from "livekit-server-sdk";
 import { requireAuth } from "../middlewares/requireAuth";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -29,7 +31,14 @@ router.post("/token", requireAuth, async (req: Request, res: Response): Promise<
     const clerkUserId = (req as any).clerkUserId as string;
     const room = safeRoomName(roomName || `${meetingType || "meeting"}-${Date.now()}`);
     const identity = clerkUserId || `guest-${Date.now()}`;
-    const name = displayName || "Denarixx User";
+
+    const [me] = await db
+      .select({ name: usersTable.name, avatarUrl: usersTable.avatarUrl })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .limit(1);
+
+    const name = me?.name || displayName || "Denarixx User";
     const metadata = JSON.stringify({
       avatarUrl: avatarUrl || null,
       meetingType: meetingType || "direct",
@@ -38,8 +47,8 @@ router.post("/token", requireAuth, async (req: Request, res: Response): Promise<
     const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
       identity,
       name,
-      metadata,
       ttl: "2h",
+      metadata: JSON.stringify({ avatarUrl: me?.avatarUrl || avatarUrl || null }),
     });
 
     token.addGrant({
