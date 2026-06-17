@@ -84,7 +84,7 @@ router.get("/inbox", requireAuth, async (req, res) => {
     // Fetch partner user info
     const partnerIds = [...convMap.keys()];
     const partners = await db
-      .select({ id: usersTable.id, name: usersTable.name, avatarUrl: usersTable.avatarUrl, role: usersTable.role })
+      .select({ id: usersTable.id, name: usersTable.name, avatarUrl: usersTable.avatarUrl, role: usersTable.role, lastSeenAt: usersTable.lastSeenAt })
       .from(usersTable)
       .where(inArray(usersTable.id, partnerIds));
 
@@ -264,7 +264,7 @@ router.get("/:partnerId", requireAuth, async (req, res) => {
       .orderBy(directMessages.createdAt);
 
     const [partner] = await db
-      .select({ id: usersTable.id, name: usersTable.name, avatarUrl: usersTable.avatarUrl, role: usersTable.role })
+      .select({ id: usersTable.id, name: usersTable.name, avatarUrl: usersTable.avatarUrl, role: usersTable.role, lastSeenAt: usersTable.lastSeenAt })
       .from(usersTable)
       .where(eq(usersTable.id, partnerId))
       .limit(1);

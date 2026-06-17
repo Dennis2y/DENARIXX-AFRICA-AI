@@ -20,6 +20,7 @@ export const usersTable = pgTable("users", {
   userType: text("user_type").notNull().default("candidate"),
   emailNotifications: boolean("email_notifications").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
