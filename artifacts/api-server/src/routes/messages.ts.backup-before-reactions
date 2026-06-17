@@ -1,47 +1,10 @@
 import { Router, type IRouter, type Response } from "express";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { db, usersTable } from "@workspace/db";
 import { directMessages, userBlocks } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { eq, and, or, desc, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
-
-const messageUploadDir = path.resolve(process.cwd(), "uploads/messages");
-fs.mkdirSync(messageUploadDir, { recursive: true });
-
-const messageUpload = multer({
-  storage: multer.diskStorage({
-    destination: messageUploadDir,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || "").toLowerCase();
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext || ".bin"}`);
-    },
-  }),
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const isAudio = file.mimetype.startsWith("audio/");
-    const isImage = file.mimetype.startsWith("image/");
-
-    const allowed = [
-      "application/pdf",
-      "application/zip",
-      "application/x-zip-compressed",
-      "text/plain",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-
-    if (!allowed.includes(file.mimetype) && !isAudio && !isImage) {
-      cb(new Error(`Unsupported file type: ${file.mimetype}`));
-      return;
-    }
-
-    cb(null, true);
-  },
-});
 
 const typingMap = new Map<string, number>();
 
@@ -58,16 +21,6 @@ function notifyUser(userId: number, event: Record<string, unknown>) {
   for (const client of clients) {
     client.write(`data: ${JSON.stringify({ ...event, at: Date.now() })}\n\n`);
   }
-}
-
-function runMessageUpload(req: any, res: any, next: any) {
-  messageUpload.single("file")(req, res, (err: any) => {
-    if (err) {
-      res.status(400).json({ error: err.message || "Upload failed" });
-      return;
-    }
-    next();
-  });
 }
 
 async function getDbUser(clerkUserId: string) {
@@ -343,68 +296,6 @@ router.get("/:partnerId/typing-status", requireAuth, async (req, res) => {
 
 
 
-
-// POST /api/messages/:partnerId/attachment — send file/image attachment
-router.post("/:partnerId/attachment", requireAuth, runMessageUpload, async (req, res) => {
-  try {
-    const clerkUserId = (req as any).clerkUserId as string;
-    const partnerId = parseInt(req.params.partnerId as string, 10);
-
-    if (isNaN(partnerId)) {
-      res.status(400).json({ error: "Invalid partnerId" });
-      return;
-    }
-
-    const me = await getDbUser(clerkUserId);
-    if (!me) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    if (me.id === partnerId) {
-      res.status(400).json({ error: "Cannot send attachment to yourself" });
-      return;
-    }
-
-    const blockStatus = await getBlockStatus(me.id, partnerId);
-    if (blockStatus.isBlocked) {
-      res.status(403).json({ error: "Messaging is blocked" });
-      return;
-    }
-
-    if (!req.file) {
-      res.status(400).json({ error: "file is required" });
-      return;
-    }
-
-    const fileUrl = `http://localhost:3000/uploads/messages/${req.file.filename}`;
-    const isImage = req.file.mimetype.startsWith("image/");
-    const isAudio = req.file.mimetype.startsWith("audio/");
-
-    const [msg] = await db.insert(directMessages).values({
-      fromUserId: me.id,
-      toUserId: partnerId,
-      content: req.file.originalname || "Attachment",
-      messageType: isAudio ? "voice" : isImage ? "image" : "attachment",
-      metadata: {
-        fileUrl,
-        fileName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-      },
-    }).returning();
-
-    notifyUser(me.id, { type: "message", partnerId, messageId: msg.id });
-    notifyUser(partnerId, { type: "message", partnerId: me.id, messageId: msg.id });
-
-    res.status(201).json({ message: msg });
-  } catch (err) {
-    req.log.error({ err }, "Failed to send attachment");
-    res.status(500).json({ error: "Failed to send attachment" });
-  }
-});
-
-
 // POST /api/messages/:partnerId/call — create ringing call message
 router.post("/:partnerId/call", requireAuth, async (req, res) => {
   try {
@@ -503,65 +394,6 @@ router.patch("/:partnerId/call/:messageId", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to update call message");
     res.status(500).json({ error: "Failed to update call message" });
-  }
-});
-
-
-
-// PATCH /api/messages/:partnerId/:messageId/reaction — add/remove reaction
-router.patch("/:partnerId/:messageId/reaction", requireAuth, async (req, res) => {
-  try {
-    const clerkUserId = (req as any).clerkUserId as string;
-    const partnerId = parseInt(req.params.partnerId as string, 10);
-    const messageId = parseInt(req.params.messageId as string, 10);
-    const { reaction } = req.body as { reaction?: string | null };
-
-    if (isNaN(partnerId) || isNaN(messageId)) {
-      res.status(400).json({ error: "Invalid IDs" });
-      return;
-    }
-
-    const allowed = ["👍", "❤️", "😂", "🔥", "👏", "🙏"];
-    const cleanReaction = reaction && allowed.includes(reaction) ? reaction : null;
-
-    const me = await getDbUser(clerkUserId);
-    if (!me) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    const [existing] = await db
-      .select()
-      .from(directMessages)
-      .where(
-        and(
-          eq(directMessages.id, messageId),
-          or(
-            and(eq(directMessages.fromUserId, me.id), eq(directMessages.toUserId, partnerId)),
-            and(eq(directMessages.fromUserId, partnerId), eq(directMessages.toUserId, me.id))
-          )
-        )
-      )
-      .limit(1);
-
-    if (!existing) {
-      res.status(404).json({ error: "Message not found" });
-      return;
-    }
-
-    const [updated] = await db
-      .update(directMessages)
-      .set({ reaction: cleanReaction })
-      .where(eq(directMessages.id, messageId))
-      .returning();
-
-    notifyUser(me.id, { type: "reaction", partnerId, messageId });
-    notifyUser(partnerId, { type: "reaction", partnerId: me.id, messageId });
-
-    res.json({ message: updated });
-  } catch (err) {
-    req.log.error({ err }, "Failed to update reaction");
-    res.status(500).json({ error: "Failed to update reaction" });
   }
 });
 
@@ -683,7 +515,7 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
     const partnerId = parseInt(req.params.partnerId as string, 10);
     if (isNaN(partnerId)) { res.status(400).json({ error: "Invalid partnerId" }); return; }
 
-    const { content, jobApplicationId, replyToMessageId } = req.body as { content?: string; jobApplicationId?: number; replyToMessageId?: number };
+    const { content, jobApplicationId } = req.body as { content?: string; jobApplicationId?: number };
     if (!content || typeof content !== "string" || content.trim().length === 0 || content.length > 2000) {
       res.status(400).json({ error: "Message content required (1-2000 chars)" }); return;
     }
@@ -706,7 +538,6 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
       fromUserId: me.id,
       toUserId: partnerId,
       content: content.trim(),
-      replyToMessageId: typeof replyToMessageId === "number" ? replyToMessageId : null,
       jobApplicationId: typeof jobApplicationId === "number" ? jobApplicationId : null,
     }).returning();
 
@@ -719,91 +550,6 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-// PATCH /api/messages/:partnerId/:messageId/delete — delete for me or everyone
-router.patch("/:partnerId/:messageId/delete", requireAuth, async (req, res) => {
-  try {
-    const clerkUserId = (req as any).clerkUserId as string;
-    const partnerId = parseInt(req.params.partnerId as string, 10);
-    const messageId = parseInt(req.params.messageId as string, 10);
-    const { mode } = req.body as { mode?: "me" | "everyone" };
-
-    if (isNaN(partnerId) || isNaN(messageId)) {
-      res.status(400).json({ error: "Invalid IDs" });
-      return;
-    }
-
-    if (mode !== "me" && mode !== "everyone") {
-      res.status(400).json({ error: "mode must be me or everyone" });
-      return;
-    }
-
-    const me = await getDbUser(clerkUserId);
-    if (!me) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    const [existing] = await db
-      .select()
-      .from(directMessages)
-      .where(
-        and(
-          eq(directMessages.id, messageId),
-          or(
-            and(eq(directMessages.fromUserId, me.id), eq(directMessages.toUserId, partnerId)),
-            and(eq(directMessages.fromUserId, partnerId), eq(directMessages.toUserId, me.id))
-          )
-        )
-      )
-      .limit(1);
-
-    if (!existing) {
-      res.status(404).json({ error: "Message not found" });
-      return;
-    }
-
-    if (mode === "everyone" && existing.fromUserId !== me.id) {
-      res.status(403).json({ error: "You can only delete your own message for everyone" });
-      return;
-    }
-
-    const currentDeleted = Array.isArray(existing.deletedForUserIds)
-      ? existing.deletedForUserIds as number[]
-      : [];
-
-    const [updated] = await db
-      .update(directMessages)
-      .set(
-        mode === "everyone"
-          ? {
-              content: "This message was deleted",
-              messageType: "text",
-              metadata: {},
-              reaction: null,
-              deletedForEveryone: true,
-            }
-          : {
-              deletedForUserIds: Array.from(new Set([...currentDeleted, me.id])),
-            }
-      )
-      .where(eq(directMessages.id, messageId))
-      .returning();
-
-    notifyUser(me.id, { type: "delete", partnerId, messageId });
-    notifyUser(partnerId, { type: "delete", partnerId: me.id, messageId });
-
-    res.json({ message: updated });
-  } catch (err) {
-    req.log.error({ err }, "Failed to delete message");
-    res.status(500).json({ error: "Failed to delete message" });
-  }
-});
 
 
 // DELETE /api/messages/:partnerId — clear thread with a user

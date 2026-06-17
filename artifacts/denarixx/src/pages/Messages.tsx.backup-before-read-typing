@@ -4,15 +4,6 @@ import { Redirect, useLocation, useSearch } from "wouter";
 import {
   ArrowLeft,
   Send,
-  Paperclip,
-  Mic,
-  Square,
-  Play,
-  FileText,
-  Image as ImageIcon,
-  Check,
-  CheckCheck,
-  Keyboard,
   MessageCircle,
   Search,
   RefreshCw,
@@ -122,13 +113,7 @@ type Message = {
   id: number;
   fromUserId: number;
   toUserId: number;
-  replyToMessageId?: number | null;
   content: string;
-  messageType?: "text" | "call" | "attachment" | "image" | "voice";
-  metadata?: Record<string, any>;
-  reaction?: string | null;
-  deletedForUserIds?: number[];
-  deletedForEveryone?: boolean;
   isRead: boolean;
   jobApplicationId: number | null;
   createdAt: string;
@@ -189,60 +174,13 @@ function useThread(partnerId: number | null, getToken: () => Promise<string | nu
   });
 }
 
-
-function useTypingStatus(partnerId: number | null, getToken: () => Promise<string | null>) {
-  return useQuery<{ isTyping: boolean }>({
-    queryKey: ["messages-typing", partnerId],
-    queryFn: async () => {
-      const token = await getToken();
-      const r = await fetch(`${basePath}/api/messages/${partnerId}/typing-status`, {
-        credentials: "include",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!r.ok) return { isTyping: false };
-      return r.json();
-    },
-    enabled: partnerId !== null,
-    refetchInterval: 2000,
-  });
-}
-
 function useSendMessage(partnerId: number | null, getToken: () => Promise<string | null>, jobApplicationId?: number | null) {
   const qc = useQueryClient();
 
-
-  useEffect(() => {
-    const source = new EventSource(`${basePath}/api/messages/events`, { withCredentials: true });
-
-    source.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data?.type === "ping" || data?.type === "connected") return;
-
-        qc.invalidateQueries({ queryKey: ["messages-inbox"] });
-        qc.invalidateQueries({ queryKey: ["messages-unread-count"] });
-        qc.invalidateQueries({ queryKey: ["messages-thread"] });
-        qc.invalidateQueries({ queryKey: ["messages-typing"] });
-      } catch {}
-    };
-
-    source.onerror = () => {
-      // Polling remains as fallback if SSE disconnects.
-    };
-
-    return () => source.close();
-  }, [qc]);
-
-
   return useMutation({
-    mutationFn: async (payload: { content: string; replyToMessageId?: number | null }) => {
+    mutationFn: async (content: string) => {
       const token = await getToken();
-      const content = payload.content;
       const body: Record<string, unknown> = { content };
-
-      if (typeof payload.replyToMessageId === "number") body.replyToMessageId = payload.replyToMessageId;
 
       if (jobApplicationId) body.jobApplicationId = jobApplicationId;
 
@@ -429,29 +367,16 @@ function ThreadView({
   jobApplicationId?: number | null;
 }) {
   const { getToken } = useAuth();
-  const qc = useQueryClient();
   const { data, isLoading } = useThread(partnerId, getToken);
-  const { data: typingData } = useTypingStatus(partnerId, getToken);
   const { mutateAsync: send, isPending } = useSendMessage(partnerId, getToken, jobApplicationId);
   const { activeMeeting, startingMeeting, startMeeting, endMeeting } = useLiveMeeting(basePath, getToken);
 
   const [text, setText] = useState("");
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [messageSearch, setMessageSearch] = useState("");
-  const [openMessageMenuId, setOpenMessageMenuId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [recordingVoice, setRecordingVoice] = useState(false);
-  const [voiceSeconds, setVoiceSeconds] = useState(0);
-  const voiceTimerRef = useRef<number | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const voiceChunksRef = useRef<Blob[]>([]);
-  const voiceStartedAtRef = useRef<number>(0);
 
   const messages = data?.messages ?? [];
   const visibleMessages = messageSearch.trim()
@@ -465,210 +390,12 @@ function ThreadView({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-
-  const sendTypingStatus = async (isTyping: boolean) => {
-    const token = await getToken();
-    await fetch(`${basePath}/api/messages/${partnerId}/typing`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ isTyping }),
-    }).catch(() => {});
-  };
-
-  const handleTextChange = (value: string) => {
-    setText(value);
-
-    if (blockStatus.isBlocked) return;
-
-    sendTypingStatus(true);
-
-    if (typingTimeoutRef.current) {
-      window.clearTimeout(typingTimeoutRef.current);
-    }
-
-    typingTimeoutRef.current = window.setTimeout(() => {
-      sendTypingStatus(false);
-    }, 1800);
-  };
-
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed || isPending) return;
 
     setText("");
-    await sendTypingStatus(false);
-    await send({ content: trimmed, replyToMessageId: replyingTo?.id ?? null });
-  };
-
-
-  const deleteMessage = async (
-    messageId: number,
-    mode: "me" | "everyone"
-  ) => {
-    const token = await getToken();
-
-    const r = await fetch(
-      `${basePath}/api/messages/${partnerId}/${messageId}/delete`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ mode }),
-      }
-    );
-
-    if (!r.ok) {
-      alert(await r.text());
-      return;
-    }
-
-    qc.invalidateQueries({
-      queryKey: ["messages-thread", partnerId],
-    });
-
-    qc.invalidateQueries({
-      queryKey: ["messages-inbox"],
-    });
-  };
-
-  const reactToMessage = async (messageId: number, reaction: string | null) => {
-    const token = await getToken();
-    const res = await fetch(`${basePath}/api/messages/${partnerId}/${messageId}/reaction`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ reaction }),
-    });
-
-    if (!res.ok) {
-      alert(await res.text());
-      return;
-    }
-
-    qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
-    qc.invalidateQueries({ queryKey: ["messages-inbox"] });
-  };
-
-
-
-  const startVoiceRecording = async () => {
-    if (blockStatus.isBlocked || recordingVoice) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      voiceChunksRef.current = [];
-      voiceStartedAtRef.current = Date.now();
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) voiceChunksRef.current.push(event.data);
-      };
-
-      recorder.onstop = async () => {
-        const duration = Math.max(1, Math.round((Date.now() - voiceStartedAtRef.current) / 1000));
-        const blob = new Blob(voiceChunksRef.current, { type: "audio/webm" });
-        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
-
-        stream.getTracks().forEach((track) => track.stop());
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        setUploadingAttachment(true);
-
-        try {
-          const token = await getToken();
-          const res = await fetch(`${basePath}/api/messages/${partnerId}/attachment`, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: formData,
-          });
-
-          if (!res.ok) {
-            alert(await res.text());
-            return;
-          }
-
-          qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
-          qc.invalidateQueries({ queryKey: ["messages-inbox"] });
-        } finally {
-          setUploadingAttachment(false);
-        }
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-      setRecordingVoice(true);
-      setVoiceSeconds(0);
-      voiceTimerRef.current = window.setInterval(() => {
-        setVoiceSeconds((seconds) => seconds + 1);
-      }, 1000);
-    } catch {
-      alert("Microphone permission is needed to record voice notes.");
-    }
-  };
-
-  const stopVoiceRecording = () => {
-    const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === "inactive") return;
-
-    recorder.stop();
-    setRecordingVoice(false);
-
-    if (voiceTimerRef.current) {
-      window.clearInterval(voiceTimerRef.current);
-      voiceTimerRef.current = null;
-    }
-  };
-
-  const sendAttachment = async (file: File) => {
-    if (blockStatus.isBlocked) return;
-
-    if (file.size > 15 * 1024 * 1024) {
-      alert("File must be under 15MB");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    setUploadingAttachment(true);
-
-    try {
-      const token = await getToken();
-      const res = await fetch(`${basePath}/api/messages/${partnerId}/attachment`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
-      });
-
-      if (!res.ok) {
-        alert(await res.text());
-        return;
-      }
-
-      qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
-      qc.invalidateQueries({ queryKey: ["messages-inbox"] });
-    } finally {
-      setUploadingAttachment(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    await send(trimmed);
   };
 
   const clearChat = async () => {
@@ -718,83 +445,16 @@ function ThreadView({
     window.location.reload();
   };
 
-  const updateCallStatus = async (messageId: number, status: "accepted" | "declined" | "ended" | "missed") => {
-    const token = await getToken();
-    const res = await fetch(`${basePath}/api/messages/${partnerId}/call/${messageId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ status }),
-    });
-
-    if (!res.ok) {
-      alert(await res.text());
-      return null;
-    }
-
-    return res.json();
-  };
-
-  const joinCall = async (msg: Message) => {
-    const metadata = msg.metadata ?? {};
-    const mode = metadata.mode === "video" ? "video" : "audio";
-    const roomName = typeof metadata.roomName === "string"
-      ? metadata.roomName
-      : `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`;
-
-    if ((metadata.status === "ringing" || metadata.status === "accepted") && msg.id) {
-      await updateCallStatus(msg.id, "accepted");
-    }
-
+  const startDirectCall = async (mode: "audio" | "video") => {
     await startMeeting({
-      roomName,
+      roomName: `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`,
       displayName: partner?.name || "Denarixx User",
       meetingType: "direct",
       avatarUrl: null,
     });
+
+    await send(`${mode === "video" ? "Video" : "Audio"} call started. Join from this chat.`);
   };
-
-  const declineCall = async (msg: Message) => {
-    await updateCallStatus(msg.id, "declined");
-  };
-
-  const startDirectCall = async (mode: "audio" | "video") => {
-    const roomName = `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`;
-
-    const token = await getToken();
-    const res = await fetch(`${basePath}/api/messages/${partnerId}/call`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ mode, roomName }),
-    });
-
-    if (!res.ok) {
-      alert(await res.text());
-      return;
-    }
-
-    const data = await res.json();
-    await joinCall(data.message);
-  };
-
-
-
-  useEffect(() => {
-    return () => {
-      if (voiceTimerRef.current) {
-        window.clearInterval(voiceTimerRef.current);
-      }
-    };
-  }, []);
-
-  const voiceTimeLabel = `${Math.floor(voiceSeconds / 60)}:${String(voiceSeconds % 60).padStart(2, "0")}`;
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-background">
@@ -931,316 +591,57 @@ function ThreadView({
             {visibleMessages.map(msg => {
               const isMe = msg.fromUserId === myId;
 
-              if (
-                typeof myId === "number" &&
-                Array.isArray(msg.deletedForUserIds) &&
-                msg.deletedForUserIds.includes(myId)
-              ) {
-                return null;
-              }
-
               return (
                 <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div className={`relative max-w-[68%] rounded-2xl px-4 py-3 pr-11 text-sm shadow-sm ${
+                  <div className={`max-w-[68%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
                     isMe
-                      ? "bg-gradient-to-br from-slate-800 via-cyan-950 to-teal-950 text-white border border-cyan-400/20 rounded-br-md shadow-[0_12px_35px_rgba(0,188,212,0.12)]"
+                      ? "bg-cyan-400 text-black rounded-br-md"
                       : "bg-card border border-border text-foreground rounded-bl-md"
                   }`}>
-                    {msg.replyToMessageId && (
-                      <div className={`mb-2 rounded-xl border-l-4 px-3 py-2 text-xs ${
-                        isMe ? "border-cyan-300 bg-white/10 text-cyan-100/80" : "border-cyan-400 bg-background/70 text-muted-foreground"
-                      }`}>
-                        Replying to message #{msg.replyToMessageId}
-                      </div>
-                    )}
-
-                    {msg.messageType === "image" ? (
-                      <div className="min-w-[230px]">
-                        <a href={msg.metadata?.fileUrl} target="_blank" rel="noreferrer">
-                          <img
-                            src={msg.metadata?.fileUrl}
-                            alt={msg.metadata?.fileName || "Image attachment"}
-                            className="mb-2 max-h-64 w-full rounded-xl object-cover"
-                          />
-                        </a>
-                        <p className={`truncate text-xs ${isMe ? "text-black/70" : "text-muted-foreground"}`}>
-                          {msg.metadata?.fileName || msg.content}
-                        </p>
-                      </div>
-                    ) : msg.messageType === "voice" ? (
-                      <div className="min-w-[230px]">
-                        <div className={`flex items-center gap-3 rounded-2xl border p-3 ${isMe ? "border-black/10 bg-black/5" : "border-border bg-background/60"}`}>
-                          <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isMe ? "bg-white/10 text-cyan-100" : "bg-cyan-400/10 text-cyan-300"}`}>
-                            <Play className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold">Voice note</p>
-                            <audio controls src={msg.metadata?.fileUrl} className="mt-2 w-full max-w-[220px]" />
-                          </div>
-                        </div>
-                      </div>
-                    ) : msg.messageType === "attachment" ? (
-                      <a
-                        href={msg.metadata?.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`flex min-w-[230px] items-center gap-3 rounded-2xl border p-3 transition ${isMe ? "border-cyan-300/15 bg-white/5 text-white hover:bg-white/10" : "border-border bg-background/60 text-foreground hover:bg-muted"}`}
-                      >
-                        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isMe ? "bg-white/10 text-cyan-100" : "bg-cyan-400/10 text-cyan-300"}`}>
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{msg.metadata?.fileName || msg.content}</p>
-                          <p className={`text-xs ${isMe ? "text-cyan-100/65" : "text-muted-foreground"}`}>Open attachment</p>
-                        </div>
-                      </a>
-                    ) : msg.messageType === "call" ? (
+                    {parseCallMessage(msg.content) ? (
                       <div className="min-w-[230px]">
                         <div className={`mb-3 flex items-center gap-3 ${isMe ? "text-black" : "text-foreground"}`}>
-                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isMe ? "bg-white/10 text-cyan-100" : "bg-cyan-400/10 text-cyan-300"}`}>
-                            {msg.metadata?.mode === "video" ? <Video className="h-5 w-5" /> : <PhoneCall className="h-5 w-5" />}
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isMe ? "bg-black/10" : "bg-cyan-400/10 text-cyan-300"}`}>
+                            {parseCallMessage(msg.content)?.mode === "video" ? <Video className="h-5 w-5" /> : <PhoneCall className="h-5 w-5" />}
                           </div>
                           <div>
                             <p className="font-bold">
-                              {msg.metadata?.mode === "video" ? "Video call" : "Audio call"}
+                              {parseCallMessage(msg.content)?.mode === "video" ? "Video call" : "Audio call"}
                             </p>
-                            <p className={`text-xs ${isMe ? "text-cyan-100/65" : "text-muted-foreground"}`}>
-                              {msg.metadata?.status === "ringing" ? "Ringing…" :
-                               msg.metadata?.status === "accepted" ? "In progress" :
-                               msg.metadata?.status === "declined" ? "Declined" :
-                               msg.metadata?.status === "ended" ? "Ended" :
-                               msg.metadata?.status === "missed" ? "Missed" : "Call"}
-                            </p>
+                            <p className={`text-xs ${isMe ? "text-black/60" : "text-muted-foreground"}`}>Started from this chat</p>
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
-                          {msg.metadata?.status !== "declined" && msg.metadata?.status !== "ended" && msg.metadata?.status !== "missed" && (
-                            <Button
-                              size="sm"
-                              disabled={startingMeeting || !myId}
-                              onClick={() => joinCall(msg)}
-                              className={`flex-1 rounded-xl ${isMe ? "bg-white/15 text-white hover:bg-white/25" : "bg-cyan-400 text-black hover:bg-cyan-300"}`}
-                            >
-                              {msg.metadata?.status === "ringing" && !isMe ? "Accept" : "Join"}
-                            </Button>
-                          )}
-
-                          {msg.metadata?.status === "ringing" && !isMe && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => declineCall(msg)}
-                              className="flex-1 rounded-xl border-red-400/30 text-red-300 hover:bg-red-500/10"
-                            >
-                              Decline
-                            </Button>
-                          )}
-                        </div>
+                        <Button
+                          size="sm"
+                          disabled={startingMeeting || !myId}
+                          onClick={() => startDirectCall(parseCallMessage(msg.content)?.mode || "audio")}
+                          className={`w-full rounded-xl ${isMe ? "bg-black text-white hover:bg-black/80" : "bg-cyan-400 text-black hover:bg-cyan-300"}`}
+                        >
+                          Join call
+                        </Button>
                       </div>
                     ) : (
                       <p className="leading-relaxed">{msg.content}</p>
                     )}
 
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className={`flex items-center gap-1 text-[11px] ${isMe ? "text-cyan-100/65" : "text-muted-foreground"}`}>
-                        <span>{new Date(msg.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
-                        {isMe && (
-                          msg.isRead ? <CheckCheck className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />
-                        )}
-                      </p>
-
-                      <div className="absolute right-2 top-2 z-20">
-                        <button
-                          type="button"
-                          onClick={() => setOpenMessageMenuId(openMessageMenuId === msg.id ? null : msg.id)}
-                          className={`flex h-7 w-7 items-center justify-center rounded-full transition ${
-                            isMe
-                              ? "bg-white/10 text-cyan-100/80 hover:bg-white/20"
-                              : "bg-background/70 text-muted-foreground hover:bg-muted"
-                          }`}
-                          title="Message options"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-
-                        {openMessageMenuId === msg.id && (
-                          <div
-                            className={`absolute top-9 z-50 w-48 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl ${
-                              isMe ? "right-0" : "left-0"
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplyingTo(msg);
-                                setOpenMessageMenuId(null);
-                              }}
-                              className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
-                            >
-                              ↩ Reply
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMessageMenuId(null);
-                                if (window.confirm("Delete this message only for you?")) {
-                                  deleteMessage(msg.id, "me");
-                                }
-                              }}
-                              className="w-full px-4 py-3 text-left text-sm text-red-300 hover:bg-red-500/10"
-                            >
-                              Delete for me
-                            </button>
-
-                            {isMe && !msg.deletedForEveryone && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenMessageMenuId(null);
-                                  if (window.confirm("Delete this message for everyone?")) {
-                                    deleteMessage(msg.id, "everyone");
-                                  }
-                                }}
-                                className="w-full px-4 py-3 text-left text-sm text-orange-300 hover:bg-orange-500/10"
-                              >
-                                Delete for everyone
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="relative group/reactions">
-                        {msg.reaction ? (
-                          <button
-                            onClick={() => reactToMessage(msg.id, null)}
-                            className="rounded-full bg-white/15 px-2 py-0.5 text-xs text-white shadow-sm"
-                            title="Remove reaction"
-                          >
-                            {msg.reaction}
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              className={`rounded-full border border-white/20 px-2 py-0.5 text-xs opacity-70 transition-opacity hover:opacity-100 ${isMe ? "bg-black/10 hover:bg-black/20" : "bg-white/10 hover:bg-white/20"}`}
-                              title="React"
-                            >
-                              +
-                            </button>
-
-                            <div className={`absolute bottom-6 z-50 hidden rounded-full border border-border bg-card px-2 py-1 shadow-2xl group-hover/reactions:flex ${isMe ? "right-0" : "left-0"}`}>
-                              {["👍", "❤️", "😂", "🔥"].map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  onClick={() => reactToMessage(msg.id, emoji)}
-                                  className="rounded-full px-1.5 py-1 text-sm hover:bg-muted"
-                                  title={`React ${emoji}`}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    <p className={`text-[11px] mt-1 ${isMe ? "text-black/60" : "text-muted-foreground"}`}>
+                      {new Date(msg.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
                   </div>
                 </div>
               );
             })}
-            {typingData?.isTyping && (
-              <div className="flex justify-start">
-                <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
-                  <Keyboard className="h-4 w-4 text-cyan-300" />
-                  {partner?.name || "User"} is typing…
-                </div>
-              </div>
-            )}
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
       <div className="flex-shrink-0 border-t border-border bg-background/95 px-5 py-4 pr-24 backdrop-blur-xl">
-        {recordingVoice && (
-          <div className="mb-3 flex items-center gap-3 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-red-100 shadow-lg">
-            <div className="h-3 w-3 animate-pulse rounded-full bg-red-400" />
-            <span className="text-sm font-semibold">{voiceTimeLabel}</span>
-
-            <div className="flex flex-1 items-center gap-1 overflow-hidden">
-              {Array.from({ length: 28 }).map((_, i) => (
-                <span
-                  key={i}
-                  className="w-1 animate-pulse rounded-full bg-red-300/80"
-                  style={{
-                    height: `${8 + ((i * 7) % 22)}px`,
-                    animationDelay: `${i * 40}ms`,
-                  }}
-                />
-              ))}
-            </div>
-
-            <span className="text-xs text-red-100/70">Recording voice note…</span>
-          </div>
-        )}
-
-        {replyingTo && (
-          <div className="mb-3 flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm">
-            <div className="min-w-0">
-              <p className="font-semibold text-cyan-300">Replying to message</p>
-              <p className="truncate text-muted-foreground">{replyingTo.content}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplyingTo(null)}
-              className="rounded-full px-3 py-1 text-lg text-muted-foreground hover:bg-white/10 hover:text-white"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-sm">
           <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/zip,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) sendAttachment(file);
-            }}
-          />
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={uploadingAttachment || blockStatus.isBlocked}
-            onClick={() => fileInputRef.current?.click()}
-            className="h-10 w-10 rounded-full p-0 text-muted-foreground hover:text-cyan-300"
-            title="Attach file"
-          >
-            {uploadingAttachment ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={uploadingAttachment || blockStatus.isBlocked}
-            onClick={recordingVoice ? stopVoiceRecording : startVoiceRecording}
-            className={`h-10 w-10 rounded-full p-0 ${recordingVoice ? "bg-red-500 text-white hover:bg-red-400" : "text-muted-foreground hover:text-cyan-300"}`}
-            title={recordingVoice ? "Stop recording" : "Record voice note"}
-          >
-            {recordingVoice ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
-
-          <input
             value={text}
-            onChange={e => handleTextChange(e.target.value)}
+            onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
             placeholder={blockStatus.isBlocked ? "Messaging is blocked…" : "Type a message…"}
             className="h-11 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"
@@ -1434,7 +835,6 @@ function MessagesContent() {
   }, [partnerParam]);
 
   const conversations = data?.conversations ?? [];
-
   const qc = useQueryClient();
 
   useEffect(() => {

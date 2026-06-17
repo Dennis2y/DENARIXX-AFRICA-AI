@@ -122,13 +122,10 @@ type Message = {
   id: number;
   fromUserId: number;
   toUserId: number;
-  replyToMessageId?: number | null;
   content: string;
   messageType?: "text" | "call" | "attachment" | "image" | "voice";
   metadata?: Record<string, any>;
   reaction?: string | null;
-  deletedForUserIds?: number[];
-  deletedForEveryone?: boolean;
   isRead: boolean;
   jobApplicationId: number | null;
   createdAt: string;
@@ -237,12 +234,9 @@ function useSendMessage(partnerId: number | null, getToken: () => Promise<string
 
 
   return useMutation({
-    mutationFn: async (payload: { content: string; replyToMessageId?: number | null }) => {
+    mutationFn: async (content: string) => {
       const token = await getToken();
-      const content = payload.content;
       const body: Record<string, unknown> = { content };
-
-      if (typeof payload.replyToMessageId === "number") body.replyToMessageId = payload.replyToMessageId;
 
       if (jobApplicationId) body.jobApplicationId = jobApplicationId;
 
@@ -436,12 +430,10 @@ function ThreadView({
   const { activeMeeting, startingMeeting, startMeeting, endMeeting } = useLiveMeeting(basePath, getToken);
 
   const [text, setText] = useState("");
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [messageSearch, setMessageSearch] = useState("");
-  const [openMessageMenuId, setOpenMessageMenuId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -501,42 +493,9 @@ function ThreadView({
 
     setText("");
     await sendTypingStatus(false);
-    await send({ content: trimmed, replyToMessageId: replyingTo?.id ?? null });
+    await send(trimmed);
   };
 
-
-  const deleteMessage = async (
-    messageId: number,
-    mode: "me" | "everyone"
-  ) => {
-    const token = await getToken();
-
-    const r = await fetch(
-      `${basePath}/api/messages/${partnerId}/${messageId}/delete`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ mode }),
-      }
-    );
-
-    if (!r.ok) {
-      alert(await r.text());
-      return;
-    }
-
-    qc.invalidateQueries({
-      queryKey: ["messages-thread", partnerId],
-    });
-
-    qc.invalidateQueries({
-      queryKey: ["messages-inbox"],
-    });
-  };
 
   const reactToMessage = async (messageId: number, reaction: string | null) => {
     const token = await getToken();
@@ -931,29 +890,13 @@ function ThreadView({
             {visibleMessages.map(msg => {
               const isMe = msg.fromUserId === myId;
 
-              if (
-                typeof myId === "number" &&
-                Array.isArray(msg.deletedForUserIds) &&
-                msg.deletedForUserIds.includes(myId)
-              ) {
-                return null;
-              }
-
               return (
                 <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div className={`relative max-w-[68%] rounded-2xl px-4 py-3 pr-11 text-sm shadow-sm ${
+                  <div className={`max-w-[68%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
                     isMe
-                      ? "bg-gradient-to-br from-slate-800 via-cyan-950 to-teal-950 text-white border border-cyan-400/20 rounded-br-md shadow-[0_12px_35px_rgba(0,188,212,0.12)]"
+                      ? "bg-cyan-400 text-black rounded-br-md"
                       : "bg-card border border-border text-foreground rounded-bl-md"
                   }`}>
-                    {msg.replyToMessageId && (
-                      <div className={`mb-2 rounded-xl border-l-4 px-3 py-2 text-xs ${
-                        isMe ? "border-cyan-300 bg-white/10 text-cyan-100/80" : "border-cyan-400 bg-background/70 text-muted-foreground"
-                      }`}>
-                        Replying to message #{msg.replyToMessageId}
-                      </div>
-                    )}
-
                     {msg.messageType === "image" ? (
                       <div className="min-w-[230px]">
                         <a href={msg.metadata?.fileUrl} target="_blank" rel="noreferrer">
@@ -970,7 +913,7 @@ function ThreadView({
                     ) : msg.messageType === "voice" ? (
                       <div className="min-w-[230px]">
                         <div className={`flex items-center gap-3 rounded-2xl border p-3 ${isMe ? "border-black/10 bg-black/5" : "border-border bg-background/60"}`}>
-                          <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isMe ? "bg-white/10 text-cyan-100" : "bg-cyan-400/10 text-cyan-300"}`}>
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isMe ? "bg-black/10" : "bg-cyan-400/10 text-cyan-300"}`}>
                             <Play className="h-5 w-5" />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -984,27 +927,27 @@ function ThreadView({
                         href={msg.metadata?.fileUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={`flex min-w-[230px] items-center gap-3 rounded-2xl border p-3 transition ${isMe ? "border-cyan-300/15 bg-white/5 text-white hover:bg-white/10" : "border-border bg-background/60 text-foreground hover:bg-muted"}`}
+                        className={`flex min-w-[230px] items-center gap-3 rounded-2xl border p-3 transition ${isMe ? "border-black/10 bg-black/5 text-black hover:bg-black/10" : "border-border bg-background/60 text-foreground hover:bg-muted"}`}
                       >
-                        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isMe ? "bg-white/10 text-cyan-100" : "bg-cyan-400/10 text-cyan-300"}`}>
+                        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isMe ? "bg-black/10" : "bg-cyan-400/10 text-cyan-300"}`}>
                           <FileText className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold">{msg.metadata?.fileName || msg.content}</p>
-                          <p className={`text-xs ${isMe ? "text-cyan-100/65" : "text-muted-foreground"}`}>Open attachment</p>
+                          <p className={`text-xs ${isMe ? "text-black/60" : "text-muted-foreground"}`}>Open attachment</p>
                         </div>
                       </a>
                     ) : msg.messageType === "call" ? (
                       <div className="min-w-[230px]">
                         <div className={`mb-3 flex items-center gap-3 ${isMe ? "text-black" : "text-foreground"}`}>
-                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isMe ? "bg-white/10 text-cyan-100" : "bg-cyan-400/10 text-cyan-300"}`}>
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isMe ? "bg-black/10" : "bg-cyan-400/10 text-cyan-300"}`}>
                             {msg.metadata?.mode === "video" ? <Video className="h-5 w-5" /> : <PhoneCall className="h-5 w-5" />}
                           </div>
                           <div>
                             <p className="font-bold">
                               {msg.metadata?.mode === "video" ? "Video call" : "Audio call"}
                             </p>
-                            <p className={`text-xs ${isMe ? "text-cyan-100/65" : "text-muted-foreground"}`}>
+                            <p className={`text-xs ${isMe ? "text-black/60" : "text-muted-foreground"}`}>
                               {msg.metadata?.status === "ringing" ? "Ringing…" :
                                msg.metadata?.status === "accepted" ? "In progress" :
                                msg.metadata?.status === "declined" ? "Declined" :
@@ -1020,7 +963,7 @@ function ThreadView({
                               size="sm"
                               disabled={startingMeeting || !myId}
                               onClick={() => joinCall(msg)}
-                              className={`flex-1 rounded-xl ${isMe ? "bg-white/15 text-white hover:bg-white/25" : "bg-cyan-400 text-black hover:bg-cyan-300"}`}
+                              className={`flex-1 rounded-xl ${isMe ? "bg-black text-white hover:bg-black/80" : "bg-cyan-400 text-black hover:bg-cyan-300"}`}
                             >
                               {msg.metadata?.status === "ringing" && !isMe ? "Accept" : "Join"}
                             </Button>
@@ -1043,80 +986,18 @@ function ThreadView({
                     )}
 
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className={`flex items-center gap-1 text-[11px] ${isMe ? "text-cyan-100/65" : "text-muted-foreground"}`}>
+                      <p className={`flex items-center gap-1 text-[11px] ${isMe ? "text-black/60" : "text-muted-foreground"}`}>
                         <span>{new Date(msg.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span>
                         {isMe && (
                           msg.isRead ? <CheckCheck className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />
                         )}
                       </p>
 
-                      <div className="absolute right-2 top-2 z-20">
-                        <button
-                          type="button"
-                          onClick={() => setOpenMessageMenuId(openMessageMenuId === msg.id ? null : msg.id)}
-                          className={`flex h-7 w-7 items-center justify-center rounded-full transition ${
-                            isMe
-                              ? "bg-white/10 text-cyan-100/80 hover:bg-white/20"
-                              : "bg-background/70 text-muted-foreground hover:bg-muted"
-                          }`}
-                          title="Message options"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-
-                        {openMessageMenuId === msg.id && (
-                          <div
-                            className={`absolute top-9 z-50 w-48 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl ${
-                              isMe ? "right-0" : "left-0"
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReplyingTo(msg);
-                                setOpenMessageMenuId(null);
-                              }}
-                              className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
-                            >
-                              ↩ Reply
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMessageMenuId(null);
-                                if (window.confirm("Delete this message only for you?")) {
-                                  deleteMessage(msg.id, "me");
-                                }
-                              }}
-                              className="w-full px-4 py-3 text-left text-sm text-red-300 hover:bg-red-500/10"
-                            >
-                              Delete for me
-                            </button>
-
-                            {isMe && !msg.deletedForEveryone && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenMessageMenuId(null);
-                                  if (window.confirm("Delete this message for everyone?")) {
-                                    deleteMessage(msg.id, "everyone");
-                                  }
-                                }}
-                                className="w-full px-4 py-3 text-left text-sm text-orange-300 hover:bg-orange-500/10"
-                              >
-                                Delete for everyone
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
                       <div className="relative group/reactions">
                         {msg.reaction ? (
                           <button
                             onClick={() => reactToMessage(msg.id, null)}
-                            className="rounded-full bg-white/15 px-2 py-0.5 text-xs text-white shadow-sm"
+                            className="rounded-full bg-black/10 px-2 py-0.5 text-xs shadow-sm"
                             title="Remove reaction"
                           >
                             {msg.reaction}
@@ -1183,22 +1064,6 @@ function ThreadView({
             </div>
 
             <span className="text-xs text-red-100/70">Recording voice note…</span>
-          </div>
-        )}
-
-        {replyingTo && (
-          <div className="mb-3 flex items-center justify-between rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm">
-            <div className="min-w-0">
-              <p className="font-semibold text-cyan-300">Replying to message</p>
-              <p className="truncate text-muted-foreground">{replyingTo.content}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplyingTo(null)}
-              className="rounded-full px-3 py-1 text-lg text-muted-foreground hover:bg-white/10 hover:text-white"
-            >
-              ×
-            </button>
           </div>
         )}
 
