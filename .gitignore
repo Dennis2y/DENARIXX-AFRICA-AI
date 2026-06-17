@@ -16,3 +16,23 @@ artifacts/api-server/uploads/
 
 # Mac
 .DS_Store
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Typescript
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+
+# Local workspace
+.local/
+
+# Logs
+pnpm-debug.log*
