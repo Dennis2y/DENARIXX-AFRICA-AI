@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useUser, Show } from "@clerk/react";
+import { useUser, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -25,6 +25,7 @@ type Skill = { skill: string; level: string };
 
 function ProfileContent() {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -91,33 +92,28 @@ function ProfileContent() {
 
     setUploadingAvatar(true);
     try {
-      // Step 1: get presigned upload URL from backend
-      const urlRes = await fetch(`${basePath}/api/storage/uploads/request-url`, {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const token = await getToken();
+
+      const uploadRes = await fetch(`${basePath}/api/users/me/avatar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
       });
-      if (!urlRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = await urlRes.json();
 
-      // Step 2: upload file directly to GCS via presigned URL
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed");
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text();
+        console.error("Avatar upload failed:", errorText);
+        throw new Error("Avatar upload failed");
+      }
 
-      // Step 3: save serving URL to user profile in DB
-      const servingUrl = `${basePath}/api/storage${objectPath}`;
-      await fetch(`${basePath}/api/users/me`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ avatarUrl: servingUrl }),
-      });
-      setDbAvatarUrl(servingUrl);
+      const data = await uploadRes.json();
+      setDbAvatarUrl(data.avatarUrl);
       setAvatarPreview(null);
     } catch {
       setAvatarPreview(null);

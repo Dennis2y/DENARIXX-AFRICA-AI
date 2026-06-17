@@ -1,9 +1,27 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { db, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
 import { eq, and, or, ilike, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
+
+const avatarDir = path.resolve(process.cwd(), "uploads/avatars");
+fs.mkdirSync(avatarDir, { recursive: true });
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: avatarDir,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase() || ".png";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 
 // GET /api/users/me — get current user profile (JIT provision if new)
 router.get("/me", requireAuth, async (req, res) => {
@@ -98,6 +116,44 @@ router.get("/search", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to search users");
     res.status(500).json({ error: "Failed to search users" });
+  }
+});
+
+
+
+// POST /api/users/me/avatar — local profile image upload
+router.post("/me/avatar", requireAuth, avatarUpload.single("avatar"), async (req, res) => {
+  console.log("🔥 AVATAR ROUTE HIT", {
+    hasFile: Boolean(req.file),
+    file: req.file?.filename,
+    contentType: req.headers["content-type"],
+  });
+
+  const clerkUserId = (req as any).clerkUserId as string;
+
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "Avatar file is required" });
+      return;
+    }
+
+    const avatarUrl = `http://localhost:3000/uploads/avatars/${req.file.filename}`;
+
+    const [updated] = await db
+      .update(usersTable)
+      .set({ avatarUrl, updatedAt: new Date() })
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.json({ ok: true, avatarUrl, user: updated });
+  } catch (err) {
+    req.log.error({ err }, "Failed to upload avatar");
+    res.status(500).json({ error: "Failed to upload avatar" });
   }
 });
 

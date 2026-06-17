@@ -14,10 +14,11 @@ function safeRoomName(value: string) {
 
 router.post("/token", requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { roomName, displayName, meetingType } = req.body as {
+    const { roomName, displayName, meetingType, avatarUrl } = req.body as {
       roomName?: string;
       displayName?: string;
       meetingType?: "direct" | "community" | "webinar";
+      avatarUrl?: string | null;
     };
 
     if (!process.env.LIVEKIT_URL || !process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET) {
@@ -29,10 +30,15 @@ router.post("/token", requireAuth, async (req: Request, res: Response): Promise<
     const room = safeRoomName(roomName || `${meetingType || "meeting"}-${Date.now()}`);
     const identity = clerkUserId || `guest-${Date.now()}`;
     const name = displayName || "Denarixx User";
+    const metadata = JSON.stringify({
+      avatarUrl: avatarUrl || null,
+      meetingType: meetingType || "direct",
+    });
 
     const token = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, {
       identity,
       name,
+      metadata,
       ttl: "2h",
     });
 

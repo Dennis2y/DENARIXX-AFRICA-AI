@@ -10,6 +10,11 @@ import {
   ChevronLeft,
   Briefcase,
   Phone,
+  MapPin,
+  Globe,
+  Linkedin,
+  Github,
+  Star,
   Video,
   MoreVertical,
 } from "lucide-react";
@@ -44,6 +49,32 @@ function NavBar() {
   );
 }
 
+
+function getPresenceLabel(lastSeenAt?: string | null) {
+  if (!lastSeenAt) return "Offline";
+
+  const diffMs = Date.now() - new Date(lastSeenAt).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 2) return "Online";
+  if (diffMin < 60) return `Last seen ${diffMin}m ago`;
+
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `Last seen ${diffHours}h ago`;
+
+  return `Last seen ${new Date(lastSeenAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`;
+}
+
+function getPresenceDotClass(lastSeenAt?: string | null) {
+  if (!lastSeenAt) return "bg-zinc-500";
+
+  const diffMin = Math.floor((Date.now() - new Date(lastSeenAt).getTime()) / 60000);
+
+  if (diffMin < 2) return "bg-emerald-400";
+  if (diffMin < 15) return "bg-yellow-400";
+  return "bg-zinc-500";
+}
+
 function Avatar({ name, url, size = 40 }: { name?: string | null; url?: string | null; size?: number }) {
   const initials = (name ?? "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 
@@ -63,7 +94,7 @@ function Avatar({ name, url, size = 40 }: { name?: string | null; url?: string |
 
 type Conversation = {
   partnerId: number;
-  partner: { id: number; name: string | null; avatarUrl: string | null; role: string | null } | null;
+  partner: { id: number; name: string | null; avatarUrl: string | null; role: string | null; lastSeenAt?: string | null } | null;
   lastMessage: { content: string; createdAt: string; fromUserId: number };
   unreadCount: number;
 };
@@ -161,6 +192,156 @@ function useSendMessage(partnerId: number | null, getToken: () => Promise<string
   });
 }
 
+
+type PublicProfile = {
+  id: number;
+  name: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  twitterHandle: string | null;
+  linkedinUrl: string | null;
+  githubHandle: string | null;
+  role: string | null;
+  country: string | null;
+  userType: string | null;
+  reputationScore: number;
+  lastSeenAt: string | null;
+  createdAt: string;
+  skills: { skill: string; level: string }[];
+};
+
+function ProfileDrawer({
+  partnerId,
+  open,
+  onClose,
+  getToken,
+}: {
+  partnerId: number;
+  open: boolean;
+  onClose: () => void;
+  getToken: () => Promise<string | null>;
+}) {
+  const { data, isLoading } = useQuery<{ user: PublicProfile }>({
+    queryKey: ["public-profile", partnerId],
+    enabled: open,
+    queryFn: async () => {
+      const token = await getToken();
+      const r = await fetch(`${basePath}/api/users/${partnerId}/public`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!r.ok) throw new Error("Failed to load profile");
+      return r.json();
+    },
+  });
+
+  if (!open) return null;
+
+  const user = data?.user;
+
+  return (
+    <div className="absolute inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-sm">
+      <div className="h-full w-[430px] max-w-[92vw] overflow-y-auto border-l border-border bg-card p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between">
+          <p className="text-lg font-bold">Profile</p>
+          <Button variant="ghost" onClick={onClose} className="rounded-xl">Close</Button>
+        </div>
+
+        {isLoading || !user ? (
+          <div className="flex items-center justify-center py-20 text-muted-foreground">
+            <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Loading profile…
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Avatar name={user.name} url={user.avatarUrl} size={76} />
+                <span className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-card ${getPresenceDotClass(user.lastSeenAt)}`} />
+              </div>
+
+              <div className="min-w-0">
+                <p className="truncate text-2xl font-bold">{user.name || "Denarixx User"}</p>
+                <p className="text-sm text-cyan-300">{user.role || user.userType || "Community member"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{getPresenceLabel(user.lastSeenAt)}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground">Reputation</p>
+                <p className="mt-1 flex items-center gap-1 font-bold text-yellow-300">
+                  <Star className="h-4 w-4" /> {user.reputationScore ?? 0}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground">Member since</p>
+                <p className="mt-1 font-bold">
+                  {new Date(user.createdAt).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
+                </p>
+              </div>
+            </div>
+
+            {user.bio && (
+              <div className="mt-5 rounded-2xl border border-border bg-background/60 p-4">
+                <p className="mb-2 text-sm font-semibold">About</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">{user.bio}</p>
+              </div>
+            )}
+
+            <div className="mt-5 space-y-3">
+              {user.location && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 text-cyan-300" /> {user.location}
+                </p>
+              )}
+              {user.country && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Globe className="h-4 w-4 text-cyan-300" /> {user.country}
+                </p>
+              )}
+              {user.linkedinUrl && (
+                <a href={user.linkedinUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-cyan-300 hover:underline">
+                  <Linkedin className="h-4 w-4" /> LinkedIn
+                </a>
+              )}
+              {user.githubHandle && (
+                <a href={`https://github.com/${user.githubHandle}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-cyan-300 hover:underline">
+                  <Github className="h-4 w-4" /> GitHub
+                </a>
+              )}
+              {user.website && (
+                <a href={user.website} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-cyan-300 hover:underline">
+                  <Globe className="h-4 w-4" /> Website
+                </a>
+              )}
+            </div>
+
+            {user.skills?.length > 0 && (
+              <div className="mt-6">
+                <p className="mb-3 text-sm font-semibold">Skills</p>
+                <div className="flex flex-wrap gap-2">
+                  {user.skills.map((skill) => (
+                    <span key={`${skill.skill}-${skill.level}`} className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
+                      {skill.skill} • {skill.level}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function ThreadView({
   partnerId,
   onBack,
@@ -256,6 +437,7 @@ function ThreadView({
       roomName: `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`,
       displayName: partner?.name || "Denarixx User",
       meetingType: "direct",
+      avatarUrl: partner?.avatarUrl || null,
     });
 
     await send(`${mode === "video" ? "Video" : "Audio"} call started. Join from this chat.`);
@@ -277,12 +459,15 @@ function ThreadView({
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <Avatar name={partner?.name} url={partner?.avatarUrl} size={44} />
+        <div className="relative">
+          <Avatar name={partner?.name} url={partner?.avatarUrl} size={44} />
+          <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${getPresenceDotClass(partner?.lastSeenAt)}`} />
+        </div>
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold">{partner?.name ?? "User"}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {partner?.role || "Online"} • Secure messages and live calls
+            {partner?.role || "Denarixx member"} • {getPresenceLabel(partner?.lastSeenAt)}
           </p>
         </div>
 
@@ -338,29 +523,12 @@ function ThreadView({
         </div>
       </div>
 
-      {profileOpen && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-[420px] max-w-[92vw] rounded-3xl border border-border bg-card p-6 shadow-2xl">
-            <div className="flex items-center gap-4">
-              <Avatar name={partner?.name} url={partner?.avatarUrl} size={64} />
-              <div className="min-w-0">
-                <p className="truncate text-xl font-bold">{partner?.name || "User"}</p>
-                <p className="text-sm text-muted-foreground">{partner?.role || "Denarixx member"}</p>
-                <p className="mt-1 text-xs text-cyan-300">Available for messages and live calls</p>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Button onClick={() => startDirectCall("audio")} variant="outline" className="rounded-2xl">Audio call</Button>
-              <Button onClick={() => startDirectCall("video")} className="rounded-2xl bg-cyan-400 text-black hover:bg-cyan-300">Video call</Button>
-            </div>
-
-            <Button onClick={() => setProfileOpen(false)} variant="ghost" className="mt-4 w-full rounded-2xl">
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
+      <ProfileDrawer
+        partnerId={partnerId}
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        getToken={getToken}
+      />
 
       {searchOpen && (
         <div className="border-b border-border bg-card/50 px-5 py-3">
@@ -583,7 +751,10 @@ function InboxList({
                 selectedId === conv.partnerId ? "bg-cyan-400/10 border-l-4 border-l-cyan-400" : "hover:bg-muted/40"
               }`}
             >
+              <div className="relative">
               <Avatar name={conv.partner?.name} url={conv.partner?.avatarUrl} size={44} />
+              <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card ${getPresenceDotClass(conv.partner?.lastSeenAt)}`} />
+            </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
@@ -626,6 +797,31 @@ function MessagesContent() {
 
   const conversations = data?.conversations ?? [];
   const qc = useQueryClient();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function pingPresence() {
+      if (cancelled) return;
+      const token = await getToken();
+
+      await fetch(`${basePath}/api/users/presence`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      }).catch(() => {});
+    }
+
+    pingPresence();
+    const timer = window.setInterval(pingPresence, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [getToken]);
 
   const seedDemo = useMutation({
     mutationFn: async () => {

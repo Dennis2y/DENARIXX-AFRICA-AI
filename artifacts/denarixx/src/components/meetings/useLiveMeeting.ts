@@ -14,6 +14,7 @@ export function useLiveMeeting(basePath: string, getToken: () => Promise<string 
     roomName: string;
     displayName?: string;
     meetingType?: "direct" | "community" | "webinar";
+    avatarUrl?: string | null;
   }) {
     setStartingMeeting(true);
 
