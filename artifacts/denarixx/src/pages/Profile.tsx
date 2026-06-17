@@ -53,7 +53,13 @@ function ProfileContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${basePath}/api/users/me`, { credentials: "include" });
+        const token = await getToken();
+        const res = await fetch(`${basePath}/api/users/me`, {
+          credentials: "include",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         if (!res.ok) return;
         const data = await res.json();
         setForm({

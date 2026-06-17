@@ -1,4 +1,5 @@
-import { useUser, useClerk, Show } from "@clerk/react";
+import { useEffect, useState } from "react";
+import { useUser, useClerk, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -32,11 +33,17 @@ const modules: Module[] = [
   { icon: BarChart3, label: "Post a Job", desc: "Hire African talent — employer dashboard", color: "text-rose-400", bg: "bg-rose-400/10 border-rose-400/20", href: `${basePath}/employer`, live: true },
 ];
 
-function useProfile() {
+function useProfile(getToken: () => Promise<string | null>) {
   return useQuery({
     queryKey: ["my-profile"],
     queryFn: async () => {
-      const res = await fetch(`${basePath}/api/users/me`, { credentials: "include" });
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/users/me`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -83,8 +90,21 @@ function useUnreadCount() {
 
 function DashboardContent() {
   const { user } = useUser();
+
+  const [dbAvatarUrl, setDbAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${basePath}/api/users/me`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.avatarUrl) setDbAvatarUrl(data.avatarUrl);
+      })
+      .catch(() => {});
+  }, []);
+
   const { signOut } = useClerk();
-  const { data: profile } = useProfile();
+  const { getToken } = useAuth();
+  const { data: profile } = useProfile(getToken);
   const { data: connData } = useConnections();
   const { data: appData } = useApplications();
   const { data: unreadData } = useUnreadCount();
