@@ -174,9 +174,9 @@ function ApplicantRow({
 
   function handleMessage() {
     const params = new URLSearchParams({
-      partner: String(applicant.userId),
-      appId: String(applicant.id),
-      job: encodeURIComponent(jobTitle),
+      partnerId: String(applicant.userId),
+      jobApplicationId: String(applicant.id),
+      jobTitle,
     });
     setLocation(`/messages?${params.toString()}`);
   }
