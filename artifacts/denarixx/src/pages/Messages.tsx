@@ -221,10 +221,33 @@ function useSendMessage(partnerId: number | null, getToken: () => Promise<string
         const data = JSON.parse(event.data);
         if (data?.type === "ping" || data?.type === "connected") return;
 
+        if (data?.incoming && "Notification" in window && Notification.permission === "granted") {
+          const title =
+            data.type === "call"
+              ? `Incoming ${data.mode === "video" ? "video" : "audio"} call`
+              : "New message";
+
+          const body =
+            data.type === "call"
+              ? `${data.callerName || "Someone"} is calling you`
+              : `New message from ${data.senderName || "Denarixx User"}`;
+
+          const notification = new Notification(title, {
+            body,
+            icon: "/favicon.ico",
+            tag: data.type === "call" ? `call-${data.messageId || data.partnerId}` : `message-${data.partnerId}`,
+          });
+
+          notification.onclick = () => {
+            window.focus();
+            window.location.href = `${basePath}/messages?partnerId=${data.partnerId}`;
+          };
+        }
+
         qc.invalidateQueries({ queryKey: ["messages-inbox"] });
         qc.invalidateQueries({ queryKey: ["messages-unread-count"] });
-        qc.invalidateQueries({ queryKey: ["messages-thread"] });
-        qc.invalidateQueries({ queryKey: ["messages-typing"] });
+        qc.invalidateQueries({ queryKey: ["messages-thread"], exact: false });
+        qc.invalidateQueries({ queryKey: ["messages-typing"], exact: false });
       } catch {}
     };
 
@@ -442,7 +465,11 @@ function ThreadView({
   const [searchOpen, setSearchOpen] = useState(false);
   const [messageSearch, setMessageSearch] = useState("");
   const [openMessageMenuId, setOpenMessageMenuId] = useState<number | null>(null);
+  const [openReactionMessageId, setOpenReactionMessageId] = useState<number | null>(null);
+  const [incomingCall, setIncomingCall] = useState<Message | null>(null);
+  const [activeCallMessageId, setActiveCallMessageId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -464,6 +491,42 @@ function ThreadView({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!messages.length || typeof myId !== "number") return;
+
+    const latestIncomingRingingCall = [...messages]
+      .reverse()
+      .find((msg) =>
+        msg.messageType === "call" &&
+        msg.fromUserId !== myId &&
+        ["ringing", "accepted"].includes(String(msg.metadata?.status)) &&
+        activeCallMessageId !== msg.id
+      );
+
+    setIncomingCall(latestIncomingRingingCall ?? null);
+  }, [messages, myId, activeCallMessageId]);
+
+  useEffect(() => {
+    if (!ringtoneAudioRef.current) {
+      const audio = new Audio(`${basePath}/sounds/incoming-call.mp3`);
+      audio.loop = true;
+      audio.volume = 1.0;
+      audio.preload = "auto";
+      ringtoneAudioRef.current = audio;
+    }
+
+    if (incomingCall) {
+      ringtoneAudioRef.current.play().catch(() => {});
+    } else {
+      ringtoneAudioRef.current.pause();
+      ringtoneAudioRef.current.currentTime = 0;
+    }
+
+    return () => {
+      ringtoneAudioRef.current?.pause();
+    };
+  }, [incomingCall]);
 
 
   const sendTypingStatus = async (isTyping: boolean) => {
@@ -555,8 +618,8 @@ function ThreadView({
       return;
     }
 
-    qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
-    qc.invalidateQueries({ queryKey: ["messages-inbox"] });
+    await qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
+    await qc.invalidateQueries({ queryKey: ["messages-inbox"] });
   };
 
 
@@ -735,6 +798,8 @@ function ThreadView({
       return null;
     }
 
+    qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
+    qc.invalidateQueries({ queryKey: ["messages-inbox"] });
     return res.json();
   };
 
@@ -745,9 +810,16 @@ function ThreadView({
       ? metadata.roomName
       : `direct-${Math.min(partnerId, myId || 0)}-${Math.max(partnerId, myId || 0)}`;
 
-    if ((metadata.status === "ringing" || metadata.status === "accepted") && msg.id) {
+    const isIncoming = msg.fromUserId !== myId;
+
+    if (isIncoming && metadata.status === "ringing" && msg.id) {
       await updateCallStatus(msg.id, "accepted");
     }
+
+    ringtoneAudioRef.current?.pause();
+    if (ringtoneAudioRef.current) ringtoneAudioRef.current.currentTime = 0;
+    setIncomingCall(null);
+    setActiveCallMessageId(msg.id);
 
     await startMeeting({
       roomName,
@@ -758,6 +830,9 @@ function ThreadView({
   };
 
   const declineCall = async (msg: Message) => {
+    ringtoneAudioRef.current?.pause();
+    if (ringtoneAudioRef.current) ringtoneAudioRef.current.currentTime = 0;
+    setIncomingCall(null);
     await updateCallStatus(msg.id, "declined");
   };
 
@@ -781,7 +856,20 @@ function ThreadView({
     }
 
     const data = await res.json();
-    await joinCall(data.message);
+
+    if (data?.message?.id) {
+      setActiveCallMessageId(data.message.id);
+    }
+
+    await startMeeting({
+      roomName,
+      displayName: partner?.name || "Denarixx User",
+      meetingType: "direct",
+      avatarUrl: null,
+    });
+
+    qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
+    qc.invalidateQueries({ queryKey: ["messages-inbox"] });
   };
 
 
@@ -798,12 +886,63 @@ function ThreadView({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-background">
+
+      {incomingCall && (
+        <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-[28px] border border-cyan-400/30 bg-card p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
+              {incomingCall.metadata?.mode === "video" ? <Video className="h-9 w-9" /> : <Phone className="h-9 w-9" />}
+            </div>
+
+            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">
+              Incoming {incomingCall.metadata?.mode === "video" ? "video" : "audio"} call
+            </p>
+            <h3 className="mt-2 text-xl font-bold">{partner?.name || "Denarixx User"}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">is calling you now</p>
+
+            <button
+              type="button"
+              onClick={() => ringtoneAudioRef.current?.play().catch(() => {})}
+              className="mt-4 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs text-cyan-200 hover:bg-cyan-400/20"
+            >
+              Enable ringtone sound
+            </button>
+
+            <div className="mt-6 flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => declineCall(incomingCall)}
+                className="flex-1 rounded-2xl border-red-400/30 text-red-300 hover:bg-red-500/10"
+              >
+                Decline
+              </Button>
+
+              <Button
+                onClick={() => joinCall(incomingCall)}
+                className="flex-1 rounded-2xl bg-cyan-400 text-black hover:bg-cyan-300"
+              >
+                Accept
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeMeeting && (
         <LiveMiniMeeting
           token={activeMeeting.token}
           serverUrl={activeMeeting.serverUrl}
           roomName={activeMeeting.roomName}
-          onClose={endMeeting}
+          onClose={async () => {
+            const messageId = activeCallMessageId;
+            endMeeting();
+            setActiveCallMessageId(null);
+            ringtoneAudioRef.current?.pause();
+            if (ringtoneAudioRef.current) ringtoneAudioRef.current.currentTime = 0;
+            if (messageId) {
+              await updateCallStatus(messageId, "ended");
+            }
+          }}
         />
       )}
 
@@ -886,6 +1025,16 @@ function ThreadView({
       {searchOpen && (
         <div className="border-b border-border bg-card/50 px-5 py-3">
           <div className="flex items-center gap-2">
+            {"Notification" in window && Notification.permission !== "granted" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => Notification.requestPermission()}
+                className="hidden rounded-xl border-cyan-400/30 text-xs text-cyan-300 hover:bg-cyan-400/10 sm:inline-flex"
+              >
+                Enable notifications
+              </Button>
+            )}
             <input
               value={messageSearch}
               onChange={(e) => setMessageSearch(e.target.value)}
@@ -1015,7 +1164,7 @@ function ThreadView({
                         </div>
 
                         <div className="flex gap-2">
-                          {msg.metadata?.status !== "declined" && msg.metadata?.status !== "ended" && msg.metadata?.status !== "missed" && (
+                          {msg.metadata?.status !== "declined" && msg.metadata?.status !== "ended" && msg.metadata?.status !== "missed" && activeCallMessageId !== msg.id && (
                             <Button
                               size="sm"
                               disabled={startingMeeting || !myId}
@@ -1072,6 +1221,32 @@ function ThreadView({
                           >
                             <button
                               type="button"
+                              onClick={async () => {
+                                const copyText =
+                                  msg.messageType === "attachment" || msg.messageType === "image" || msg.messageType === "voice"
+                                    ? String(msg.metadata?.fileUrl || msg.metadata?.fileName || msg.content || "")
+                                    : String(msg.content || "");
+
+                                try {
+                                  await navigator.clipboard.writeText(copyText);
+                                } catch {
+                                  const textarea = document.createElement("textarea");
+                                  textarea.value = copyText;
+                                  document.body.appendChild(textarea);
+                                  textarea.select();
+                                  document.execCommand("copy");
+                                  document.body.removeChild(textarea);
+                                }
+
+                                setOpenMessageMenuId(null);
+                              }}
+                              className="w-full px-4 py-3 text-left text-sm hover:bg-muted"
+                            >
+                              📋 Copy
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => {
                                 setReplyingTo(msg);
                                 setOpenMessageMenuId(null);
@@ -1112,7 +1287,7 @@ function ThreadView({
                         )}
                       </div>
 
-                      <div className="relative group/reactions">
+                      <div className="relative">
                         {msg.reaction ? (
                           <button
                             onClick={() => reactToMessage(msg.id, null)}
@@ -1124,24 +1299,31 @@ function ThreadView({
                         ) : (
                           <>
                             <button
+                              type="button"
+                              onClick={() => setOpenReactionMessageId(openReactionMessageId === msg.id ? null : msg.id)}
                               className={`rounded-full border border-white/20 px-2 py-0.5 text-xs opacity-70 transition-opacity hover:opacity-100 ${isMe ? "bg-black/10 hover:bg-black/20" : "bg-white/10 hover:bg-white/20"}`}
                               title="React"
                             >
                               +
                             </button>
 
-                            <div className={`absolute bottom-6 z-50 hidden rounded-full border border-border bg-card px-2 py-1 shadow-2xl group-hover/reactions:flex ${isMe ? "right-0" : "left-0"}`}>
-                              {["👍", "❤️", "😂", "🔥"].map((emoji) => (
+                            {openReactionMessageId === msg.id && (
+                              <div className={`absolute bottom-8 z-50 grid w-[280px] grid-cols-10 gap-1 rounded-2xl border border-border bg-card/95 p-2 shadow-2xl backdrop-blur-xl ${isMe ? "right-0" : "left-0"}`}>
+                              {["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "👏", "💯", "😍", "🎉", "😁", "🤔", "👌", "🚀", "💪", "🥳", "😎", "😭", "🤝"].map((emoji) => (
                                 <button
                                   key={emoji}
-                                  onClick={() => reactToMessage(msg.id, emoji)}
-                                  className="rounded-full px-1.5 py-1 text-sm hover:bg-muted"
+                                  onClick={async () => {
+                                    setOpenReactionMessageId(null);
+                                    await reactToMessage(msg.id, emoji);
+                                  }}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full text-lg transition hover:scale-110 hover:bg-muted"
                                   title={`React ${emoji}`}
                                 >
                                   {emoji}
                                 </button>
                               ))}
                             </div>
+                            )}
                           </>
                         )}
                       </div>

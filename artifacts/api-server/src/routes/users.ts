@@ -5,6 +5,7 @@ import fs from "fs";
 import { db, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
 import { eq, and, or, ilike, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { clerkClient } from "@clerk/express";
 
 const router: IRouter = Router();
 
@@ -42,18 +43,31 @@ router.get("/me", requireAuth, async (req, res) => {
       return;
     }
 
-    // JIT provision — upsert user row on first access from this Clerk session
-    const { getAuth } = await import("@clerk/express");
-    const auth = getAuth(req);
-    const email = (auth as any)?.sessionClaims?.email ?? "";
-    const name = (auth as any)?.sessionClaims?.name ?? null;
+    // JIT provision — create/update user row from Clerk on first access
+    const clerk = await clerkClient.users.getUser(clerkUserId);
+    const email = clerk.emailAddresses?.[0]?.emailAddress ?? `${clerkUserId}@denarixx.local`;
+    const name =
+      clerk.fullName ||
+      [clerk.firstName, clerk.lastName].filter(Boolean).join(" ") ||
+      email.split("@")[0];
 
     const [created] = await db
       .insert(usersTable)
-      .values({ clerkUserId, email, name })
+      .values({
+        clerkUserId,
+        email,
+        name,
+        avatarUrl: clerk.imageUrl || null,
+        lastSeenAt: new Date(),
+      })
       .onConflictDoUpdate({
         target: usersTable.email,
-        set: { clerkUserId, name: name ?? undefined },
+        set: {
+          clerkUserId,
+          name,
+          avatarUrl: clerk.imageUrl || null,
+          lastSeenAt: new Date(),
+        },
       })
       .returning();
 
@@ -322,6 +336,56 @@ router.delete("/push-token", requireAuth, async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to remove push token");
     res.status(500).json({ error: "Failed to remove push token" });
+  }
+});
+
+
+// GET /api/users/:id/public — public profile for community/member views
+router.get("/:id/public", requireAuth, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    if (!Number.isFinite(userId)) {
+      res.status(400).json({ error: "Invalid user id" });
+      return;
+    }
+
+    const [user] = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        role: usersTable.role,
+        bio: usersTable.bio,
+        location: usersTable.location,
+        website: usersTable.website,
+        twitterHandle: usersTable.twitterHandle,
+        linkedinUrl: usersTable.linkedinUrl,
+        githubHandle: usersTable.githubHandle,
+        avatarUrl: usersTable.avatarUrl,
+        userType: usersTable.userType,
+        reputationScore: usersTable.reputationScore,
+        lastSeenAt: usersTable.lastSeenAt,
+        createdAt: usersTable.createdAt,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const skills = await db
+      .select()
+      .from(userSkillsTable)
+      .where(eq(userSkillsTable.userId, userId));
+
+    res.json({ user: { ...user, skills } });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load public profile");
+    res.status(500).json({ error: "Failed to load public profile" });
   }
 });
 

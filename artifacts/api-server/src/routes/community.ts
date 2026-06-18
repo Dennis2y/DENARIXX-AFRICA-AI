@@ -16,6 +16,7 @@ router.get("/members", async (req, res) => {
         location: usersTable.location,
         avatarUrl: usersTable.avatarUrl,
         reputationScore: usersTable.reputationScore,
+        lastSeenAt: usersTable.lastSeenAt,
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useUser, useAuth, Show } from "@clerk/react";
-import { Redirect, Link } from "wouter";
+import { Redirect, Link, useSearch } from "wouter";
 import { motion } from "framer-motion";
 import {
   User, MapPin, Globe, Twitter, Linkedin, Github,
-  Plus, X, ArrowLeft, Save, Loader2, Check, Camera, Bell
+  Plus, X, ArrowLeft, Save, Loader2, Check, Camera, Bell, MessageCircle, Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,171 @@ const SUGGESTED_SKILLS = [
 
 type Skill = { skill: string; level: string };
 
+
+type PublicProfile = {
+  id: number;
+  name: string | null;
+  email?: string | null;
+  role: string | null;
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  twitterHandle: string | null;
+  linkedinUrl: string | null;
+  githubHandle: string | null;
+  avatarUrl: string | null;
+  userType: string | null;
+  reputationScore: number;
+  lastSeenAt?: string | null;
+  skills: Skill[];
+};
+
+function getPresenceLabel(lastSeenAt?: string | null) {
+  if (!lastSeenAt) return "Offline";
+  const diffMin = Math.floor((Date.now() - new Date(lastSeenAt).getTime()) / 60000);
+  if (diffMin < 2) return "Online";
+  if (diffMin < 60) return `Last seen ${diffMin}m ago`;
+  if (diffMin < 1440) return `Last seen ${Math.floor(diffMin / 60)}h ago`;
+  return `Last seen ${new Date(lastSeenAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`;
+}
+
+function PublicProfileView({ userId }: { userId: number }) {
+  const { getToken } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${basePath}/api/users/${userId}/public`, {
+          credentials: "include",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (!res.ok) return;
+        const data = await res.json();
+        setProfile(data.user ?? null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
+  }, [userId, getToken]);
+
+  const initials = (profile?.name || "U").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <nav className="border-b border-border bg-background/80 backdrop-blur-lg sticky top-0 z-40">
+        <div className="container mx-auto px-4 h-16 flex items-center gap-4">
+          <Link to="/community">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> Community
+            </Button>
+          </Link>
+          <h1 className="font-semibold">Member Profile</h1>
+        </div>
+      </nav>
+
+      <main className="container mx-auto px-4 py-10 max-w-3xl">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : !profile ? (
+          <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
+            Profile not found.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-border bg-card p-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="h-24 w-24 overflow-hidden rounded-full border-2 border-primary/40 bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary shrink-0">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={profile.name || "Profile"} className="h-full w-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-2xl font-bold">{profile.name || "Anonymous"}</h2>
+                  <p className="mt-1 text-primary">{profile.role || profile.userType || "Community member"}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{getPresenceLabel(profile.lastSeenAt)}</p>
+                  {profile.location && (
+                    <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" /> {profile.location}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-2 sm:flex-col">
+                  <Link to={`/messages?partnerId=${profile.id}`}>
+                    <Button className="gap-2 bg-cyan-400 text-background hover:bg-cyan-400/90">
+                      <MessageCircle className="h-4 w-4" /> Message
+                    </Button>
+                  </Link>
+                  <Link to="/skillswap">
+                    <Button variant="outline" className="gap-2">
+                      <Briefcase className="h-4 w-4" /> Connect
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            {profile.bio && (
+              <section className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="mb-3 font-semibold text-primary">About</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{profile.bio}</p>
+              </section>
+            )}
+
+            {profile.skills?.length > 0 && (
+              <section className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="mb-3 font-semibold text-primary">Skills</h3>
+                <div className="flex flex-wrap gap-2">
+                  {profile.skills.map((s) => (
+                    <span key={`${s.skill}-${s.level}`} className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary">
+                      {s.skill} <span className="text-xs text-muted-foreground">({s.level})</span>
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {(profile.website || profile.linkedinUrl || profile.githubHandle || profile.twitterHandle) && (
+              <section className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="mb-3 font-semibold text-primary">Links</h3>
+                <div className="space-y-2 text-sm">
+                  {profile.website && <p><Globe className="mr-2 inline h-4 w-4 text-muted-foreground" />{profile.website}</p>}
+                  {profile.linkedinUrl && <p><Linkedin className="mr-2 inline h-4 w-4 text-muted-foreground" />{profile.linkedinUrl}</p>}
+                  {profile.githubHandle && <p><Github className="mr-2 inline h-4 w-4 text-muted-foreground" />{profile.githubHandle}</p>}
+                  {profile.twitterHandle && <p><Twitter className="mr-2 inline h-4 w-4 text-muted-foreground" />{profile.twitterHandle}</p>}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+
 function ProfileContent() {
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const publicUserId = params.get("userId");
+
+  if (publicUserId && Number.isFinite(Number(publicUserId))) {
+    return <PublicProfileView userId={Number(publicUserId)} />;
+  }
+
   const { user } = useUser();
   const { getToken } = useAuth();
   const [saving, setSaving] = useState(false);

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useUser, useClerk, useAuth, Show } from "@clerk/react";
 import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Zap, User, BookOpen, Brain, FileText, Briefcase, Users, BarChart3,
   LogOut, Trophy, ChevronRight, Sparkles, Lock, Mic, MessageCircle, Home
@@ -75,16 +75,22 @@ function useApplications() {
   });
 }
 
-function useUnreadCount() {
+function useUnreadCount(getToken: () => Promise<string | null>) {
   return useQuery<{ count: number }>({
     queryKey: ["messages-unread-count"],
     queryFn: async () => {
-      const res = await fetch(`${basePath}/api/messages/unread-count`, { credentials: "include" });
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/messages/unread-count`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) return { count: 0 };
       return res.json();
     },
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+    refetchInterval: 10_000,
+    staleTime: 0,
   });
 }
 
@@ -107,8 +113,28 @@ function DashboardContent() {
   const { data: profile } = useProfile(getToken);
   const { data: connData } = useConnections();
   const { data: appData } = useApplications();
-  const { data: unreadData } = useUnreadCount();
+  const { data: unreadData } = useUnreadCount(getToken);
   const unreadCount = unreadData?.count ?? 0;
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    const source = new EventSource(`${basePath}/api/messages/events`, { withCredentials: true });
+
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data?.type === "message" || data?.type === "call" || data?.type === "clear") {
+          qc.invalidateQueries({ queryKey: ["messages-unread-count"] });
+        }
+      } catch {}
+    };
+
+    source.onerror = () => {
+      // React Query polling remains fallback.
+    };
+
+    return () => source.close();
+  }, [qc]);
 
   const firstName = user?.firstName ?? user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ?? "Explorer";
   const skillCount = profile?.skills?.length ?? 0;

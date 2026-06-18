@@ -515,14 +515,15 @@ router.patch("/:partnerId/:messageId/reaction", requireAuth, async (req, res) =>
     const partnerId = parseInt(req.params.partnerId as string, 10);
     const messageId = parseInt(req.params.messageId as string, 10);
     const { reaction } = req.body as { reaction?: string | null };
+    const cleanReaction =
+      typeof reaction === "string" && reaction.trim().length > 0
+        ? reaction.trim().normalize("NFC")
+        : null;
 
     if (isNaN(partnerId) || isNaN(messageId)) {
       res.status(400).json({ error: "Invalid IDs" });
       return;
     }
-
-    const allowed = ["👍", "❤️", "😂", "🔥", "👏", "🙏"];
-    const cleanReaction = reaction && allowed.includes(reaction) ? reaction : null;
 
     const me = await getDbUser(clerkUserId);
     if (!me) {
