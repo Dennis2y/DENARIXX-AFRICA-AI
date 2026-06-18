@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens } from "@workspace/db";
+import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens, directMessages } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateAI } from "../lib/ai/aiRouter";
@@ -959,7 +959,14 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
     const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-    const [job] = await db.select({ id: jobs.id, externalApplyUrl: jobs.externalApplyUrl, moderationStatus: jobs.moderationStatus }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    const [job] = await db.select({
+      id: jobs.id,
+      title: jobs.title,
+      company: jobs.company,
+      postedByUserId: jobs.postedByUserId,
+      externalApplyUrl: jobs.externalApplyUrl,
+      moderationStatus: jobs.moderationStatus,
+    }).from(jobs).where(eq(jobs.id, jobId)).limit(1);
     if (!job) { res.status(404).json({ error: "Job not found" }); return; }
 
     if (job.moderationStatus !== "approved") {
@@ -979,6 +986,17 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
     const [application] = await db.insert(jobApplications).values({
       userId: user.id, jobId, status: "applied", coverLetter: coverLetter ?? null,
     }).returning();
+
+    if (job.postedByUserId && job.postedByUserId !== user.id) {
+      await db.insert(directMessages).values({
+        fromUserId: user.id,
+        toUserId: job.postedByUserId,
+        content: `New application received for "${job.title}" at ${job.company}. Open Employer Dashboard to review the candidate.`,
+        messageType: "text",
+        jobApplicationId: application.id,
+        deliveredAt: new Date(),
+      });
+    }
 
     res.status(201).json({ application });
   } catch (err) {
