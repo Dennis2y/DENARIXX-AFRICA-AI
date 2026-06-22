@@ -30,19 +30,9 @@ MVP is production-candidate ready.
 - GitHub documentation
 - Deployment checklist
 
-## Verified Database Flows
-- Employer job exists
-- Candidate application exists
-- Application status updates work
-- Employer/candidate messages link to job_application_id
-- Job alerts save correctly
-- Job alert matcher creates notifications
-- Notification unread count works
-- Notification read-all works
-
 ## Production Notes
 - RESEND_API_KEY still needs real key
-- EMAIL_FROM needs verified Resend domain before production
+- EMAIL_FROM needs verified Resend domain
 - PUBLIC_APP_URL must be production URL
 - Upload storage should move from local disk to cloud storage before scale
 - LiveKit must use HTTPS production domain
