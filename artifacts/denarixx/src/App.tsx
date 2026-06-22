@@ -13,6 +13,7 @@ import Landing from "@/pages/Landing";
 import Admin from "@/pages/Admin";
 import Leaderboard from "@/pages/Leaderboard";
 import Dashboard from "@/pages/Dashboard";
+import Notifications from "@/pages/Notifications";
 import Profile from "@/pages/Profile";
 import SkillSwap from "@/pages/SkillSwap";
 import DenaPage from "@/pages/Dena";
@@ -155,6 +156,7 @@ function Router() {
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/notifications" component={Notifications} />
       <Route path="/profile" component={Profile} />
       <Route path="/skillswap" component={SkillSwap} />
       <Route path="/dena" component={DenaPage} />

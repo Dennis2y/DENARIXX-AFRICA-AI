@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens, directMessages, jobAlerts } from "@workspace/db";
+import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens, directMessages, jobAlerts, notifications } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateAI } from "../lib/ai/aiRouter";
@@ -583,6 +583,106 @@ async function importRemoteOkJobs(logger?: any) {
   return { imported, checked: rows.length };
 }
 
+function jobMatchesAlert(job: any, alert: any): boolean {
+  const titleQuery = String(alert.titleQuery ?? "").toLowerCase().trim();
+  const locationQuery = String(alert.locationQuery ?? "").toLowerCase().trim();
+  const remoteType = String(alert.remoteType ?? "").toLowerCase().trim();
+
+  const jobTitle = String(job.title ?? "").toLowerCase();
+  const jobCompany = String(job.company ?? "").toLowerCase();
+  const jobLocation = String(job.location ?? "").toLowerCase();
+  const jobCountry = String(job.country ?? "").toLowerCase();
+  const jobRemoteType = String(job.remoteType ?? "").toLowerCase();
+
+  const skillText = String(job.requiredSkills ?? "").toLowerCase();
+  const titleTokens = titleQuery.split(/\s+/).filter(Boolean);
+
+  const titleOk =
+    !titleQuery ||
+    jobTitle.includes(titleQuery) ||
+    jobCompany.includes(titleQuery) ||
+    skillText.includes(titleQuery) ||
+    titleTokens.some((token) => token.length >= 2 && (jobTitle.includes(token) || skillText.includes(token))) ||
+    (titleQuery.includes("ai") && (
+      jobTitle.includes("machine learning") ||
+      jobTitle.includes("ml ") ||
+      jobTitle.includes("computer vision") ||
+      skillText.includes("machine learning") ||
+      skillText.includes("artificial intelligence")
+    ));
+
+  const locationOk =
+    !locationQuery ||
+    jobLocation.includes(locationQuery) ||
+    jobCountry.includes(locationQuery) ||
+    jobRemoteType === "remote" ||
+    jobLocation.includes("remote") ||
+    jobCountry.includes("global");
+
+  const remoteOk =
+    !remoteType ||
+    jobRemoteType === remoteType ||
+    (remoteType === "remote" && (jobLocation.includes("remote") || jobCountry.includes("global")));
+
+  return titleOk && locationOk && remoteOk;
+}
+
+async function runJobAlertMatches(logger?: any) {
+  try {
+    const activeAlerts = await db.select().from(jobAlerts).where(eq(jobAlerts.isActive, true));
+    if (!activeAlerts.length) return { checkedAlerts: 0, createdNotifications: 0 };
+
+    const recentJobs = await db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.isActive, true), eq(jobs.moderationStatus, "approved")))
+      .orderBy(desc(jobs.createdAt))
+      .limit(100);
+
+    let createdNotifications = 0;
+
+    for (const alert of activeAlerts) {
+      const matches = recentJobs.filter((job) => jobMatchesAlert(job, alert)).slice(0, 5);
+      if (!matches.length) continue;
+
+      const existing = await db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(and(
+          eq(notifications.userId, alert.userId),
+          eq(notifications.type, "job_alert_match"),
+          eq(notifications.href, "/jobs?tab=alerts")
+        ))
+        .orderBy(desc(notifications.createdAt))
+        .limit(1);
+
+      // Avoid spamming same user every sync while we do not yet store alert match history.
+      if (existing.length) continue;
+
+      await db.insert(notifications).values({
+        userId: alert.userId,
+        type: "job_alert_match",
+        title: "New jobs match your alert",
+        body: `${matches.length} recent job${matches.length === 1 ? "" : "s"} match "${alert.titleQuery}".`,
+        href: "/jobs?tab=alerts",
+        metadata: {
+          alertId: alert.id,
+          jobIds: matches.map((job) => job.id),
+          titleQuery: alert.titleQuery,
+        },
+      });
+
+      createdNotifications++;
+    }
+
+    logger?.info?.({ checkedAlerts: activeAlerts.length, createdNotifications }, "Job alert matching complete");
+    return { checkedAlerts: activeAlerts.length, createdNotifications };
+  } catch (err) {
+    logger?.error?.({ err }, "Job alert matching failed");
+    return { checkedAlerts: 0, createdNotifications: 0 };
+  }
+}
+
 async function syncGlobalJobs(logger?: any) {
   const results = [];
   try { results.push({ source: "arbeitnow", ...(await importArbeitnowJobs(logger)) }); }
@@ -591,7 +691,8 @@ async function syncGlobalJobs(logger?: any) {
   try { results.push({ source: "remoteok", ...(await importRemoteOkJobs(logger)) }); }
   catch (err) { logger?.error?.({ err }, "RemoteOK sync failed"); }
 
-  return results;
+  const alertMatches = await runJobAlertMatches(logger);
+  return [...results, { source: "job-alerts", ...alertMatches }];
 }
 
 let globalJobSyncStarted = false;
@@ -1197,6 +1298,18 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
           .then(([job]) => {
             if (!job) return;
             const notifyPromises: Promise<void>[] = [];
+
+            notifyPromises.push(
+              db.insert(notifications).values({
+                userId: appRow.applicantUserId,
+                type: "application_status",
+                title: status === "hired" ? "You were hired 🎉" : "Application status updated",
+                body: `Your application for ${job.title} at ${job.company} is now ${status}.`,
+                href: "/jobs?tab=applications",
+                metadata: { applicationId: appId, jobId: appRow.jobId, status },
+              }).then(() => undefined),
+            );
+
             // Email notification (respects emailNotifications preference)
             if (applicant.emailNotifications !== false) {
               notifyPromises.push(
@@ -1315,6 +1428,15 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
         messageType: "text",
         jobApplicationId: application.id,
         deliveredAt: new Date(),
+      });
+
+      await db.insert(notifications).values({
+        userId: job.postedByUserId,
+        type: "new_application",
+        title: "New application received",
+        body: `A candidate applied for ${job.title} at ${job.company}.`,
+        href: "/employer",
+        metadata: { applicationId: application.id, jobId },
       });
     }
 

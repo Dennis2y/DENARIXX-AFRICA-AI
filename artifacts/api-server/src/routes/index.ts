@@ -20,6 +20,7 @@ import imageGenerateRouter from "./imageGenerate";
 import artifactsRouter from "./artifacts";
 import artifactFromMessageRouter from "./artifactFromMessage";
 import meetingsRouter from "./meetings";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,7 @@ router.use("/images/generate", imageGenerateRouter);
 router.use("/artifacts", artifactsRouter);
 router.use("/artifact-from-message", artifactFromMessageRouter);
 router.use("/meetings", meetingsRouter);
+router.use("/notifications", notificationsRouter);
 
 router.use(healthRouter);
 router.use(waitlistRouter);

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Zap, User, BookOpen, Brain, FileText, Briefcase, Users, BarChart3,
-  LogOut, Trophy, ChevronRight, Sparkles, Lock, Mic, MessageCircle, Home
+  LogOut, Trophy, ChevronRight, Sparkles, Lock, Mic, MessageCircle, Home, Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -75,6 +75,54 @@ function useApplications() {
   });
 }
 
+type AppNotification = {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  isRead: boolean;
+  createdAt: string;
+};
+
+function useNotifications(getToken: () => Promise<string | null>) {
+  return useQuery<{ notifications: AppNotification[] }>({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/notifications`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) return { notifications: [] };
+      return res.json();
+    },
+    refetchInterval: 15_000,
+    staleTime: 0,
+  });
+}
+
+function useNotificationsUnreadCount(getToken: () => Promise<string | null>) {
+  return useQuery<{ count: number }>({
+    queryKey: ["notifications-unread-count"],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/notifications/unread-count`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    refetchInterval: 15_000,
+    staleTime: 0,
+  });
+}
+
 function useUnreadCount(getToken: () => Promise<string | null>) {
   return useQuery<{ count: number }>({
     queryKey: ["messages-unread-count"],
@@ -114,7 +162,12 @@ function DashboardContent() {
   const { data: connData } = useConnections();
   const { data: appData } = useApplications();
   const { data: unreadData } = useUnreadCount(getToken);
+  const { data: notificationsData } = useNotifications(getToken);
+  const { data: notificationsUnreadData } = useNotificationsUnreadCount(getToken);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const unreadCount = unreadData?.count ?? 0;
+  const notifications = notificationsData?.notifications ?? [];
+  const notificationsUnreadCount = notificationsUnreadData?.count ?? 0;
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -141,6 +194,33 @@ function DashboardContent() {
   const acceptedConnections = (connData?.connections ?? []).filter((c: any) => c.status === "accepted").length;
   const applicationCount = appData?.total ?? 0;
 
+  const markNotificationRead = async (notification: AppNotification) => {
+    const token = await getToken();
+    await fetch(`${basePath}/api/notifications/${notification.id}/read`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    if (notification.href) window.location.href = `${basePath}${notification.href}`;
+  };
+
+  const markAllNotificationsRead = async () => {
+    const token = await getToken();
+    await fetch(`${basePath}/api/notifications/read-all`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Top nav */}
@@ -159,6 +239,64 @@ function DashboardContent() {
                 <span className="hidden sm:inline">Home</span>
               </Button>
             </Link>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 relative"
+                onClick={() => setNotificationsOpen((v) => !v)}
+              >
+                <Bell className="w-4 h-4" />
+                <span className="hidden sm:inline">Alerts</span>
+                {notificationsUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center px-1">
+                    {notificationsUnreadCount > 9 ? "9+" : notificationsUnreadCount}
+                  </span>
+                )}
+              </Button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 top-12 z-50 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card p-3 shadow-2xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold">Notifications</h3>
+                      <p className="text-xs text-muted-foreground">{notificationsUnreadCount} unread</p>
+                    </div>
+                    {notificationsUnreadCount > 0 && (
+                      <button onClick={markAllNotificationsRead} className="text-xs text-primary hover:underline">
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-[360px] space-y-2 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-muted-foreground">No notifications yet.</div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <button
+                          key={notification.id}
+                          onClick={() => markNotificationRead(notification)}
+                          className={`w-full rounded-xl border p-3 text-left transition hover:bg-muted/60 ${
+                            notification.isRead ? "border-border bg-background/40" : "border-primary/30 bg-primary/5"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${notification.isRead ? "bg-muted" : "bg-primary"}`} />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">{notification.title}</p>
+                              {notification.body && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{notification.body}</p>}
+                              <p className="mt-1 text-[10px] text-muted-foreground">{new Date(notification.createdAt).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Link to="/profile">
               <Button variant="ghost" size="sm" className="gap-2">
                 <User className="w-4 h-4" />
