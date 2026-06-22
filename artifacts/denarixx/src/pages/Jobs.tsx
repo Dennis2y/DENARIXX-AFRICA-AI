@@ -665,6 +665,9 @@ function JobsContent() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [alerts, setAlerts] = useState<JobAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertTitleQuery, setAlertTitleQuery] = useState("");
+  const [alertLocationQuery, setAlertLocationQuery] = useState("");
+  const [alertRemoteType, setAlertRemoteType] = useState("all");
   const [creatingAlert, setCreatingAlert] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savedLoading, setSavedLoading] = useState(false);
@@ -839,8 +842,11 @@ function JobsContent() {
   };
 
   const handleCreateJobAlert = async () => {
-    const titleQuery = search.trim() || prompt("What job title should we alert you about? Example: AI Engineer");
-    if (!titleQuery) return;
+    const titleQuery = alertTitleQuery.trim() || search.trim();
+    if (!titleQuery) {
+      toast({ title: "Enter a job title first", description: "Example: AI Engineer", variant: "destructive" });
+      return;
+    }
 
     setCreatingAlert(true);
     try {
@@ -855,8 +861,8 @@ function JobsContent() {
         },
         body: JSON.stringify({
           titleQuery,
-          locationQuery: filterRegion !== "all" ? filterRegion : "",
-          remoteType: filterRemote !== "all" ? filterRemote : "",
+          locationQuery: alertLocationQuery.trim(),
+          remoteType: alertRemoteType !== "all" ? alertRemoteType : "",
           frequency: "daily",
         }),
       });
@@ -868,6 +874,9 @@ function JobsContent() {
         title: "Job alert created",
         description: `We'll track new jobs matching "${titleQuery}".`,
       });
+      setAlertTitleQuery("");
+      setAlertLocationQuery("");
+      setAlertRemoteType("all");
       fetchAlerts();
     } catch (err: any) {
       toast({ title: "Alert failed", description: err.message, variant: "destructive" });
@@ -1305,6 +1314,37 @@ function JobsContent() {
                 {creatingAlert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
                 New Alert
               </Button>
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-border bg-card p-4">
+              <div className="grid gap-3 md:grid-cols-[1fr_1fr_180px_auto]">
+                <input
+                  value={alertTitleQuery}
+                  onChange={e => setAlertTitleQuery(e.target.value)}
+                  placeholder="Job title e.g. AI Engineer"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50"
+                />
+                <input
+                  value={alertLocationQuery}
+                  onChange={e => setAlertLocationQuery(e.target.value)}
+                  placeholder="Location e.g. Ghana, Germany, Remote"
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50"
+                />
+                <select
+                  value={alertRemoteType}
+                  onChange={e => setAlertRemoteType(e.target.value)}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50"
+                >
+                  <option value="all">Any</option>
+                  <option value="remote">Remote</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="on-site">On-site</option>
+                </select>
+                <Button type="button" onClick={handleCreateJobAlert} disabled={creatingAlert} className="rounded-xl gap-2">
+                  {creatingAlert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                  Save Alert
+                </Button>
+              </div>
             </div>
 
             {alertsLoading ? (
