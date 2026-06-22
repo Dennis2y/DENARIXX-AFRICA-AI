@@ -377,7 +377,11 @@ router.post("/:partnerId/attachment", requireAuth, runMessageUpload, async (req,
       return;
     }
 
-    const fileUrl = `http://localhost:3000/uploads/messages/${req.file.filename}`;
+    const publicAppUrl =
+      process.env.PUBLIC_APP_URL ||
+      `${req.protocol}://${req.get("host")}`;
+
+    const fileUrl = `${publicAppUrl.replace(/\/$/, "")}/uploads/messages/${req.file.filename}`;
     const isImage = req.file.mimetype.startsWith("image/");
     const isAudio = req.file.mimetype.startsWith("audio/");
 
