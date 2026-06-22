@@ -1,6 +1,6 @@
-Denarixx Africa AI
+# Denarixx Africa AI
 
-AI Operating System for Africa
+## AI Operating System for Africa
 
 Denarixx Africa AI is an AI-powered career, learning, networking, and opportunity platform designed to help African talent connect with jobs, skills, mentors, employers, and business opportunities through intelligent automation.
 
@@ -8,15 +8,15 @@ The platform combines AI career coaching, CV optimization, job matching, profess
 
 ⸻
 
-Vision
+## Vision
 
 To become Africa’s most powerful AI-powered professional ecosystem where talent, employers, learners, and entrepreneurs can connect, learn, work, and grow.
 
 ⸻
 
-Core Modules
+## Core Modules
 
-DENA AI Assistant
+### DENA AI Assistant
 
 * AI career advisor
 * CV analysis
@@ -24,14 +24,14 @@ DENA AI Assistant
 * Job search assistance
 * Professional coaching
 
-SkillSwap AI
+### SkillSwap AI
 
 * Skill exchange marketplace
 * Mentor matching
 * Peer-to-peer learning
 * Knowledge sharing
 
-AI Job Marketplace
+### AI Job Marketplace
 
 * Global job discovery
 * AI-powered matching
@@ -39,7 +39,7 @@ AI Job Marketplace
 * Employer dashboard
 * Candidate ranking
 
-Professional Messaging
+### Professional Messaging
 
 * Direct messaging
 * File sharing
@@ -48,7 +48,7 @@ Professional Messaging
 * Reactions
 * Notifications
 
-Real-Time Communication
+### Real-Time Communication
 
 * Audio calls
 * Video calls
@@ -56,20 +56,20 @@ Real-Time Communication
 * Call history
 * Incoming call notifications
 
-CV Builder
+### CV Builder
 
 * Professional CV generation
 * CV storage
 * CV optimization
 * ATS-friendly formatting
 
-Interview Coach
+### Interview Coach
 
 * AI mock interviews
 * Feedback analysis
 * Performance tracking
 
-Canvas & Artifacts
+### Canvas & Artifacts
 
 * Save AI outputs
 * Organize projects
@@ -78,9 +78,9 @@ Canvas & Artifacts
 
 ⸻
 
-Technology Stack
+## Technology Stack
 
-Frontend
+### Frontend
 
 * React
 * TypeScript
@@ -89,7 +89,7 @@ Frontend
 * Clerk Authentication
 * TanStack Query
 
-Backend
+### Backend
 
 * Fastify
 * Node.js
@@ -97,7 +97,7 @@ Backend
 * PostgreSQL
 * Drizzle ORM
 
-AI Layer
+### AI Layer
 
 * OpenAI
 * Gemini
@@ -105,14 +105,14 @@ AI Layer
 * Groq
 * DENA AI Framework
 
-Realtime Infrastructure
+### Realtime Infrastructure
 
 * LiveKit
 * WebSockets
 
 ⸻
 
-Key Features
+## Key Features
 
 * AI Career Coach
 * AI CV Builder
