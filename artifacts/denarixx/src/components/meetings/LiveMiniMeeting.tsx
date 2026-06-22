@@ -16,6 +16,7 @@ type Props = {
   token: string;
   serverUrl: string;
   roomName: string;
+  mode?: "audio" | "video";
   onClose: () => void;
 };
 
@@ -88,7 +89,7 @@ function MiniStage() {
   );
 }
 
-export function LiveMiniMeeting({ token, serverUrl, roomName, onClose }: Props) {
+export function LiveMiniMeeting({ token, serverUrl, roomName, mode = "video", onClose }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -99,11 +100,11 @@ export function LiveMiniMeeting({ token, serverUrl, roomName, onClose }: Props) 
           : "fixed bottom-5 right-5 z-[120] h-[420px] w-[340px] overflow-hidden rounded-[28px] border border-cyan-400/25 bg-black text-white shadow-2xl"
       }
     >
-      <LiveKitRoom token={token} serverUrl={serverUrl} connect video audio className="h-full">
+      <LiveKitRoom token={token} serverUrl={serverUrl} connect video={mode === "video"} audio className="h-full">
         <div className="flex h-full flex-col">
           <div className="flex h-12 items-center justify-between border-b border-white/10 bg-zinc-950 px-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold">Live call</p>
+              <p className="truncate text-sm font-bold">{mode === "video" ? "Video call" : "Audio call"}</p>
               <p className="truncate text-[11px] text-white/45">{roomName}</p>
             </div>
 

@@ -279,7 +279,11 @@ function useSendMessage(partnerId: number | null, getToken: () => Promise<string
         body: JSON.stringify(body),
       });
 
-      if (!r.ok) throw new Error("Failed to send");
+      if (!r.ok) {
+        const text = await r.text();
+        console.error("Send message failed:", r.status, text);
+        throw new Error(text || "Failed to send");
+      }
       return r.json();
     },
     onSuccess: () => {
@@ -826,6 +830,7 @@ function ThreadView({
       displayName: partner?.name || "Denarixx User",
       meetingType: "direct",
       avatarUrl: null,
+      mode: mode === "audio" ? "audio" : "video",
     });
   };
 
@@ -866,6 +871,7 @@ function ThreadView({
       displayName: partner?.name || "Denarixx User",
       meetingType: "direct",
       avatarUrl: null,
+      mode: mode === "audio" ? "audio" : "video",
     });
 
     qc.invalidateQueries({ queryKey: ["messages-thread", partnerId] });
@@ -933,6 +939,7 @@ function ThreadView({
           token={activeMeeting.token}
           serverUrl={activeMeeting.serverUrl}
           roomName={activeMeeting.roomName}
+          mode={activeMeeting.mode}
           onClose={async () => {
             const messageId = activeCallMessageId;
             endMeeting();

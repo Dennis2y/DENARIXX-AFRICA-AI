@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens, directMessages } from "@workspace/db";
+import { db, jobs, jobApplications, savedJobs, usersTable, userSkillsTable, pushTokens, directMessages, jobAlerts } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateAI } from "../lib/ai/aiRouter";
@@ -223,8 +223,8 @@ const SEED_JOBS = [
   {
     title: "Senior Frontend Engineer",
     company: "Andela",
-    location: "Remote, Africa",
-    description: "Join Africa's largest talent accelerator building world-class engineering teams. You'll work with US and European companies on cutting-edge products. Andela vets and places top African developers with global tech companies.",
+    location: "Remote Worldwide",
+    description: "Join a global talent accelerator building world-class engineering teams. You'll work with US and European companies on cutting-edge products. Andela vets and places top global developers with global tech companies.",
     requiredSkills: ["React", "TypeScript", "CSS", "JavaScript"],
     salary: "$4,000–6,000/month",
     jobType: "full-time",
@@ -239,7 +239,7 @@ const SEED_JOBS = [
     title: "Data Scientist",
     company: "Flutterwave",
     location: "Lagos, Nigeria",
-    description: "Help Africa's leading fintech company make sense of millions of payment transactions through machine learning and advanced analytics. You'll build models that directly impact fraud detection and risk scoring.",
+    description: "Help a leading global fintech company make sense of millions of payment transactions through machine learning and advanced analytics. You'll build models that directly impact fraud detection and risk scoring.",
     requiredSkills: ["Python", "Machine Learning", "SQL", "Data Analysis"],
     salary: "₦600,000–900,000/month",
     jobType: "full-time",
@@ -254,7 +254,7 @@ const SEED_JOBS = [
     title: "Product Designer (UI/UX)",
     company: "M-Pesa Africa",
     location: "Nairobi, Kenya",
-    description: "Shape the digital financial experiences of 50+ million mobile money users across Africa. Own end-to-end design for mobile and web products — from discovery and wireframes to high-fidelity prototypes.",
+    description: "Shape the digital financial experiences of 50+ million mobile money users across global markets. Own end-to-end design for mobile and web products — from discovery and wireframes to high-fidelity prototypes.",
     requiredSkills: ["UI/UX Design", "Figma", "User Research", "Prototyping"],
     salary: "KES 250,000–400,000/month",
     jobType: "full-time",
@@ -269,7 +269,7 @@ const SEED_JOBS = [
     title: "Backend Engineer (Node.js)",
     company: "Paystack",
     location: "Lagos, Nigeria (Hybrid)",
-    description: "Build and scale the payments infrastructure that powers thousands of African businesses. Work on high-throughput systems handling billions in transactions. Paystack is a Stripe company.",
+    description: "Build and scale the payments infrastructure that powers thousands of global businesses. Work on high-throughput systems handling billions in transactions. Paystack is a Stripe company.",
     requiredSkills: ["Node.js", "JavaScript", "PostgreSQL", "System Design"],
     salary: "₦500,000–800,000/month",
     jobType: "full-time",
@@ -284,7 +284,7 @@ const SEED_JOBS = [
     title: "AI/ML Engineer",
     company: "InstaDeep",
     location: "Tunis, Tunisia (Remote-friendly)",
-    description: "Work on cutting-edge AI research and deployment for industrial applications. InstaDeep is a global AI company headquartered in Africa, with offices in London, Paris, and Cape Town.",
+    description: "Work on cutting-edge AI research and deployment for industrial applications. InstaDeep is a global AI company with international offices, with offices in London, Paris, and Cape Town.",
     requiredSkills: ["Python", "Machine Learning", "Deep Learning", "PyTorch"],
     salary: "$3,500–5,500/month",
     jobType: "full-time",
@@ -299,7 +299,7 @@ const SEED_JOBS = [
     title: "Digital Marketing Manager",
     company: "Jumia",
     location: "Cairo, Egypt",
-    description: "Lead performance marketing campaigns for Africa's largest e-commerce platform. Drive user acquisition, retention, and revenue across multiple African markets using data-driven strategies.",
+    description: "Lead performance marketing campaigns for a major global e-commerce platform. Drive user acquisition, retention, and revenue across multiple global markets using data-driven strategies.",
     requiredSkills: ["Digital Marketing", "SEO", "Data Analysis", "Social Media"],
     salary: "$2,000–3,500/month",
     jobType: "full-time",
@@ -313,7 +313,7 @@ const SEED_JOBS = [
   {
     title: "Mobile Developer (React Native)",
     company: "Chipper Cash",
-    location: "Remote, Africa",
+    location: "Remote Worldwide",
     description: "Build mobile payment experiences for Chipper Cash users across 7 African countries. Handle real-money flows and ensure a seamless cross-border transfer experience on iOS and Android.",
     requiredSkills: ["React Native", "JavaScript", "TypeScript", "Mobile Development"],
     salary: "$3,000–5,000/month",
@@ -344,7 +344,7 @@ const SEED_JOBS = [
     title: "Product Manager",
     company: "Wave Mobile Money",
     location: "Dakar, Senegal",
-    description: "Lead product strategy for Wave's fastest-growing African markets. Wave is disrupting mobile money with zero fees and an exceptional UX across Senegal, Côte d'Ivoire, Uganda, and Tanzania.",
+    description: "Lead product strategy for Wave's fastest-growing global markets. Wave is disrupting mobile money with zero fees and an exceptional UX across Senegal, Côte d'Ivoire, Uganda, and Tanzania.",
     requiredSkills: ["Product Management", "Agile", "User Research", "Data Analysis"],
     salary: "$4,000–7,000/month",
     jobType: "full-time",
@@ -359,7 +359,7 @@ const SEED_JOBS = [
     title: "Junior Software Developer",
     company: "Turing",
     location: "Remote",
-    description: "Entry-level opportunity to work with top US companies via Turing's talent platform. Comprehensive onboarding and mentorship included. Turing matches African developers with Silicon Valley companies.",
+    description: "Entry-level opportunity to work with top US companies via Turing's talent platform. Comprehensive onboarding and mentorship included. Turing matches global developers with Silicon Valley companies.",
     requiredSkills: ["JavaScript", "Python", "SQL"],
     salary: "$1,500–2,500/month",
     jobType: "full-time",
@@ -389,7 +389,7 @@ const SEED_JOBS = [
     title: "Full-Stack Developer (Contract)",
     company: "Remoteli.io",
     location: "Remote",
-    description: "Contract roles connecting African tech talent with remote-first companies globally. Flexible 3–12 month engagements with top clients. Remoteli specialises in placing African developers in international contract roles.",
+    description: "Contract roles connecting global tech talent with remote-first companies globally. Flexible 3–12 month engagements with top clients. Remoteli specialises in placing global developers in international contract roles.",
     requiredSkills: ["JavaScript", "React", "Node.js", "PostgreSQL"],
     salary: "$30–60/hour",
     jobType: "contract",
@@ -404,8 +404,8 @@ const SEED_JOBS = [
   {
     title: "Full-Stack Engineer",
     company: "DENARIXX",
-    location: "Remote, Africa",
-    description: "Help build Africa's AI Operating System. You'll work across the entire stack — React frontend, Express/Node backend, PostgreSQL database — shipping features that empower African professionals with AI tools.",
+    location: "Remote Worldwide",
+    description: "Help build a global AI career operating system. You'll work across the entire stack — React frontend, Express/Node backend, PostgreSQL database — shipping features that empower professionals worldwide with AI tools.",
     requiredSkills: ["React", "TypeScript", "Node.js", "PostgreSQL", "REST APIs"],
     salary: "$2,500–4,000/month",
     jobType: "full-time",
@@ -419,7 +419,7 @@ const SEED_JOBS = [
   {
     title: "AI Prompt Engineer",
     company: "DENARIXX",
-    location: "Remote, Africa",
+    location: "Remote Worldwide",
     description: "Design and optimise the prompts powering DENARIXX's AI features — CV generation, job matching, interview coaching, and more. You'll work closely with product and engineering to craft prompts that deliver reliable, high-quality results.",
     requiredSkills: ["Prompt Engineering", "Python", "OpenAI API", "Data Analysis"],
     salary: "$2,000–3,500/month",
@@ -434,8 +434,8 @@ const SEED_JOBS = [
   {
     title: "Growth & Partnerships Lead",
     company: "DENARIXX",
-    location: "Remote, Africa",
-    description: "Drive user growth and build partnerships with African universities, bootcamps, and tech communities. Own our go-to-market strategy across key African markets including Nigeria, Kenya, Ghana, South Africa, and Egypt.",
+    location: "Remote Worldwide",
+    description: "Drive user growth and build partnerships with universities, bootcamps, and tech communities worldwide. Own our go-to-market strategy across key global markets including Nigeria, Kenya, Ghana, South Africa, and Egypt.",
     requiredSkills: ["Growth Marketing", "Partnerships", "Digital Marketing", "Data Analysis"],
     salary: "$2,000–3,500/month",
     jobType: "full-time",
@@ -482,7 +482,325 @@ async function ensureJobsSeeded() {
     }
   } catch {}
 }
-ensureJobsSeeded();
+// Production: do not auto-seed demo jobs.
+if (process.env.DENARIXX_ENABLE_SEED_JOBS === "true") {
+  ensureJobsSeeded();
+}
+
+
+
+async function importArbeitnowJobs(logger?: any) {
+  const response = await fetch("https://www.arbeitnow.com/api/job-board-api");
+  if (!response.ok) throw new Error("Failed to fetch Arbeitnow jobs");
+
+  const data = await response.json() as { data?: any[] };
+  const rows = Array.isArray(data.data) ? data.data.slice(0, 150) : [];
+  let imported = 0;
+
+  for (const item of rows) {
+    const title = String(item.title ?? "").trim();
+    const company = String(item.company_name ?? "Unknown company").trim();
+    const externalApplyUrl = String(item.url ?? "").trim();
+    if (!title || !externalApplyUrl) continue;
+
+    const existing = await db.select({ id: jobs.id }).from(jobs)
+      .where(and(eq(jobs.title, title), eq(jobs.company, company))).limit(1);
+    if (existing.length) continue;
+
+    await db.insert(jobs).values({
+      title,
+      company,
+      location: Array.isArray(item.location) ? item.location.join(", ") : String(item.location ?? "Global/Europe"),
+      description: String(item.description ?? "View full job details on the original job source."),
+      requiredSkills: Array.isArray(item.tags) ? item.tags.slice(0, 8).map(String) : [],
+      salary: null,
+      jobType: String(item.job_types?.[0] ?? "full-time"),
+      level: "mid",
+      source: "arbeitnow-global",
+      externalApplyUrl,
+      postedDate: item.created_at ? new Date(Number(item.created_at) * 1000) : new Date(),
+      remoteType: String(item.remote ?? "").toLowerCase() === "true" ? "remote" : "on-site",
+      country: "Global/Europe",
+      moderationStatus: "approved",
+      isActive: true,
+    });
+    imported++;
+  }
+
+  logger?.info?.({ imported, checked: rows.length }, "Arbeitnow global jobs imported");
+  return { imported, checked: rows.length };
+}
+
+async function importRemoteOkJobs(logger?: any) {
+  const response = await fetch("https://remoteok.com/api", {
+    headers: {
+      "User-Agent": "DenarixxGlobalJobs/1.0",
+      "Accept": "application/json",
+    },
+  });
+  if (!response.ok) throw new Error("Failed to fetch RemoteOK jobs");
+
+  const data = await response.json() as any[];
+  const rows = Array.isArray(data) ? data.filter((item) => item?.id).slice(0, 150) : [];
+  let imported = 0;
+
+  for (const item of rows) {
+    const title = String(item.position ?? item.title ?? "").trim();
+    const company = String(item.company ?? "Unknown company").trim();
+    const externalApplyUrl = String(item.url ?? item.apply_url ?? "").trim();
+    if (!title || !externalApplyUrl) continue;
+
+    const existing = await db.select({ id: jobs.id }).from(jobs)
+      .where(and(eq(jobs.title, title), eq(jobs.company, company))).limit(1);
+    if (existing.length) continue;
+
+    const tags = Array.isArray(item.tags) ? item.tags.map(String).slice(0, 8) : [];
+    const salary = item.salary_min || item.salary_max
+      ? `${item.salary_min ?? ""}${item.salary_min && item.salary_max ? "–" : ""}${item.salary_max ?? ""}`.trim()
+      : null;
+
+    await db.insert(jobs).values({
+      title,
+      company,
+      location: String(item.location ?? "Remote Worldwide"),
+      description: String(item.description ?? "View full job details on RemoteOK."),
+      requiredSkills: tags,
+      salary,
+      jobType: "full-time",
+      level: "mid",
+      source: "remoteok-global",
+      externalApplyUrl,
+      postedDate: item.date ? new Date(item.date) : new Date(),
+      remoteType: "remote",
+      country: "Global",
+      moderationStatus: "approved",
+      isActive: true,
+    });
+    imported++;
+  }
+
+  logger?.info?.({ imported, checked: rows.length }, "RemoteOK global jobs imported");
+  return { imported, checked: rows.length };
+}
+
+async function syncGlobalJobs(logger?: any) {
+  const results = [];
+  try { results.push({ source: "arbeitnow", ...(await importArbeitnowJobs(logger)) }); }
+  catch (err) { logger?.error?.({ err }, "Arbeitnow sync failed"); }
+
+  try { results.push({ source: "remoteok", ...(await importRemoteOkJobs(logger)) }); }
+  catch (err) { logger?.error?.({ err }, "RemoteOK sync failed"); }
+
+  return results;
+}
+
+let globalJobSyncStarted = false;
+function startGlobalJobAutoSync(logger?: any) {
+  if (globalJobSyncStarted) return;
+  globalJobSyncStarted = true;
+
+  if (process.env.DENARIXX_AUTO_SYNC_GLOBAL_JOBS !== "true") return;
+
+  syncGlobalJobs(logger).catch((err) => logger?.error?.({ err }, "Initial global job sync failed"));
+
+  setInterval(() => {
+    syncGlobalJobs(logger).catch((err) => logger?.error?.({ err }, "Scheduled global job sync failed"));
+  }, 6 * 60 * 60 * 1000);
+}
+
+// ── POST /api/jobs/import/arbeitnow ───────────────────────────────────────────
+// Imports real public jobs from Arbeitnow. No demo data.
+router.post("/import/arbeitnow", requireAuth, async (req, res) => {
+  try {
+    const [caller] = await db
+      .select({ id: usersTable.id, userType: usersTable.userType })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!caller || caller.userType !== "admin") {
+      res.status(403).json({ error: "Admin only" });
+      return;
+    }
+
+    const result = await importArbeitnowJobs(req.log);
+    res.json({ ok: true, source: "arbeitnow", ...result });
+  } catch (err) {
+    req.log.error({ err }, "Failed to import Arbeitnow jobs");
+    res.status(500).json({ error: "Failed to import Arbeitnow jobs" });
+  }
+});
+
+// ── POST /api/jobs/import/remoteok ────────────────────────────────────────────
+// Imports real worldwide remote jobs from RemoteOK. No demo data.
+// ── POST /api/jobs/import/remoteok ────────────────────────────────────────────
+// Imports real worldwide remote jobs from RemoteOK. No demo data.
+router.post("/import/remoteok", requireAuth, async (req, res) => {
+  try {
+    const [caller] = await db
+      .select({ id: usersTable.id, userType: usersTable.userType })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!caller || caller.userType !== "admin") {
+      res.status(403).json({ error: "Admin only" });
+      return;
+    }
+
+    const result = await importRemoteOkJobs(req.log);
+    res.json({ ok: true, source: "remoteok", ...result });
+  } catch (err) {
+    req.log.error({ err }, "Failed to import RemoteOK jobs");
+    res.status(500).json({ error: "Failed to import RemoteOK jobs" });
+  }
+});
+
+router.post("/import/global", requireAuth, async (req, res) => {
+  try {
+    const [caller] = await db
+      .select({ id: usersTable.id, userType: usersTable.userType })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!caller || caller.userType !== "admin") {
+      res.status(403).json({ error: "Admin only" });
+      return;
+    }
+
+    const results = await syncGlobalJobs(req.log);
+    const imported = results.reduce((sum, r: any) => sum + Number(r.imported ?? 0), 0);
+    const checked = results.reduce((sum, r: any) => sum + Number(r.checked ?? 0), 0);
+
+    res.json({ ok: true, imported, checked, results });
+  } catch (err) {
+    req.log.error({ err }, "Failed to import global jobs");
+    res.status(500).json({ error: "Failed to import global jobs" });
+  }
+});
+
+
+// ── Job Alerts ────────────────────────────────────────────────────────────────
+
+router.get("/alerts", requireAuth, async (req, res) => {
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const alerts = await db
+      .select()
+      .from(jobAlerts)
+      .where(eq(jobAlerts.userId, user.id))
+      .orderBy(desc(jobAlerts.createdAt));
+
+    res.json({ alerts });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch job alerts");
+    res.status(500).json({ error: "Failed to fetch job alerts" });
+  }
+});
+
+router.post("/alerts", requireAuth, async (req, res) => {
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const { titleQuery, locationQuery, remoteType, frequency } = req.body as {
+      titleQuery?: string;
+      locationQuery?: string;
+      remoteType?: string;
+      frequency?: string;
+    };
+
+    if (!titleQuery?.trim()) {
+      res.status(400).json({ error: "titleQuery is required" });
+      return;
+    }
+
+    const [alert] = await db
+      .insert(jobAlerts)
+      .values({
+        userId: user.id,
+        titleQuery: titleQuery.trim(),
+        locationQuery: locationQuery?.trim() || null,
+        remoteType: remoteType && remoteType !== "all" ? remoteType : null,
+        frequency: frequency || "daily",
+      })
+      .returning();
+
+    res.status(201).json({ alert });
+  } catch (err) {
+    req.log.error({ err }, "Failed to create job alert");
+    res.status(500).json({ error: "Failed to create job alert" });
+  }
+});
+
+router.patch("/alerts/:id", requireAuth, async (req, res) => {
+  try {
+    const alertId = Number(req.params.id);
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const updates: Record<string, unknown> = {};
+    for (const key of ["titleQuery", "locationQuery", "remoteType", "frequency", "isActive"] as const) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    const [alert] = await db
+      .update(jobAlerts)
+      .set(updates)
+      .where(and(eq(jobAlerts.id, alertId), eq(jobAlerts.userId, user.id)))
+      .returning();
+
+    if (!alert) { res.status(404).json({ error: "Alert not found" }); return; }
+
+    res.json({ alert });
+  } catch (err) {
+    req.log.error({ err }, "Failed to update job alert");
+    res.status(500).json({ error: "Failed to update job alert" });
+  }
+});
+
+router.delete("/alerts/:id", requireAuth, async (req, res) => {
+  try {
+    const alertId = Number(req.params.id);
+    const [user] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, (req as any).clerkUserId as string))
+      .limit(1);
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    await db
+      .delete(jobAlerts)
+      .where(and(eq(jobAlerts.id, alertId), eq(jobAlerts.userId, user.id)));
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to delete job alert");
+    res.status(500).json({ error: "Failed to delete job alert" });
+  }
+});
+
+
+startGlobalJobAutoSync();
 
 // ── GET /api/jobs ─────────────────────────────────────────────────────────────
 // Query params: ?targetTitle=<string> ?cvSkills=<comma-separated>
@@ -828,7 +1146,9 @@ router.patch("/applications/:appId/status", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const appId = Number(req.params.appId);
   const { status } = req.body as { status: string };
-  const VALID = ["applied", "reviewing", "interview", "offered", "rejected"];
+
+  req.log.info({ clerkUserId, appId, status }, "APPLICATION_STATUS_PATCH_HIT");
+  const VALID = ["applied", "reviewing", "interview", "offered", "hired", "rejected"];
 
   if (!status || !VALID.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${VALID.join(", ")}` });
@@ -974,17 +1294,17 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
       return;
     }
 
-    if (job.externalApplyUrl) {
-      res.status(400).json({ error: "This job uses an external application process.", externalApplyUrl: job.externalApplyUrl });
-      return;
-    }
+    const isExternalApplication = Boolean(job.externalApplyUrl);
 
     const [existing] = await db.select({ id: jobApplications.id })
       .from(jobApplications).where(and(eq(jobApplications.userId, user.id), eq(jobApplications.jobId, jobId))).limit(1);
     if (existing) { res.status(409).json({ error: "Already applied to this job" }); return; }
 
     const [application] = await db.insert(jobApplications).values({
-      userId: user.id, jobId, status: "applied", coverLetter: coverLetter ?? null,
+      userId: user.id,
+      jobId,
+      status: isExternalApplication ? "external_applied" : "applied",
+      coverLetter: coverLetter ?? null,
     }).returning();
 
     if (job.postedByUserId && job.postedByUserId !== user.id) {
@@ -998,7 +1318,7 @@ router.post("/:id/apply", requireAuth, async (req, res) => {
       });
     }
 
-    res.status(201).json({ application });
+    res.status(201).json({ application, externalApplyUrl: job.externalApplyUrl ?? null });
   } catch (err) {
     req.log.error({ err }, "Failed to apply for job");
     res.status(500).json({ error: "Failed to submit application" });
@@ -1074,7 +1394,7 @@ router.post("/:id/match-explain", requireAuth, async (req, res) => {
     const completion = await generateAI({
       messages: [{
         role: "system",
-        content: "You are a career coach for African tech professionals. Analyze the job match and return ONLY a valid JSON object (no markdown):\n{\n  \"summary\": \"<2-sentence explanation of why this is a good or partial match>\",\n  \"suggestions\": [\"<3 specific, actionable steps to improve the match>\"]\n}",
+        content: "You are a career coach for global tech professionals. Analyze the job match and return ONLY a valid JSON object (no markdown):\n{\n  \"summary\": \"<2-sentence explanation of why this is a good or partial match>\",\n  \"suggestions\": [\"<3 specific, actionable steps to improve the match>\"]\n}",
       }, {
         role: "user",
         content: `Job: ${job.title} at ${job.company} (${job.level} level, ${job.location})\nRequired skills: ${job.requiredSkills.join(", ")}\nUser profile skills: ${userSkills.join(", ")}\nTarget role: ${effectiveRole ?? "not specified"}\nMatched skills: ${matchedSkills.join(", ") || "none"}\nMissing skills: ${missingSkills.join(", ") || "none"}${cvNote}`,
@@ -1120,7 +1440,7 @@ router.post("/:id/cover-letter", requireAuth, async (req, res) => {
     const completion = await generateAI({
       messages: [{
         role: "system",
-        content: "You are an expert job application coach specialising in African tech careers. Write a compelling, personalised 3-paragraph cover letter. Be specific about the company and role. Use a professional but warm tone. Return ONLY the cover letter text — no subject line, no date, no address block.",
+        content: "You are an expert job application coach specialising in global tech careers. Write a compelling, personalised 3-paragraph cover letter. Be specific about the company and role. Use a professional but warm tone. Return ONLY the cover letter text — no subject line, no date, no address block.",
       }, {
         role: "user",
         content: `Candidate name: ${user.name ?? "Candidate"}\nCurrent role: ${user.role ?? "Professional"}\nSkills: ${userSkills.join(", ")}${cvNote}\n\nApplying for: ${job.title} at ${job.company} (${job.location})\nJob description: ${job.description}\nRequired skills: ${job.requiredSkills.join(", ")}`,
@@ -1164,7 +1484,7 @@ router.post("/:id/tailor-cv", requireAuth, async (req, res) => {
     const resolvedRole = targetRole ?? user.role ?? job.title;
 
 
-    const systemPrompt = `You are an expert ATS and recruitment consultant specialising in African tech careers. Analyse this CV against the job description for the target role.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords already present>],\n  "suggestions": [<3-5 actionable steps to improve the CV for this specific role>],\n  "tailoredSummary": "<2-3 sentence professional summary, tailored to this JD and target role>"\n}`;
+    const systemPrompt = `You are an expert ATS and recruitment consultant specialising in global tech careers. Analyse this CV against the job description for the target role.\n\nReturn ONLY a valid JSON object (no markdown):\n{\n  "atsScore": <integer 0-100>,\n  "missingKeywords": [<up to 8 important keywords missing from CV>],\n  "presentKeywords": [<up to 8 strong matching keywords already present>],\n  "suggestions": [<3-5 actionable steps to improve the CV for this specific role>],\n  "tailoredSummary": "<2-3 sentence professional summary, tailored to this JD and target role>"\n}`;
     const userPrompt = `Target role: ${resolvedRole}\n\nCV:\n${cvContent.slice(0, 2500)}\n\n---\n\nJob: ${job.title} at ${job.company}\nJob Description: ${job.description}\nRequired Skills: ${job.requiredSkills.join(", ")}`;
 
     const completion = await generateAI({

@@ -4,7 +4,7 @@ import { Redirect, Link, useSearch } from "wouter";
 import { motion } from "framer-motion";
 import {
   User, MapPin, Globe, Twitter, Linkedin, Github,
-  Plus, X, ArrowLeft, Save, Loader2, Check, Camera, Bell, MessageCircle, Briefcase
+  Plus, X, ArrowLeft, Save, Loader2, Check, Camera, Bell, FileText, UploadCloud, MessageCircle, Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -200,6 +200,9 @@ function ProfileContent() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cvInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCv, setUploadingCv] = useState(false);
+  const [cvFileName, setCvFileName] = useState<string | null>(null);
 
   const [emailNotifications, setEmailNotifications] = useState(true);
 
@@ -307,28 +310,218 @@ function ProfileContent() {
   const removeSkill = (skill: string) =>
     setSkills((prev) => prev.filter((s) => s.skill !== skill));
 
+  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = [
+      "application/pdf",
+      "text/plain",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (!allowed.includes(file.type) && !file.name.toLowerCase().endsWith(".pdf") && !file.name.toLowerCase().endsWith(".txt") && !file.name.toLowerCase().endsWith(".docx")) {
+      alert("Please upload a PDF, DOCX, or TXT CV.");
+      return;
+    }
+
+    setUploadingCv(true);
+    setCvFileName(file.name);
+
+    try {
+      const token = await getToken();
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const fileBase64 = btoa(binary);
+
+      const parseRes = await fetch(`${basePath}/api/cv-builder/parse`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ fileBase64, filename: file.name }),
+      });
+
+      if (!parseRes.ok) {
+        const text = await parseRes.text();
+        throw new Error(text || "Could not parse CV");
+      }
+
+      const parsed = await parseRes.json();
+      const data = parsed.data ?? parsed.parsed ?? parsed.cv ?? parsed;
+
+      const inferredRole =
+        data.title ||
+        data.role ||
+        data.targetRole ||
+        data.currentRole ||
+        data.headline ||
+        "";
+
+      const inferredBio =
+        data.summary ||
+        data.profile ||
+        data.professionalSummary ||
+        "";
+
+      const inferredLocation =
+        data.location ||
+        data.address ||
+        "";
+
+      const parsedSkillsRaw =
+        data.skills ||
+        data.technicalSkills ||
+        data.coreSkills ||
+        [];
+
+      const parsedSkills = Array.isArray(parsedSkillsRaw)
+        ? parsedSkillsRaw.map((x: any) => typeof x === "string" ? x : x.skill || x.name).filter(Boolean)
+        : typeof parsedSkillsRaw === "string"
+          ? parsedSkillsRaw.split(/[,\n]/).map((x: string) => x.trim()).filter(Boolean)
+          : [];
+
+      const allText = JSON.stringify(data);
+
+      const findUrl = (patterns: RegExp[]) => {
+        for (const pattern of patterns) {
+          const match = allText.match(pattern);
+          if (match?.[0]) return match[0].replace(/\\/g, "");
+        }
+        return "";
+      };
+
+      const linkedinFromCv =
+        data.linkedin ||
+        data.linkedinUrl ||
+        data.linkedIn ||
+        data.socials?.linkedin ||
+        data.links?.linkedin ||
+        findUrl([/https?:\/\/(www\.)?linkedin\.com\/in\/[^"\s,]+/i, /linkedin\.com\/in\/[^"\s,]+/i]);
+
+      const githubFromCv =
+        data.github ||
+        data.githubUrl ||
+        data.githubHandle ||
+        data.socials?.github ||
+        data.links?.github ||
+        findUrl([/https?:\/\/(www\.)?github\.com\/[^"\s,]+/i, /github\.com\/[^"\s,]+/i]);
+
+      const websiteFromCv =
+        data.website ||
+        data.portfolio ||
+        data.portfolioUrl ||
+        data.personalWebsite ||
+        data.links?.website ||
+        data.links?.portfolio ||
+        findUrl([/https?:\/\/[^"\s,]*(portfolio|vercel|netlify|denarixx|personal)[^"\s,]*/i]);
+
+      setForm((prev) => ({
+        ...prev,
+        role: prev.role || inferredRole,
+        bio: prev.bio || inferredBio,
+        location: prev.location || inferredLocation,
+        linkedinUrl: prev.linkedinUrl || linkedinFromCv || "",
+        githubHandle: prev.githubHandle || githubFromCv || "",
+        website: prev.website || websiteFromCv || "",
+      }));
+
+      if (parsedSkills.length) {
+        setSkills((prev) => {
+          const existing = new Set(prev.map((s) => s.skill.toLowerCase()));
+          const next = [...prev];
+          for (const skill of parsedSkills.slice(0, 20)) {
+            if (!existing.has(String(skill).toLowerCase())) {
+              next.push({ skill: String(skill), level: "intermediate" });
+            }
+          }
+          return next;
+        });
+      }
+
+      const resumeMarkdown =
+        parsed.resumeMarkdown ||
+        parsed.markdown ||
+        parsed.cvText ||
+        parsed.text ||
+        JSON.stringify(data, null, 2);
+
+      await fetch(`${basePath}/api/resumes`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: file.name,
+          resumeMarkdown,
+          targetRole: inferredRole || null,
+          language: "English",
+          formSnapshot: data,
+        }),
+      }).catch(() => {});
+
+      try {
+        localStorage.setItem("denarixx_last_cv", resumeMarkdown);
+      } catch {}
+
+      alert("CV uploaded. Profile fields and skills were updated. Click Save Profile to keep them.");
+    } catch (err: any) {
+      alert(err?.message ?? "CV upload failed");
+      setCvFileName(null);
+    } finally {
+      setUploadingCv(false);
+      if (cvInputRef.current) cvInputRef.current.value = "";
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-      await fetch(`${base}/api/users/me`, {
+      const token = await getToken();
+      const profileRes = await fetch(`${basePath}/api/users/me`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ ...form, emailNotifications }),
       });
-      await fetch(`${base}/api/users/me/skills`, {
+
+      if (!profileRes.ok) {
+        const errorText = await profileRes.text();
+        console.error("Profile save failed:", profileRes.status, errorText);
+        throw new Error(errorText || "Failed to save profile");
+      }
+
+      const skillsRes = await fetch(`${basePath}/api/users/me/skills`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ skills }),
       });
+
+      if (!skillsRes.ok) {
+        const errorText = await skillsRes.text();
+        console.error("Skills save failed:", skillsRes.status, errorText);
+        throw new Error(errorText || "Failed to save skills");
+      }
+
       setSaved(true);
       setTimeout(() => {
         window.location.href = `${basePath}/dashboard`;
       }, 1200);
-    } catch {
-      // silent
+    } catch (err: any) {
+      alert(err?.message ?? "Profile save failed");
     } finally {
       setSaving(false);
     }
@@ -472,6 +665,45 @@ function ProfileContent() {
                     onChange={(e) => handleChange("location", e.target.value)}
                     className="bg-background border-border"
                   />
+                </div>
+              </section>
+
+              {/* CV Upload */}
+              <section className="rounded-xl border border-border bg-card p-6 space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-primary flex items-center gap-2">
+                      <FileText className="w-4 h-4" />Upload CV
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Upload a PDF, DOCX, or TXT CV. Denarixx will extract skills and update your profile.
+                    </p>
+                    {cvFileName && (
+                      <p className="text-xs text-green-400 mt-2">Loaded: {cvFileName}</p>
+                    )}
+                  </div>
+
+                  <input
+                    ref={cvInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="hidden"
+                    onChange={handleCvUpload}
+                  />
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={uploadingCv}
+                    onClick={() => cvInputRef.current?.click()}
+                    className="shrink-0 gap-2"
+                  >
+                    {uploadingCv ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" />Reading…</>
+                    ) : (
+                      <><UploadCloud className="w-4 h-4" />Upload CV</>
+                    )}
+                  </Button>
                 </div>
               </section>
 

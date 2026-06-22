@@ -18,3 +18,4 @@ export * from "./documentUploads";
 export * from "./documentChunks";
 export * from "./artifacts";
 export * from "./userBlocks";
+export * from "./jobAlerts";

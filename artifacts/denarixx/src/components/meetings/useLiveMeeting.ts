@@ -4,6 +4,7 @@ export type ActiveMeeting = {
   token: string;
   serverUrl: string;
   roomName: string;
+  mode: "audio" | "video";
 };
 
 export function useLiveMeeting(basePath: string, getToken: () => Promise<string | null>) {
@@ -15,6 +16,7 @@ export function useLiveMeeting(basePath: string, getToken: () => Promise<string 
     displayName?: string;
     meetingType?: "direct" | "community" | "webinar";
     avatarUrl?: string | null;
+    mode?: "audio" | "video";
   }) {
     setStartingMeeting(true);
 
@@ -42,6 +44,7 @@ export function useLiveMeeting(basePath: string, getToken: () => Promise<string 
         token: data.token,
         serverUrl: data.url,
         roomName: data.roomName,
+        mode: options.mode ?? "video",
       });
     } finally {
       setStartingMeeting(false);

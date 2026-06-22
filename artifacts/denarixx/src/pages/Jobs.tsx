@@ -1,19 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Show } from "@clerk/react";
+import { Show, useAuth } from "@clerk/react";
 import { Redirect, Link, useSearch } from "wouter";
 import {
   Briefcase, MapPin, Clock, ChevronLeft, Search,
   Sparkles, CheckCircle, Send, Loader2, X, Star, TrendingUp,
   Bookmark, BookmarkCheck, ChevronDown, ChevronUp, Wand2,
   ClipboardCheck, AlertCircle, Copy, Check, ExternalLink,
-  Globe, Calendar,
+  Globe, Calendar, Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useTypewriterText } from "@/hooks/useTypewriterText";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function decodeHtml(value: string | null | undefined) {
+  if (!value) return "";
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = value;
+  return textarea.value;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +47,7 @@ type Job = {
   country: string | null;
 };
 
-type Tab = "browse" | "applications" | "saved";
+type Tab = "browse" | "applications" | "saved" | "alerts";
 
 type Application = {
   id: number;
@@ -55,6 +62,16 @@ type Application = {
   level: string;
   salary: string | null;
   externalApplyUrl: string | null;
+};
+
+type JobAlert = {
+  id: number;
+  titleQuery: string;
+  locationQuery: string | null;
+  remoteType: string | null;
+  frequency: string;
+  isActive: boolean;
+  createdAt: string;
 };
 
 type MatchExplain = {
@@ -93,7 +110,7 @@ const TYPE_LABELS: Record<string, string> = {
   contract: "Contract",
 };
 
-const STATUS_STEPS = ["applied", "reviewing", "interview", "offered"] as const;
+const STATUS_STEPS = ["external_applied", "applied", "reviewing", "interview", "offered", "hired"] as const;
 type StatusStep = typeof STATUS_STEPS[number];
 
 // Skills to detect in CV text for enhanced matching
@@ -368,16 +385,32 @@ function TailorCVModal({ job, onClose }: { job: Job; onClose: () => void }) {
 
 // ── StatusPipeline ─────────────────────────────────────────────────────────
 
-function StatusPipeline({ appId, currentStatus, onUpdate }: { appId: number; currentStatus: string; onUpdate: (appId: number, status: string) => void }) {
+function StatusPipeline({
+  appId,
+  currentStatus,
+  onUpdate,
+  readOnly = false,
+}: {
+  appId: number;
+  currentStatus: string;
+  onUpdate?: (appId: number, status: string) => void;
+  readOnly?: boolean;
+}) {
   const isRejected = currentStatus === "rejected";
+  const isExternal = currentStatus === "external_applied";
   const activeIdx = STATUS_STEPS.indexOf(currentStatus as StatusStep);
 
   return (
     <div className="mt-3">
-      {isRejected ? (
+      {isExternal ? (
+        <div className="flex items-center gap-2">
+          <span className="text-xs px-2 py-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 text-cyan-300 font-medium">External Applied</span>
+          <span className="text-[10px] text-muted-foreground">Tracked in Denarixx. Final response comes from the company.</span>
+        </div>
+      ) : isRejected ? (
         <div className="flex items-center gap-2">
           <span className="text-xs px-2 py-1 rounded-full border border-red-400/20 bg-red-400/10 text-red-400 font-medium">Rejected</span>
-          <button onClick={() => onUpdate(appId, "applied")} className="text-[10px] text-muted-foreground hover:text-foreground underline">Reopen</button>
+          <button disabled={readOnly} onClick={() => { if (!readOnly) onUpdate?.(appId, "applied"); }} className="text-[10px] text-muted-foreground hover:text-foreground underline">Reopen</button>
         </div>
       ) : (
         <div className="flex items-center gap-1 flex-wrap">
@@ -385,14 +418,14 @@ function StatusPipeline({ appId, currentStatus, onUpdate }: { appId: number; cur
             const isPast = activeIdx > idx;
             const isActive = activeIdx === idx;
             return (
-              <button key={step} onClick={() => onUpdate(appId, step)}
+              <button key={step} disabled={readOnly} onClick={() => { if (!readOnly) onUpdate?.(appId, step); }}
                 className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors capitalize ${isActive ? "border-primary/40 bg-primary/10 text-primary" : isPast ? "border-green-400/20 bg-green-400/5 text-green-400/70" : "border-border bg-transparent text-muted-foreground hover:text-foreground"}`}
               >
-                {isPast && <CheckCircle className="w-2.5 h-2.5" />}{step}
+                {isPast && <CheckCircle className="w-2.5 h-2.5" />}{step === "external_applied" ? "External Applied" : step}
               </button>
             );
           })}
-          <button onClick={() => onUpdate(appId, "rejected")} className="text-[10px] px-2 py-0.5 rounded-full border border-red-400/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition-colors">Reject</button>
+          <button disabled={readOnly} onClick={() => { if (!readOnly) onUpdate?.(appId, "rejected"); }} className="text-[10px] px-2 py-0.5 rounded-full border border-red-400/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition-colors">Reject</button>
         </div>
       )}
     </div>
@@ -463,10 +496,11 @@ function MatchExplainPanel({ job, explain, loading, onLoad }: { job: Job; explai
 // ── JobCard ────────────────────────────────────────────────────────────────
 
 function JobCard({
-  job, onApply, onSave, onTailor, onMatchExplain, matchExplain, matchExplainLoading,
+  job, onApply, onExternalApply, onSave, onTailor, onMatchExplain, matchExplain, matchExplainLoading,
 }: {
   job: Job;
   onApply: (job: Job) => void;
+  onExternalApply: (job: Job) => void;
   onSave: (job: Job) => void;
   onTailor: (job: Job) => void;
   onMatchExplain: (jobId: number) => void;
@@ -478,9 +512,7 @@ function JobCard({
   const isExternal = !!job.externalApplyUrl;
   const isDenarixx = job.source === "denarixx";
 
-  const handleExternalClick = () => {
-    toast({ title: "Opening company career page ↗", description: "This application is tracked externally by the company." });
-  };
+  void toast;
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -560,7 +592,7 @@ function JobCard({
             {isExternal && (
               <div className="mb-3 rounded-lg border border-amber-400/20 bg-amber-400/5 p-2.5 flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-300/80">This listing links to <strong className="text-amber-300">{job.company}</strong>'s external career page. Your application won't be tracked in DENARIXX.</p>
+                <p className="text-[11px] text-amber-300/80">This listing links to <strong className="text-amber-300">{job.company}</strong>'s external career page. DENARIXX will track that you opened this external application. Final submission happens on the company website.</p>
               </div>
             )}
           </motion.div>
@@ -587,15 +619,15 @@ function JobCard({
           </button>
 
           {isExternal ? (
-            <a
-              href={job.externalApplyUrl!}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleExternalClick}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-400/20 hover:bg-amber-500/20 transition-colors"
+            <Button
+              size="sm"
+              type="button"
+              onClick={() => onExternalApply(job)}
+              disabled={job.applied}
+              className={`rounded-xl gap-1.5 h-8 text-xs ${job.applied ? "bg-muted text-muted-foreground cursor-default" : "bg-amber-500/10 text-amber-400 border border-amber-400/20 hover:bg-amber-500/20"}`}
             >
-              <ExternalLink className="w-3 h-3" />Apply Externally
-            </a>
+              {job.applied ? <><CheckCircle className="w-3 h-3" />Tracked</> : <><ExternalLink className="w-3 h-3" />Apply Externally</>}
+            </Button>
           ) : (
             <Button
               size="sm"
@@ -621,23 +653,30 @@ function JobCard({
 
 function JobsContent() {
   const { toast } = useToast();
+  const { getToken } = useAuth();
 
   const urlSearch = useSearch();
   const [tab, setTab] = useState<Tab>(() => {
     const t = new URLSearchParams(urlSearch).get("tab");
-    return (["browse", "applications", "saved"].includes(t ?? "") ? t as Tab : "browse");
+    return (["browse", "applications", "saved", "alerts"].includes(t ?? "") ? t as Tab : "browse");
   });
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [savedJobsList, setSavedJobsList] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [alerts, setAlerts] = useState<JobAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [creatingAlert, setCreatingAlert] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savedLoading, setSavedLoading] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
+  const [userType, setUserType] = useState<string | null>(null);
+  const [importingJobs, setImportingJobs] = useState(false);
 
   const [search, setSearch] = useState("");
   const [filterLevel, setFilterLevel] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterRemote, setFilterRemote] = useState("all");
+  const [filterRegion, setFilterRegion] = useState("all");
 
   const [applyModalJob, setApplyModalJob] = useState<Job | null>(null);
   const [tailorJob, setTailorJob] = useState<Job | null>(null);
@@ -671,24 +710,70 @@ function JobsContent() {
 
   const fetchApplications = useCallback(async () => {
     try {
-      const res = await fetch(`${basePath}/api/jobs/my-applications`, { credentials: "include" });
-      if (!res.ok) return;
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/jobs/my-applications`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        console.error("Failed to load applications:", res.status, await res.text());
+        return;
+      }
       setApplications((await res.json()).applications ?? []);
-    } catch {}
-  }, []);
+    } catch (err) {
+      console.error("Failed to load applications:", err);
+    }
+  }, [getToken]);
 
   const fetchSaved = useCallback(async () => {
     setSavedLoading(true);
     try {
-      const res = await fetch(`${basePath}/api/jobs/saved`, { credentials: "include" });
-      if (!res.ok) return;
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/jobs/saved`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        console.error("Failed to load saved jobs:", res.status, await res.text());
+        return;
+      }
       setSavedJobsList((await res.json()).jobs ?? []);
-    } catch {
+    } catch (err) {
+      console.error("Failed to load saved jobs:", err);
       toast({ title: "Failed to load saved jobs", variant: "destructive" });
     } finally {
       setSavedLoading(false);
     }
-  }, []);
+  }, [getToken, toast]);
+
+  const fetchAlerts = useCallback(async () => {
+    setAlertsLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/jobs/alerts`, {
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        console.error("Failed to load job alerts:", res.status, await res.text());
+        return;
+      }
+
+      setAlerts((await res.json()).alerts ?? []);
+    } catch (err) {
+      console.error("Failed to load job alerts:", err);
+      toast({ title: "Failed to load alerts", variant: "destructive" });
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, [getToken, toast]);
 
   useEffect(() => {
     // Load latest saved CV from server → cache to localStorage → then fetch jobs
@@ -704,25 +789,196 @@ function JobsContent() {
           }
         }
       } catch {}
+      try {
+        const me = await fetch(`${basePath}/api/users/me`, { credentials: "include" });
+        if (me.ok) {
+          const data = await me.json();
+          setUserType(data.userType ?? "candidate");
+        }
+      } catch {}
+
       fetchJobs();
       fetchApplications();
     };
     init();
   }, []);
-  useEffect(() => { if (tab === "saved") fetchSaved(); }, [tab]);
+  useEffect(() => { if (tab === "saved") fetchSaved(); }, [tab, fetchSaved]);
+  useEffect(() => { if (tab === "alerts") fetchAlerts(); }, [tab, fetchAlerts]);
 
   // ── Handlers
 
-  const handleApply = async (job: Job, coverLetter: string) => {
+  const handleImportRealJobs = async () => {
+    setImportingJobs(true);
     try {
+      const sources = ["arbeitnow", "remoteok"];
+      const results = [];
+
+      for (const source of sources) {
+        const res = await fetch(`${basePath}/api/jobs/import/${source}`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Failed to import ${source}`);
+        results.push({ source, ...data });
+      }
+
+      const imported = results.reduce((sum, r) => sum + Number(r.imported ?? 0), 0);
+      const checked = results.reduce((sum, r) => sum + Number(r.checked ?? 0), 0);
+
+      toast({
+        title: "Global jobs imported",
+        description: `Imported ${imported} new jobs from ${sources.length} global sources. Checked ${checked}.`,
+      });
+      fetchJobs();
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setImportingJobs(false);
+    }
+  };
+
+  const handleCreateJobAlert = async () => {
+    const titleQuery = search.trim() || prompt("What job title should we alert you about? Example: AI Engineer");
+    if (!titleQuery) return;
+
+    setCreatingAlert(true);
+    try {
+      const token = await getToken();
+
+      const res = await fetch(`${basePath}/api/jobs/alerts`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          titleQuery,
+          locationQuery: filterRegion !== "all" ? filterRegion : "",
+          remoteType: filterRemote !== "all" ? filterRemote : "",
+          frequency: "daily",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to create alert");
+
+      toast({
+        title: "Job alert created",
+        description: `We'll track new jobs matching "${titleQuery}".`,
+      });
+      fetchAlerts();
+    } catch (err: any) {
+      toast({ title: "Alert failed", description: err.message, variant: "destructive" });
+    } finally {
+      setCreatingAlert(false);
+    }
+  };
+
+  const handleExternalApply = async (job: Job) => {
+    try {
+      const token = await getToken();
+
       const res = await fetch(`${basePath}/api/jobs/${job.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ coverLetter: "External application opened from Denarixx Global Jobs AI." }),
+      });
+
+      if (res.status !== 409 && !res.ok) {
+        const text = await res.text();
+        console.error("External application tracking failed:", res.status, text);
+        throw new Error(text || "Could not track application");
+      }
+
+      setAllJobs(prev => prev.map(j => j.id === job.id ? { ...j, applied: true } : j));
+      setSavedJobsList(prev => prev.map(j => j.id === job.id ? { ...j, applied: true } : j));
+      await fetchApplications();
+
+      toast({
+        title: "External application tracked",
+        description: `Opening ${job.company}'s application page now.`,
+      });
+
+      window.open(job.externalApplyUrl!, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      toast({ title: "Could not track application", description: err.message, variant: "destructive" });
+      window.open(job.externalApplyUrl!, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleToggleAlert = async (alert: JobAlert) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/jobs/alerts/${alert.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ isActive: !alert.isActive }),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, isActive: !a.isActive } : a));
+      toast({ title: alert.isActive ? "Alert paused" : "Alert activated" });
+    } catch (err: any) {
+      toast({ title: "Alert update failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteAlert = async (alertId: number) => {
+    if (!window.confirm("Delete this job alert?")) return;
+
+    try {
+      const token = await getToken();
+      const res = await fetch(`${basePath}/api/jobs/alerts/${alertId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      setAlerts(prev => prev.filter(a => a.id !== alertId));
+      toast({ title: "Alert deleted" });
+    } catch (err: any) {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleApply = async (job: Job, coverLetter: string) => {
+    try {
+      const token = await getToken();
+
+      const res = await fetch(`${basePath}/api/jobs/${job.id}/apply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ coverLetter }),
       });
       if (res.status === 409) { toast({ title: "Already applied" }); return; }
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Application failed:", res.status, text);
+        try {
+          throw new Error(JSON.parse(text).error ?? "Failed");
+        } catch {
+          throw new Error(text || "Failed");
+        }
+      }
       toast({ title: "Application submitted! 🎉", description: `Applied to ${job.title} at ${job.company}.` });
       setAllJobs(prev => prev.map(j => j.id === job.id ? { ...j, applied: true } : j));
       setSavedJobsList(prev => prev.map(j => j.id === job.id ? { ...j, applied: true } : j));
@@ -737,8 +993,21 @@ function JobsContent() {
     if (savingJobId !== null) return;
     setSavingJobId(job.id);
     try {
-      const res = await fetch(`${basePath}/api/jobs/${job.id}/save`, { method: job.saved ? "DELETE" : "POST", credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
+      const token = await getToken();
+
+      const res = await fetch(`${basePath}/api/jobs/${job.id}/save`, {
+        method: job.saved ? "DELETE" : "POST",
+        credentials: "include",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Save job failed:", res.status, text);
+        throw new Error(text || "Failed");
+      }
       const newSaved = !job.saved;
       setAllJobs(prev => prev.map(j => j.id === job.id ? { ...j, saved: newSaved } : j));
       setSavedJobsList(prev => newSaved ? prev : prev.filter(j => j.id !== job.id));
@@ -755,9 +1024,13 @@ function JobsContent() {
     setMatchExplainLoading(jobId);
     try {
       const cvText = (() => { try { return localStorage.getItem("denarixx_last_cv") ?? ""; } catch { return ""; } })();
+      const token = await getToken();
       const res = await fetch(`${basePath}/api/jobs/${jobId}/match-explain`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({ cvText: cvText.slice(0, 1200) }),
       });
@@ -798,7 +1071,18 @@ function JobsContent() {
     const levelOk = filterLevel === "all" || j.level === filterLevel;
     const typeOk = filterType === "all" || j.jobType === filterType;
     const remoteOk = filterRemote === "all" || j.remoteType === filterRemote;
-    return textOk && levelOk && typeOk && remoteOk;
+    const regionText = `${j.country ?? ""} ${j.location ?? ""}`.toLowerCase();
+    const regionOk =
+      filterRegion === "all" ||
+      (filterRegion === "global" && (regionText.includes("global") || regionText.includes("worldwide") || j.remoteType === "remote")) ||
+      (filterRegion === "north-america" && (regionText.includes("usa") || regionText.includes("united states") || regionText.includes("canada") || regionText.includes("north america"))) ||
+      (filterRegion === "europe" && (regionText.includes("europe") || regionText.includes("germany") || regionText.includes("uk") || regionText.includes("united kingdom") || regionText.includes("france") || regionText.includes("netherlands") || regionText.includes("spain"))) ||
+      (filterRegion === "middle-east" && (regionText.includes("middle east") || regionText.includes("uae") || regionText.includes("dubai") || regionText.includes("qatar") || regionText.includes("saudi"))) ||
+      (filterRegion === "asia" && (regionText.includes("asia") || regionText.includes("india") || regionText.includes("singapore") || regionText.includes("japan") || regionText.includes("china"))) ||
+      (filterRegion === "africa" && (regionText.includes("africa") || regionText.includes("ghana") || regionText.includes("nigeria") || regionText.includes("kenya") || regionText.includes("south africa"))) ||
+      (filterRegion === "oceania" && (regionText.includes("australia") || regionText.includes("new zealand") || regionText.includes("oceania"))) ||
+      (filterRegion === "latin-america" && (regionText.includes("latin america") || regionText.includes("brazil") || regionText.includes("mexico") || regionText.includes("argentina")));
+    return textOk && levelOk && typeOk && remoteOk && regionOk;
   });
 
   const topMatches = filtered.filter(j => (j.matchScore ?? 0) >= 60 && !j.applied);
@@ -807,6 +1091,7 @@ function JobsContent() {
     <JobCard
       key={job.id} job={job}
       onApply={j => setApplyModalJob(j)}
+      onExternalApply={handleExternalApply}
       onSave={handleSave}
       onTailor={j => setTailorJob(j)}
       onMatchExplain={handleMatchExplain}
@@ -826,16 +1111,26 @@ function JobsContent() {
           <span className="text-border">|</span>
           <div className="flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-yellow-400" />
-            <span className="font-semibold text-sm">Jobs AI</span>
+            <span className="font-semibold text-sm">Global Jobs AI</span>
           </div>
           <div className="ml-auto flex gap-1">
-            {(["browse", "applications", "saved"] as Tab[]).map(t => (
+            {userType === "admin" && (
+              <button
+                onClick={handleImportRealJobs}
+                disabled={importingJobs}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-green-400/10 text-green-300 hover:bg-green-400/20 disabled:opacity-60"
+              >
+                {importingJobs ? "Importing…" : "Import Global Jobs"}
+              </button>
+            )}
+            {(["browse", "applications", "saved", "alerts"] as Tab[]).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {t === "browse" && "Browse"}
                 {t === "applications" && <>My Applications{applications.length > 0 && <span className="bg-primary/20 text-primary text-[10px] rounded-full px-1.5 py-0.5 leading-none">{applications.length}</span>}</>}
                 {t === "saved" && <>Saved{savedJobsList.length > 0 && <span className="bg-yellow-400/20 text-yellow-400 text-[10px] rounded-full px-1.5 py-0.5 leading-none">{savedJobsList.length}</span>}</>}
+                {t === "alerts" && <>Alerts{alerts.length > 0 && <span className="bg-cyan-400/20 text-cyan-300 text-[10px] rounded-full px-1.5 py-0.5 leading-none">{alerts.length}</span>}</>}
               </button>
             ))}
           </div>
@@ -848,7 +1143,7 @@ function JobsContent() {
         {tab === "browse" && (
           <>
             <div className="mb-6">
-              <h1 className="text-2xl font-bold mb-1">Jobs AI <span className="text-yellow-400">🌍</span></h1>
+              <h1 className="text-2xl font-bold mb-1">Global Jobs AI <span className="text-yellow-400">🌍</span></h1>
               <p className="text-muted-foreground text-sm">
                 {hasProfile
                   ? "Ranked by match score · Green skills = you have them · Orange = missing · Amber = applies externally"
@@ -870,16 +1165,25 @@ function JobsContent() {
               </div>
             )}
 
-            {/* Top matches */}
-            {topMatches.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 mb-3">
-                  <TrendingUp className="w-4 h-4 text-primary" />Top AI Matches for You
-                </h2>
-                <div className="space-y-3">{topMatches.slice(0, 3).map(renderCard)}</div>
-                {filtered.length > 3 && <div className="my-6 border-t border-border" />}
+            <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold">Global Jobs AI</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Search global jobs, save alerts, and apply with your Denarixx profile.
+                </p>
               </div>
-            )}
+
+              <Button
+                type="button"
+                variant="outline"
+                disabled={creatingAlert}
+                onClick={handleCreateJobAlert}
+                className="gap-2 rounded-xl"
+              >
+                {creatingAlert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                Create Job Alert
+              </Button>
+            </div>
 
             {/* Filters */}
             <div className="flex gap-2 mb-4 flex-wrap">
@@ -911,6 +1215,17 @@ function JobsContent() {
               </select>
             </div>
 
+            {/* Top matches */}
+            {topMatches.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-primary" />Top AI Matches for You
+                </h2>
+                <div className="space-y-3">{topMatches.slice(0, 3).map(renderCard)}</div>
+                {filtered.length > 3 && <div className="my-6 border-t border-border" />}
+              </div>
+            )}
+
             {loading ? (
               <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : (
@@ -938,7 +1253,7 @@ function JobsContent() {
               <div className="text-center py-20 text-muted-foreground">
                 <Send className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="mb-2">No applications yet.</p>
-                <button onClick={() => setTab("browse")} className="text-sm text-primary hover:underline">Browse jobs →</button>
+                <button onClick={() => setTab("browse")} className="text-sm text-primary hover:underline">Browse global jobs →</button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -946,8 +1261,8 @@ function JobsContent() {
                   <div key={app.id} className="rounded-xl border border-border bg-card p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold">{app.title}</h3>
-                        <p className="text-sm text-muted-foreground">{app.company} · {app.location}</p>
+                        <h3 className="font-semibold">{decodeHtml(app.title)}</h3>
+                        <p className="text-sm text-muted-foreground">{decodeHtml(app.company)} · {decodeHtml(app.location)}</p>
                         {app.salary && <p className="text-sm text-green-400 mt-1">{app.salary}</p>}
                       </div>
                       <span className="text-[10px] text-muted-foreground flex-shrink-0">{new Date(app.appliedAt).toLocaleDateString()}</span>
@@ -960,7 +1275,7 @@ function JobsContent() {
                         <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-4 bg-muted/30 rounded-lg p-2.5">{app.coverLetter}</p>
                       </details>
                     )}
-                    <StatusPipeline appId={app.id} currentStatus={app.status} onUpdate={handleStatusUpdate} />
+                    <StatusPipeline appId={app.id} currentStatus={app.status} readOnly />
                     <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-4 flex-wrap">
                       <a href={`${basePath}/dena`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors">
                         <Sparkles className="w-3 h-3 text-primary" />Ask DENA for coaching
@@ -970,6 +1285,63 @@ function JobsContent() {
                           <ExternalLink className="w-3 h-3" />View job posting
                         </a>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── ALERTS ── */}
+        {tab === "alerts" && (
+          <>
+            <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold">Job Alerts</h1>
+                <p className="text-sm text-muted-foreground mt-1">Manage saved searches for new global jobs.</p>
+              </div>
+              <Button type="button" onClick={handleCreateJobAlert} disabled={creatingAlert} className="rounded-xl gap-2">
+                {creatingAlert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                New Alert
+              </Button>
+            </div>
+
+            {alertsLoading ? (
+              <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : alerts.length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground">
+                <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="mb-2">No job alerts yet.</p>
+                <button onClick={handleCreateJobAlert} className="text-sm text-primary hover:underline">Create your first alert →</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {alerts.map(alert => (
+                  <div key={alert.id} className="rounded-xl border border-border bg-card p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold">{alert.titleQuery}</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {alert.locationQuery || "Global"} · {alert.remoteType || "Any location"} · {alert.frequency}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Created {new Date(alert.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <span className={`text-xs px-2 py-1 rounded-full border ${alert.isActive ? "border-green-400/20 bg-green-400/10 text-green-400" : "border-muted bg-muted/30 text-muted-foreground"}`}>
+                        {alert.isActive ? "Active" : "Paused"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-border/40 flex items-center gap-3">
+                      <button onClick={() => handleToggleAlert(alert)} className="text-xs text-muted-foreground hover:text-primary">
+                        {alert.isActive ? "Pause" : "Activate"}
+                      </button>
+                      <button onClick={() => handleDeleteAlert(alert.id)} className="text-xs text-red-400/80 hover:text-red-400">
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -988,7 +1360,7 @@ function JobsContent() {
               <div className="text-center py-20 text-muted-foreground">
                 <Bookmark className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="mb-2">No saved jobs yet.</p>
-                <button onClick={() => setTab("browse")} className="text-sm text-primary hover:underline">Browse jobs →</button>
+                <button onClick={() => setTab("browse")} className="text-sm text-primary hover:underline">Browse global jobs →</button>
               </div>
             ) : (
               <div className="space-y-3">{savedJobsList.map(renderCard)}</div>

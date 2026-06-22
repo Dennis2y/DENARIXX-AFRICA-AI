@@ -1,18 +1,31 @@
-# FINAL MVP TEST REPORT
+# Denarixx Africa AI — Final MVP Test Report
 
-Core MVP flow:
-1. Candidate profile
-2. CV generation and saved resume persistence
-3. Jobs AI matching
-4. Job application
-5. Employer applicant review
-6. Employer status update
-7. Employer-to-applicant messaging
+Status: Beta-ready
 
-Status: MVP build-ready locally after environment setup.
+## Passed
+- Messaging
+- Unread badges
+- Reactions
+- Delete for me/everyone
+- Clear chat
+- Voice notes
+- Image/file attachments
+- Audio calls
+- Video calls
+- Incoming call popup
+- Decline/end call
+- Job applications
+- Employer dashboard
+- Hired status
+- Candidate read-only pipeline
+- DENA AI
+- CV Builder
+- Interview Coach
+- Canvas/Memory
 
-Remaining production needs:
-- Clerk keys
-- PostgreSQL database
-- OpenAI key
-- Deployment environment variables
+## Remaining Before Public Launch
+- RESEND_API_KEY for real emails
+- Production file storage
+- HTTPS deployment
+- Security review
+- Final mobile/responsive check

@@ -436,7 +436,7 @@ router.post("/:partnerId/call", requireAuth, async (req, res) => {
     }).returning();
 
     notifyUser(me.id, { type: "call", partnerId, messageId: msg.id });
-    notifyUser(partnerId, { type: "call", partnerId: me.id, messageId: msg.id });
+    notifyUser(partnerId, { type: "call", partnerId: me.id, messageId: msg.id, incoming: true, mode });
 
     res.status(201).json({ message: msg });
   } catch (err) {
@@ -712,7 +712,7 @@ router.post("/:partnerId", requireAuth, async (req, res) => {
     }).returning();
 
     notifyUser(me.id, { type: "message", partnerId });
-    notifyUser(partnerId, { type: "message", partnerId: me.id });
+    notifyUser(partnerId, { type: "message", partnerId: me.id, incoming: true });
     res.status(201).json({ message: msg });
   } catch (err) {
     req.log.error({ err }, "Failed to send message");

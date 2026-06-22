@@ -32,11 +32,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@clerk/react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type ModerationStatus = "pending" | "approved" | "rejected";
-type ApplicationStatus = "applied" | "reviewing" | "interview" | "offered" | "rejected";
+type ApplicationStatus = "applied" | "reviewing" | "interview" | "offered" | "hired" | "rejected";
 
 interface MyJob {
   id: number;
@@ -103,6 +104,7 @@ const APP_STATUS_CONFIG: Record<ApplicationStatus, { label: string; classes: str
   reviewing:  { label: "Reviewing",  classes: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
   interview:  { label: "Interview",  classes: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
   offered:    { label: "Offered",    classes: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+  hired:      { label: "Hired",      classes: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" },
   rejected:   { label: "Rejected",   classes: "bg-red-500/15 text-red-300 border-red-500/30" },
 };
 
@@ -149,20 +151,33 @@ function ApplicantRow({
   const [expanded, setExpanded] = useState(false);
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
+  const { getToken } = useAuth();
 
-  const STATUS_OPTIONS: ApplicationStatus[] = ["applied", "reviewing", "interview", "offered", "rejected"];
+  const STATUS_OPTIONS: ApplicationStatus[] = ["applied", "reviewing", "interview", "offered", "hired", "rejected"];
 
   async function handleStatusChange(newStatus: ApplicationStatus) {
     if (newStatus === applicant.status) return;
     setUpdating(true);
     try {
+      const token = await getToken();
       const res = await fetch(`${BASE}/api/jobs/applications/${applicant.id}/status`, {
         method: "PATCH",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to update");
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Employer status update failed:", res.status, text);
+        try {
+          throw new Error(JSON.parse(text).error ?? "Failed to update");
+        } catch {
+          throw new Error(text || "Failed to update");
+        }
+      }
       onStatusChange(applicant.id, newStatus);
       toast({ title: "Status updated", description: `${applicant.candidateName ?? "Candidate"} marked as ${APP_STATUS_CONFIG[newStatus].label}` });
     } catch (e: any) {
