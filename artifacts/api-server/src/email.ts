@@ -30,6 +30,10 @@ async function writeEmailLog(entry: {
   }
 }
 
+function getEmailFrom(): string {
+  return process.env.EMAIL_FROM || "DENARIXX AFRICA AI <onboarding@resend.dev>";
+}
+
 function getAppDomain(): string {
   const domains = process.env.REPLIT_DOMAINS;
   if (domains) return `https://${domains.split(",")[0].trim()}`;
@@ -432,7 +436,7 @@ export async function sendApplicationStatusEmail(params: {
 
   try {
     const result = await client.emails.send({
-      from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+      from: getEmailFrom(),
       to: [params.email],
       subject,
       html,
@@ -604,7 +608,7 @@ export async function sendJobMatchEmail(params: {
 
   try {
     const result = await client.emails.send({
-      from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+      from: getEmailFrom(),
       to: [params.email],
       subject,
       html,
@@ -638,7 +642,7 @@ export async function sendWelcomeEmail(params: {
 
   try {
     const result = await client.emails.send({
-      from: "DENARIXX AFRICA AI <onboarding@resend.dev>",
+      from: getEmailFrom(),
       to: [params.email],
       subject,
       html,
