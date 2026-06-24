@@ -36,3 +36,4 @@ build/
 
 # Logs
 pnpm-debug.log*
+\!.env.example
