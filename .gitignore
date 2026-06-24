@@ -13,6 +13,7 @@ artifacts/api-server/uploads/
 
 # Logs
 *.log
+pnpm-debug.log*
 
 # Mac
 .DS_Store
@@ -33,7 +34,3 @@ build/
 
 # Local workspace
 .local/
-
-# Logs
-pnpm-debug.log*
-\!.env.example
