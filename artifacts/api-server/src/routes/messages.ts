@@ -6,6 +6,7 @@ import { db, usersTable } from "@workspace/db";
 import { directMessages, userBlocks } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { eq, and, or, desc, inArray } from "drizzle-orm";
+import { jobApplications, jobs } from "@workspace/db/schema";
 
 const router: IRouter = Router();
 
@@ -680,6 +681,93 @@ router.get("/:partnerId", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to load messages" });
   }
 });
+
+
+// POST /api/messages/application/:jobApplicationId — employer/candidate message linked to application
+router.post("/application/:jobApplicationId", requireAuth, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const jobApplicationId = parseInt(req.params.jobApplicationId as string, 10);
+    const { content } = req.body as { content?: string };
+
+    if (isNaN(jobApplicationId)) {
+      res.status(400).json({ error: "Invalid jobApplicationId" });
+      return;
+    }
+
+    if (!content || typeof content !== "string" || content.trim().length === 0 || content.length > 2000) {
+      res.status(400).json({ error: "Message content required (1-2000 chars)" });
+      return;
+    }
+
+    const me = await getDbUser(clerkUserId);
+    if (!me) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const [application] = await db
+      .select({
+        id: jobApplications.id,
+        applicantUserId: jobApplications.userId,
+        jobId: jobApplications.jobId,
+        employerUserId: jobs.postedByUserId,
+        jobTitle: jobs.title,
+      })
+      .from(jobApplications)
+      .innerJoin(jobs, eq(jobApplications.jobId, jobs.id))
+      .where(eq(jobApplications.id, jobApplicationId))
+      .limit(1);
+
+    if (!application) {
+      res.status(404).json({ error: "Application not found" });
+      return;
+    }
+
+    const isApplicant = me.id === application.applicantUserId;
+    const isEmployer = me.id === application.employerUserId;
+
+    if (!isApplicant && !isEmployer) {
+      res.status(403).json({ error: "You are not allowed to message on this application" });
+      return;
+    }
+
+    const partnerId = isEmployer ? application.applicantUserId : application.employerUserId;
+
+    if (!partnerId || partnerId === me.id) {
+      res.status(400).json({ error: "Invalid conversation partner" });
+      return;
+    }
+
+    const blockStatus = await getBlockStatus(me.id, partnerId);
+    if (blockStatus.blockedByMe || blockStatus.blockedMe) {
+      res.status(403).json({ error: "Messaging is blocked for this conversation" });
+      return;
+    }
+
+    const [msg] = await db.insert(directMessages).values({
+      fromUserId: me.id,
+      toUserId: partnerId,
+      content: content.trim(),
+      jobApplicationId,
+      metadata: {
+        context: "job_application",
+        jobId: application.jobId,
+        jobTitle: application.jobTitle,
+      },
+    }).returning();
+
+    notifyUser(me.id, { type: "message", partnerId, jobApplicationId });
+    notifyUser(partnerId, { type: "message", partnerId: me.id, jobApplicationId, incoming: true });
+
+    res.status(201).json({ message: msg, partnerId });
+  } catch (err) {
+    req.log.error({ err }, "Failed to send application message");
+    res.status(500).json({ error: "Failed to send application message" });
+  }
+});
+
+
 
 // POST /api/messages/:partnerId — send a message
 router.post("/:partnerId", requireAuth, async (req, res) => {
